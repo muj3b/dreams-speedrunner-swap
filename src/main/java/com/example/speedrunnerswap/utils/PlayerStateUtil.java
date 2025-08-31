@@ -1,6 +1,6 @@
 package com.example.speedrunnerswap.utils;
 
-import com.example.speedrunnerswap.game.PlayerState;
+import com.example.speedrunnerswap.models.PlayerState;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.potion.PotionEffect;
@@ -18,7 +18,7 @@ public class PlayerStateUtil {
      * @param player The player to capture state from
      * @return The captured player state
      */
-    public static PlayerState capturePlayerState(Player player) {
+    public static com.example.speedrunnerswap.models.PlayerState capturePlayerState(Player player) {
         return new PlayerState(
                 player.getInventory().getContents().clone(),
                 player.getInventory().getArmorContents().clone(),
@@ -48,7 +48,7 @@ public class PlayerStateUtil {
      * @param player The player to apply state to
      * @param state The state to apply
      */
-    public static void applyPlayerState(Player player, PlayerState state) {
+    public static void applyPlayerState(Player player, com.example.speedrunnerswap.models.PlayerState state) {
         // Clear inventory and apply saved inventory
         player.getInventory().clear();
         player.getInventory().setContents(state.getInventory());

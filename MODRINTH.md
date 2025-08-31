@@ -52,7 +52,7 @@ The plugin is highly configurable through `config.yml`:
 ## Requirements
 
 - Java 17 or higher
-- Paper/Spigot 1.20.6
+- Paper/Spigot 1.21.8
 
 ## Links
 

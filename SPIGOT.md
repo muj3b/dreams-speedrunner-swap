@@ -60,7 +60,7 @@ This plugin provides a complete, ready-to-use implementation with intuitive GUIs
 ## Requirements
 
 - Java 17 or higher
-- Paper/Spigot 1.20.6
+- Paper/Spigot 1.21.8
 
 ## Support
 

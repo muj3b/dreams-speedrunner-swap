@@ -1,16 +1,16 @@
-package com.example.speedrunnerswap.game;
+package com.example.speedrunnerswap.models;
 
 import org.bukkit.GameMode;
 import org.bukkit.Location;
 import org.bukkit.inventory.ItemStack;
-import org.bukkit.potion.PotionEffect;
 
+
+
+import org.bukkit.potion.PotionEffect;
 import java.util.Collection;
 
-/**
- * Class to store a player's state for syncing between runners
- */
 public class PlayerState {
+
     private final ItemStack[] inventory;
     private final ItemStack[] armor;
     private final ItemStack offhand;
@@ -30,14 +30,57 @@ public class PlayerState {
     private final boolean allowFlight;
     private final boolean flying;
     private final Collection<PotionEffect> activePotionEffects;
-    private final float absorptionAmount;
+    private final double absorptionAmount;
+    private Team selectedTeam;
 
-    public PlayerState(ItemStack[] inventory, ItemStack[] armor, ItemStack offhand, Location location, 
-                      double health, int foodLevel, float saturation, float exhaustion, 
-                      int totalExperience, float exp, int level, int fireTicks, 
+    public int getFireTicks() {
+        return fireTicks;
+    }
+
+    public int getRemainingAir() {
+        return remainingAir;
+    }
+
+    public int getMaximumAir() {
+        return maximumAir;
+    }
+
+    public GameMode getGameMode() {
+        return gameMode;
+    }
+
+    public float getFallDistance() {
+        return fallDistance;
+    }
+
+    public boolean isAllowFlight() {
+        return allowFlight;
+    }
+
+    public boolean isFlying() {
+        return flying;
+    }
+
+    public Collection<PotionEffect> getActivePotionEffects() {
+        return activePotionEffects;
+    }
+
+    public double getAbsorptionAmount() {
+        return absorptionAmount;
+    }
+
+    public enum Team {
+        RUNNER,
+        HUNTER,
+        NONE;
+    }
+
+    public PlayerState(ItemStack[] inventory, ItemStack[] armor, ItemStack offhand, Location location,
+                      double health, int foodLevel, float saturation, float exhaustion,
+                      int totalExperience, float exp, int level, int fireTicks,
                       int remainingAir, int maximumAir, GameMode gameMode, float fallDistance,
                       boolean allowFlight, boolean flying, Collection<PotionEffect> activePotionEffects,
-                      float absorptionAmount) {
+                      double absorptionAmount) {
         this.inventory = inventory;
         this.armor = armor;
         this.offhand = offhand;
@@ -58,7 +101,12 @@ public class PlayerState {
         this.flying = flying;
         this.activePotionEffects = activePotionEffects;
         this.absorptionAmount = absorptionAmount;
+        this.selectedTeam = Team.NONE; // Default to NONE if not provided
     }
+
+
+
+
 
     public ItemStack[] getInventory() {
         return inventory;
@@ -104,39 +152,13 @@ public class PlayerState {
         return level;
     }
 
-    public int getFireTicks() {
-        return fireTicks;
+
+
+    public Team getSelectedTeam() {
+        return selectedTeam;
     }
 
-    public int getRemainingAir() {
-        return remainingAir;
-    }
-
-    public int getMaximumAir() {
-        return maximumAir;
-    }
-
-    public GameMode getGameMode() {
-        return gameMode;
-    }
-
-    public float getFallDistance() {
-        return fallDistance;
-    }
-
-    public boolean isAllowFlight() {
-        return allowFlight;
-    }
-
-    public boolean isFlying() {
-        return flying;
-    }
-
-    public Collection<PotionEffect> getActivePotionEffects() {
-        return activePotionEffects;
-    }
-
-    public float getAbsorptionAmount() {
-        return absorptionAmount;
+    public void setSelectedTeam(Team selectedTeam) {
+        this.selectedTeam = selectedTeam;
     }
 }

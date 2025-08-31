@@ -197,15 +197,126 @@ public class ConfigManager {
     public boolean isPauseOnDisconnect() {
         return config.getBoolean("swap.pause_on_disconnect", true);
     }
-    
+
     /**
-     * Get whether safe swaps are enabled
-     * @return True if safe swaps are enabled
+     * Get the spawn location for players after the game ends.
+     * @return The spawn location.
      */
+    public org.bukkit.Location getSpawnLocation() {
+        double x = config.getDouble("spawn.x", 0);
+        double y = config.getDouble("spawn.y", 0);
+        double z = config.getDouble("spawn.z", 0);
+        String worldName = config.getString("spawn.world", "world");
+        org.bukkit.World world = plugin.getServer().getWorld(worldName);
+        if (world == null) {
+            world = plugin.getServer().getWorlds().get(0); // Fallback to default world
+            plugin.getLogger().warning("Spawn world '" + worldName + "' not found. Using default world: " + world.getName());
+        }
+        return new org.bukkit.Location(world, x, y, z);
+    }
+
+    /**
+     * Get whether the swap should be randomized.
+     * @return True if the swap should be randomized.
+     */
+    public boolean isSwapRandomized() {
+        return config.getBoolean("swap.randomized", false);
+    }
+
+    public void setRandomizeSwap(boolean randomizeSwap) {
+        config.set("swap.randomize", randomizeSwap);
+        plugin.saveConfig();
+    }
+
+    public void setSwapInterval(int interval) {
+        config.set("swap.interval", interval);
+        plugin.saveConfig();
+    }
+
+
+
+    public void setSafeSwapEnabled(boolean safeSwapEnabled) {
+        config.set("safe_swap.enabled", safeSwapEnabled);
+        plugin.saveConfig();
+    }
+
+
+
+    public void setBroadcastsEnabled(boolean broadcastsEnabled) {
+        config.set("broadcasts.enabled", broadcastsEnabled);
+        plugin.saveConfig();
+    }
+
+    public boolean isVoiceChatIntegrationEnabled() {
+        return config.getBoolean("voice_chat.enabled", false);
+    }
+
+    public void setVoiceChatIntegrationEnabled(boolean enabled) {
+        config.set("voice_chat.enabled", enabled);
+        plugin.saveConfig();
+    }
+
+    public String getFreezeMode() {
+        return config.getString("freeze.mode", "SPECTATOR");
+    }
+
+    public void setFreezeMode(String mode) {
+        config.set("freeze.mode", mode);
+        plugin.saveConfig();
+    }
+
+    public boolean isTrackerEnabled() {
+        return config.getBoolean("tracker.enabled", true);
+    }
+
+    public void setTrackerEnabled(boolean enabled) {
+        config.set("tracker.enabled", enabled);
+        plugin.saveConfig();
+    }
+
+    public int getTrackerUpdateTicks() {
+        return config.getInt("tracker.update_ticks", 20);
+    }
+
+    public boolean isParticleTrailEnabled() {
+        return config.getBoolean("particle_trail.enabled", true);
+    }
+
+    public int getParticleSpawnInterval() {
+        return config.getInt("particle_trail.spawn_interval", 5);
+    }
+
+    public String getParticleTrailType() {
+        return config.getString("particle_trail.type", "DUST");
+    }
+
+    public int[] getParticleTrailColor() {
+        List<Integer> rgb = config.getIntegerList("particle_trail.color");
+        return new int[]{
+            rgb.size() > 0 ? rgb.get(0) : 255,
+            rgb.size() > 1 ? rgb.get(1) : 0,
+            rgb.size() > 2 ? rgb.get(2) : 0
+        };
+    }
+
     public boolean isSafeSwapEnabled() {
         return config.getBoolean("safe_swap.enabled", true);
     }
-    
+
+    public String getGuiMainMenuTitle() {
+        return config.getString("gui.main_menu.title", "§6SpeedrunnerSwap - Main Menu");
+    }
+
+    public String getGuiTeamSelectorTitle() {
+        return config.getString("gui.team_selector.title", "§6SpeedrunnerSwap - Team Selector");
+    }
+
+    public String getGuiSettingsTitle() {
+        return config.getString("gui.settings.title", "§6SpeedrunnerSwap - Settings");
+    }
+
+
+
     /**
      * Get the horizontal scan radius for safe swaps
      * @return The horizontal scan radius
@@ -231,14 +342,6 @@ public class ConfigManager {
     }
     
     /**
-     * Get the freeze mode for inactive runners
-     * @return The freeze mode (EFFECTS or SPECTATOR)
-     */
-    public String getFreezeMode() {
-        return config.getString("freeze_mode", "EFFECTS");
-    }
-    
-    /**
      * Get whether to cancel movement for inactive runners
      * @return True if movement should be canceled
      */
@@ -254,115 +357,63 @@ public class ConfigManager {
         return config.getBoolean("cancel.interactions", true);
     }
     
-    /**
-     * Get whether the tracker is enabled
-     * @return True if the tracker is enabled
-     */
-    public boolean isTrackerEnabled() {
-        return config.getBoolean("tracker.enabled", true);
+    public int getGuiMainMenuRows() {
+        return config.getInt("gui.main_menu_rows", 3);
     }
     
-    /**
-     * Get how often to update the compass in ticks
-     * @return The compass update interval in ticks
-     */
-    public int getTrackerUpdateTicks() {
-        return config.getInt("tracker.update_ticks", 10);
+    public int getGuiTeamSelectorRows() {
+        return config.getInt("gui.team_selector_rows", 4);
     }
-    
-    /**
-     * Get whether to show coordinates in the action bar for hunters
-     * @return True if coordinates should be shown
-     */
-    public boolean isShowCoordinates() {
-        return config.getBoolean("tracker.show_coordinates", true);
+
+    public int getGuiSettingsRows() {
+        return config.getInt("gui.settings_rows", 5);
     }
-    
-    /**
-     * Get the title for the main menu GUI
-     * @return The main menu title
-     */
-    public String getMainMenuTitle() {
-        return config.getString("gui.main_menu.title", "SpeedrunnerSwap Menu");
-    }
-    
-    /**
-     * Get the number of rows for the main menu GUI
-     * @return The number of rows
-     */
-    public int getMainMenuRows() {
-        return config.getInt("gui.main_menu.rows", 3);
-    }
-    
-    /**
-     * Get the title for the team selector GUI
-     * @return The team selector title
-     */
-    public String getTeamSelectorTitle() {
-        return config.getString("gui.team_selector.title", "Team Selector");
-    }
-    
-    /**
-     * Get the number of rows for the team selector GUI
-     * @return The number of rows
-     */
-    public int getTeamSelectorRows() {
-        return config.getInt("gui.team_selector.rows", 4);
-    }
-    
-    /**
-     * Get the title for the settings GUI
-     * @return The settings title
-     */
-    public String getSettingsTitle() {
-        return config.getString("gui.settings.title", "Settings");
-    }
-    
-    /**
-     * Get the number of rows for the settings GUI
-     * @return The number of rows
-     */
-    public int getSettingsRows() {
-        return config.getInt("gui.settings.rows", 5);
-    }
-    
-    /**
-     * Get whether broadcasts are enabled
-     * @return True if broadcasts are enabled
-     */
-    public boolean isBroadcastsEnabled() {
-        return config.getBoolean("broadcasts.enabled", true);
-    }
-    
-    /**
-     * Get whether to broadcast game events
-     * @return True if game events should be broadcast
-     */
+
     public boolean isBroadcastGameEvents() {
         return config.getBoolean("broadcasts.game_events", true);
     }
-    
-    /**
-     * Get whether to broadcast team changes
-     * @return True if team changes should be broadcast
-     */
+
+    public boolean isBroadcastsEnabled() {
+        return config.getBoolean("broadcasts.enabled", true);
+    }
+
     public boolean isBroadcastTeamChanges() {
         return config.getBoolean("broadcasts.team_changes", true);
     }
-    
-    /**
-     * Get whether voice chat integration is enabled
-     * @return True if voice chat integration is enabled
-     */
-    public boolean isVoiceChatEnabled() {
-        return config.getBoolean("voice_chat.enabled", true);
-    }
-    
-    /**
-     * Get whether to mute inactive runners
-     * @return True if inactive runners should be muted
-     */
+
     public boolean isMuteInactiveRunners() {
         return config.getBoolean("voice_chat.mute_inactive_runners", true);
+    }
+
+    /**
+     * Get whether the freeze mechanic is enabled
+     * @return True if enabled
+     */
+    public boolean isFreezeMechanicEnabled() {
+        return config.getBoolean("freeze_mechanic.enabled", true);
+    }
+
+    /**
+     * Get the freeze duration in ticks
+     * @return The duration in ticks
+     */
+    public int getFreezeDurationTicks() {
+        return config.getInt("freeze_mechanic.duration_ticks", 100);
+    }
+
+    /**
+     * Get the interval to check for freezing in ticks
+     * @return The check interval in ticks
+     */
+    public int getFreezeCheckIntervalTicks() {
+        return config.getInt("freeze_mechanic.check_interval_ticks", 10);
+    }
+
+    /**
+     * Get the maximum distance for freezing
+     * @return The max distance
+     */
+    public double getFreezeMaxDistance() {
+        return config.getDouble("freeze_mechanic.max_distance", 50.0);
     }
 }

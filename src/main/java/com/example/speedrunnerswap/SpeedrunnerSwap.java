@@ -4,12 +4,8 @@ import com.example.speedrunnerswap.commands.SwapCommand;
 import com.example.speedrunnerswap.config.ConfigManager;
 import com.example.speedrunnerswap.game.GameManager;
 import com.example.speedrunnerswap.gui.GuiManager;
-import com.example.speedrunnerswap.listeners.ChatListener;
-import com.example.speedrunnerswap.listeners.ConnectionListener;
-import com.example.speedrunnerswap.listeners.InteractionListener;
-import com.example.speedrunnerswap.listeners.MovementListener;
+import com.example.speedrunnerswap.listeners.EventListeners;
 import com.example.speedrunnerswap.tracking.TrackerManager;
-import com.example.speedrunnerswap.voice.VoiceChatIntegration;
 import org.bukkit.Bukkit;
 import org.bukkit.plugin.java.JavaPlugin;
 
@@ -20,7 +16,6 @@ public final class SpeedrunnerSwap extends JavaPlugin {
     private GameManager gameManager;
     private GuiManager guiManager;
     private TrackerManager trackerManager;
-    private VoiceChatIntegration voiceChatIntegration;
     
     @Override
     public void onEnable() {
@@ -31,17 +26,12 @@ public final class SpeedrunnerSwap extends JavaPlugin {
         this.gameManager = new GameManager(this);
         this.guiManager = new GuiManager(this);
         this.trackerManager = new TrackerManager(this);
-        this.voiceChatIntegration = new VoiceChatIntegration(this);
         
         // Register commands
         getCommand("swap").setExecutor(new SwapCommand(this));
         
         // Register event listeners
-        Bukkit.getPluginManager().registerEvents(new ChatListener(this), this);
-        Bukkit.getPluginManager().registerEvents(new ConnectionListener(this), this);
-        Bukkit.getPluginManager().registerEvents(new InteractionListener(this), this);
-        Bukkit.getPluginManager().registerEvents(new MovementListener(this), this);
-        Bukkit.getPluginManager().registerEvents(guiManager, this);
+        getServer().getPluginManager().registerEvents(new EventListeners(this), this);
         
         // Log startup
         getLogger().info("SpeedrunnerSwap v" + getDescription().getVersion() + " has been enabled!");
@@ -99,13 +89,5 @@ public final class SpeedrunnerSwap extends JavaPlugin {
      */
     public TrackerManager getTrackerManager() {
         return trackerManager;
-    }
-    
-    /**
-     * Get the voice chat integration
-     * @return The voice chat integration
-     */
-    public VoiceChatIntegration getVoiceChatIntegration() {
-        return voiceChatIntegration;
     }
 }
