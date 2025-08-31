@@ -292,6 +292,57 @@ public class GuiManager {
                 "§e§lSafe Swap: " + (safeSwap ? "§aEnabled" : "§cDisabled"),
                 safeSwapLore);
         inventory.setItem(12, safeSwapToggle);
+
+        // Timer Visibility Section
+        List<String> timerHeaderLore = new ArrayList<>();
+        timerHeaderLore.add("§7Configure timer visibility:");
+        timerHeaderLore.add("§7• Active runner settings");
+        timerHeaderLore.add("§7• Waiting runner settings");
+        timerHeaderLore.add("§7• Hunter settings");
+        ItemStack timerHeader = createItem(Material.BOOK, "§6§lTimer Settings", timerHeaderLore);
+        inventory.setItem(18, timerHeader);
+
+        // Active Runner Timer Settings
+        String runnerVisibility = plugin.getConfigManager().getRunnerTimerVisibility();
+        List<String> runnerTimerLore = new ArrayList<>();
+        runnerTimerLore.add("§7Current: " + getVisibilityDisplay(runnerVisibility));
+        runnerTimerLore.add("");
+        runnerTimerLore.add("§7Options:");
+        runnerTimerLore.add("§7• Always show timer");
+        runnerTimerLore.add("§7• Show last 10 seconds");
+        runnerTimerLore.add("§7• Never show timer");
+        runnerTimerLore.add("");
+        runnerTimerLore.add("§7Click to change");
+        ItemStack runnerTimer = createItem(Material.CLOCK, "§e§lActive Runner Timer", runnerTimerLore);
+        inventory.setItem(19, runnerTimer);
+
+        // Waiting Runner Timer Settings
+        String waitingVisibility = plugin.getConfigManager().getWaitingTimerVisibility();
+        List<String> waitingTimerLore = new ArrayList<>();
+        waitingTimerLore.add("§7Current: " + getVisibilityDisplay(waitingVisibility));
+        waitingTimerLore.add("");
+        waitingTimerLore.add("§7Options:");
+        waitingTimerLore.add("§7• Always show timer");
+        waitingTimerLore.add("§7• Show last 10 seconds");
+        waitingTimerLore.add("§7• Never show timer");
+        waitingTimerLore.add("");
+        waitingTimerLore.add("§7Click to change");
+        ItemStack waitingTimer = createItem(Material.CLOCK, "§e§lWaiting Runner Timer", waitingTimerLore);
+        inventory.setItem(20, waitingTimer);
+
+        // Hunter Timer Settings
+        String hunterVisibility = plugin.getConfigManager().getHunterTimerVisibility();
+        List<String> hunterTimerLore = new ArrayList<>();
+        hunterTimerLore.add("§7Current: " + getVisibilityDisplay(hunterVisibility));
+        hunterTimerLore.add("");
+        hunterTimerLore.add("§7Options:");
+        hunterTimerLore.add("§7• Always show timer");
+        hunterTimerLore.add("§7• Show last 10 seconds");
+        hunterTimerLore.add("§7• Never show timer");
+        hunterTimerLore.add("");
+        hunterTimerLore.add("§7Click to change");
+        ItemStack hunterTimer = createItem(Material.CLOCK, "§e§lHunter Timer", hunterTimerLore);
+        inventory.setItem(21, hunterTimer);
         
         player.openInventory(inventory);
     }
@@ -460,6 +511,47 @@ public class GuiManager {
     public boolean isSafeSwapButton(ItemStack item) {
         return item != null && (item.getType() == Material.TOTEM_OF_UNDYING || item.getType() == Material.BARRIER) && 
                item.getItemMeta().getDisplayName().startsWith("§e§lSafe Swap");
+    }
+
+    public boolean isActiveRunnerTimerButton(ItemStack item) {
+        return item != null && item.getType() == Material.CLOCK &&
+               item.getItemMeta().getDisplayName().equals("§e§lActive Runner Timer");
+    }
+
+    public boolean isWaitingRunnerTimerButton(ItemStack item) {
+        return item != null && item.getType() == Material.CLOCK &&
+               item.getItemMeta().getDisplayName().equals("§e§lWaiting Runner Timer");
+    }
+
+    public boolean isHunterTimerButton(ItemStack item) {
+        return item != null && item.getType() == Material.CLOCK &&
+               item.getItemMeta().getDisplayName().equals("§e§lHunter Timer");
+    }
+
+    private String getVisibilityDisplay(String visibility) {
+        switch (visibility) {
+            case "always":
+                return "§aAlways Show";
+            case "last_10":
+                return "§eLast 10 Seconds";
+            case "never":
+                return "§cNever Show";
+            default:
+                return "§7Unknown";
+        }
+    }
+
+    private String getNextVisibility(String current) {
+        switch (current) {
+            case "always":
+                return "last_10";
+            case "last_10":
+                return "never";
+            case "never":
+                return "always";
+            default:
+                return "last_10";
+        }
     }
     
     // Helper methods for team management

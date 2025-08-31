@@ -4,6 +4,7 @@ import com.example.speedrunnerswap.commands.SwapCommand;
 import com.example.speedrunnerswap.config.ConfigManager;
 import com.example.speedrunnerswap.game.GameManager;
 import com.example.speedrunnerswap.gui.GuiManager;
+import com.example.speedrunnerswap.listeners.DragonDefeatListener;
 import com.example.speedrunnerswap.listeners.EventListeners;
 import com.example.speedrunnerswap.tracking.TrackerManager;
 import org.bukkit.Bukkit;
@@ -32,6 +33,7 @@ public final class SpeedrunnerSwap extends JavaPlugin {
         
         // Register event listeners
         getServer().getPluginManager().registerEvents(new EventListeners(this), this);
+        getServer().getPluginManager().registerEvents(new DragonDefeatListener(this), this);
         
         // Log startup
         getLogger().info("SpeedrunnerSwap v" + getDescription().getVersion() + " has been enabled!");

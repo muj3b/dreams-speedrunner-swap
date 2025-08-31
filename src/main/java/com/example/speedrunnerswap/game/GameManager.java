@@ -1,18 +1,17 @@
 package com.example.speedrunnerswap.game;
 
 import com.example.speedrunnerswap.SpeedrunnerSwap;
-import com.example.speedrunnerswap.utils.ActionBarUtil;
+import com.example.speedrunnerswap.models.PlayerState;
 import com.example.speedrunnerswap.utils.PlayerStateUtil;
 import com.example.speedrunnerswap.utils.SafeLocationFinder;
-import com.example.speedrunnerswap.models.PlayerState;
-import org.bukkit.Bukkit;
-import org.bukkit.GameMode;
-import org.bukkit.Location;
+import net.md_5.bungee.api.ChatMessageType;
+import net.md_5.bungee.api.chat.TextComponent;
+import org.bukkit.*;
+import org.bukkit.entity.Entity;
 import org.bukkit.entity.Player;
 import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
 import org.bukkit.scheduler.BukkitTask;
-import org.bukkit.entity.Entity;
 
 import java.util.*;
 import java.util.concurrent.ThreadLocalRandom;
@@ -405,63 +404,53 @@ public class GameManager {
         if (actionBarTask != null) {
             actionBarTask.cancel();
         }
-        
+    
         actionBarTask = Bukkit.getScheduler().runTaskTimer(plugin, () -> {
             if (!gameRunning) {
                 return;
             }
-            
-            // Update action bar only for participants
-            List<Player> participants = new ArrayList<>();
-            participants.addAll(runners);
-            participants.addAll(hunters);
-            for (Player player : participants) {
-                if (player.isOnline()) {
-                    updateActionBar(player);
-                }
-            }
-        }, 0L, 20L); // Update every 20 ticks (1 second) for better performance
+            updateActionBar();
+        }, 0L, 20L); // Update every second
     }
     
     /**
      * Update the action bar for a player
      * @param player The player to update
      */
-    private void updateActionBar(Player player) {
-        if (!gameRunning) {
+    private void updateActionBar() {
+        if (!gameRunning || gamePaused) {
             return;
         }
-        
-        // Calculate time until next swap
-        long timeUntilSwap = nextSwapTime - System.currentTimeMillis();
-        int secondsUntilSwap = Math.max(0, (int) (timeUntilSwap / 1000));
-        
-        String message;
-        
-        if (gamePaused) {
-            message = "§e§lGAME PAUSED";
-        } else if (player.equals(activeRunner)) {
-            // Active runner sees time and status
-            String status = "";
-            if (player.isSneaking()) {
-                status = " §7[Sneaking]";
-            } else if (player.isSprinting()) {
-                status = " §b[Sprinting]";
-            }
+    
+        int timeLeft = getTimeUntilNextSwap();
+        String timeMessage = String.format("§eTime until next swap: §c%ds", timeLeft);
+    
+        // Send action bar message to all online players based on their role
+        for (Player player : Bukkit.getOnlinePlayers()) {
+            String visibility;
             
-            message = "§a§lACTIVE §f| §eNext swap: §f" + secondsUntilSwap + "s" + status;
-        } else if (runners.contains(player)) {
-            // Inactive runner sees time only
-            message = "§c§lINACTIVE §f| §eNext swap: §f" + secondsUntilSwap + "s";
-        } else if (hunters.contains(player) && activeRunner != null) {
-            // Hunter sees only the target player's name (coordinates hidden)
-            message = "§6§lHUNTER §f| §eTarget: §f" + activeRunner.getName();
-        } else {
-            // Spectator sees basic info
-            message = "§7§lSPECTATOR §f| §eActive: §f" + (activeRunner != null ? activeRunner.getName() : "None");
+            if (player.equals(activeRunner)) {
+                visibility = plugin.getConfigManager().getRunnerTimerVisibility();
+            } else if (runners.contains(player)) {
+                visibility = plugin.getConfigManager().getWaitingTimerVisibility();
+            } else {
+                visibility = plugin.getConfigManager().getHunterTimerVisibility();
+            }
+    
+            // Determine if we should show the timer based on visibility setting
+            boolean showTimer = switch (visibility) {
+                case "always" -> true;
+                case "last_10" -> timeLeft <= 10;
+                case "never" -> false;
+                default -> false;
+            };
+    
+            if (showTimer) {
+                player.spigot().sendMessage(ChatMessageType.ACTION_BAR, TextComponent.fromLegacyText(timeMessage));
+            } else {
+                player.spigot().sendMessage(ChatMessageType.ACTION_BAR, TextComponent.fromLegacyText(""));
+            }
         }
-        
-        ActionBarUtil.sendActionBar(player, message);
     }
     
     /**

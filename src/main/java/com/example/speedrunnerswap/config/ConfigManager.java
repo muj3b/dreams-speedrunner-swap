@@ -416,4 +416,55 @@ public class ConfigManager {
     public double getFreezeMaxDistance() {
         return config.getDouble("freeze_mechanic.max_distance", 50.0);
     }
+
+    /**
+     * Get the timer visibility setting for active runners
+     * @return The visibility setting ("always", "last_10", or "never")
+     */
+    public String getRunnerTimerVisibility() {
+        return config.getString("timer_visibility.runner_visibility", "last_10");
+    }
+
+    /**
+     * Get the timer visibility setting for waiting runners
+     * @return The visibility setting ("always", "last_10", or "never")
+     */
+    public String getWaitingTimerVisibility() {
+        return config.getString("timer_visibility.waiting_visibility", "always");
+    }
+
+    /**
+     * Get the timer visibility setting for hunters
+     * @return The visibility setting ("always", "last_10", or "never")
+     */
+    public String getHunterTimerVisibility() {
+        return config.getString("timer_visibility.hunter_visibility", "never");
+    }
+
+    /**
+     * Set the timer visibility setting for active runners
+     * @param visibility The visibility setting ("always", "last_10", or "never")
+     */
+    public void setRunnerTimerVisibility(String visibility) {
+        config.set("timer_visibility.runner_visibility", visibility);
+        plugin.saveConfig();
+    }
+
+    /**
+     * Set the timer visibility setting for waiting runners
+     * @param visibility The visibility setting ("always", "last_10", or "never")
+     */
+    public void setWaitingTimerVisibility(String visibility) {
+        config.set("timer_visibility.waiting_visibility", visibility);
+        plugin.saveConfig();
+    }
+
+    /**
+     * Set the timer visibility setting for hunters
+     * @param visibility The visibility setting ("always", "last_10", or "never")
+     */
+    public void setHunterTimerVisibility(String visibility) {
+        config.set("timer_visibility.hunter_visibility", visibility);
+        plugin.saveConfig();
+    }
 }

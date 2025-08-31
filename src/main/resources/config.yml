@@ -101,6 +101,15 @@ freeze_mechanic:
   check_interval_ticks: 20
   max_distance: 50
 
+# Timer Visibility Configuration
+timer_visibility:
+  # Whether active runners see the timer
+  runner_visibility: "last_10"  # Options: "always", "last_10", "never"
+  # Whether waiting runners see the timer
+  waiting_visibility: "always"  # Options: "always", "last_10", "never"
+  # Whether hunters see the timer
+  hunter_visibility: "never"    # Options: "always", "last_10", "never"
+
 # Simple Voice Chat Integration (if available)
 voice_chat:
   # Whether to integrate with Simple Voice Chat
