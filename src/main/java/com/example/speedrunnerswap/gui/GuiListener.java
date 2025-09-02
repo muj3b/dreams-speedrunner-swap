@@ -101,27 +101,41 @@ public class GuiListener implements Listener {
         if (guiManager.isSettingsMenu(event.getInventory())) {
             event.setCancelled(true);
 
-            if (guiManager.isBackButton(clickedItem)) {
-                guiManager.openMainMenu(player);
+            // Check if clicked item is valid
+            if (event.getCurrentItem() == null || !event.getCurrentItem().hasItemMeta()) return;
+            
+            String buttonId = guiManager.getButtonId(event.getCurrentItem());
+            if (buttonId == null) return;
+
+            switch (buttonId) {
+                case "back":
+                    guiManager.openMainMenu(player);
+                    break;
+                case "swap_interval":
+                    handleSwapIntervalClick(event);
+                    break;
+                case "random_swaps":
+                    handleRandomizeSwapClick(event);
+                    break;
+                case "safe_swaps":
+                    handleSafeSwapClick(event);
+                    break;
+                case "active_runner_timer":
+                    handleActiveRunnerTimerClick(event);
+                    break;
+                case "waiting_runner_timer":
+                    handleWaitingRunnerTimerClick(event);
+                    break;
+                case "hunter_timer":
+                    handleHunterTimerClick(event);
+                    break;
             }
-            else if (guiManager.isSwapIntervalButton(clickedItem)) {
-                handleSwapIntervalClick(event);
-            }
-            else if (guiManager.isRandomizeSwapButton(clickedItem)) {
-                handleRandomizeSwapClick(event);
-            }
-            else if (guiManager.isSafeSwapButton(clickedItem)) {
-                handleSafeSwapClick(event);
-            }
-            else if (guiManager.isActiveRunnerTimerButton(clickedItem)) {
-                handleActiveRunnerTimerClick(event);
-            }
-            else if (guiManager.isWaitingRunnerTimerButton(clickedItem)) {
-                handleWaitingRunnerTimerClick(event);
-            }
-            else if (guiManager.isHunterTimerButton(clickedItem)) {
-                handleHunterTimerClick(event);
-            }
+
+            // Apply live refreshes where needed
+            plugin.getGameManager().refreshSwapSchedule();
+            plugin.getGameManager().refreshHunterSwapSchedule();
+            plugin.getGameManager().refreshActionBar();
+            plugin.getGameManager().refreshTracker();
             // Apply live refreshes where needed
             plugin.getGameManager().refreshSwapSchedule();
             plugin.getGameManager().refreshHunterSwapSchedule();
@@ -343,25 +357,39 @@ public class GuiListener implements Listener {
     }
 
     private void handleSwapIntervalClick(InventoryClickEvent event) {
+        ItemStack clickedItem = event.getCurrentItem();
+        if (clickedItem == null || !guiManager.isSwapIntervalButton(clickedItem)) return;
+        
         int currentInterval = plugin.getConfigManager().getSwapInterval();
         if (event.isLeftClick()) {
-            plugin.getConfigManager().setSwapInterval(currentInterval + 30);
+            if (event.isShiftClick()) {
+                plugin.getConfigManager().setSwapInterval(currentInterval + 60);
+            } else {
+                plugin.getConfigManager().setSwapInterval(currentInterval + 30);
+            }
         } else if (event.isRightClick()) {
-            plugin.getConfigManager().setSwapInterval(Math.max(30, currentInterval - 30));
-        } else if (event.isShiftClick()) {
-            plugin.getConfigManager().setSwapInterval(60); // Reset to default
+            if (event.isShiftClick()) {
+                plugin.getConfigManager().setSwapInterval(Math.max(30, currentInterval - 60));
+            } else {
+                plugin.getConfigManager().setSwapInterval(Math.max(30, currentInterval - 30));
+            }
         }
         guiManager.openSettingsMenu((Player) event.getWhoClicked());
     }
 
     private void handleRandomizeSwapClick(InventoryClickEvent event) {
-
+        ItemStack clickedItem = event.getCurrentItem();
+        if (clickedItem == null || !guiManager.isRandomizeSwapButton(clickedItem)) return;
+        
         boolean currentValue = plugin.getConfigManager().isSwapRandomized();
         plugin.getConfigManager().setSwapRandomized(!currentValue);
-         guiManager.openSettingsMenu((Player) event.getWhoClicked());
-     }
+        guiManager.openSettingsMenu((Player) event.getWhoClicked());
+    }
 
     private void handleSafeSwapClick(InventoryClickEvent event) {
+        ItemStack clickedItem = event.getCurrentItem();
+        if (clickedItem == null || !guiManager.isSafeSwapButton(clickedItem)) return;
+        
         boolean currentValue = plugin.getConfigManager().isSafeSwapEnabled();
         plugin.getConfigManager().setSafeSwapEnabled(!currentValue);
         guiManager.openSettingsMenu((Player) event.getWhoClicked());

@@ -34,7 +34,65 @@ public class ConfigManager {
     public ConfigManager(SpeedrunnerSwap plugin) {
         this.plugin = plugin;
         loadConfig();
-        this.powerUpsEnabled = config.getBoolean("powerups.enabled", true);
+    }
+
+    /**
+     * Get whether safe swaps are enabled
+     * @return True if safe swaps are enabled
+     */
+    public boolean isSafeSwapEnabled() {
+        return config.getBoolean("safe_swap.enabled", true);
+    }
+
+    /**
+     * Set whether safe swaps are enabled
+     * @param enabled True to enable safe swaps
+     */
+    public void setSafeSwapEnabled(boolean enabled) {
+        config.set("safe_swap.enabled", enabled);
+        saveConfig();
+    }
+
+    /**
+     * Get the swap interval in seconds
+     * @return The interval in seconds
+     */
+    public int getSwapInterval() {
+        return config.getInt("swap.interval", 300);
+    }
+
+    /**
+     * Set the swap interval in seconds
+     * @param interval The interval in seconds (minimum 30)
+     */
+    public void setSwapInterval(int interval) {
+        config.set("swap.interval", Math.max(30, interval));
+        saveConfig();
+    }
+
+    /**
+     * Get whether randomized swaps are enabled
+     * @return True if swaps should be randomized
+     */
+    public boolean isSwapRandomized() {
+        return config.getBoolean("swap.randomize", false);
+    }
+
+    /**
+     * Backward-compatibility alias for legacy callers
+     * @return True if swaps should be randomized
+     */
+    public boolean isRandomizeSwap() {
+        return isSwapRandomized();
+    }
+
+    /**
+     * Set whether swaps should be randomized
+     * @param randomized True to enable randomized swaps
+     */
+    public void setSwapRandomized(boolean randomized) {
+        config.set("swap.randomize", randomized);
+        saveConfig();
     }
     
     /**
@@ -164,45 +222,9 @@ public class ConfigManager {
     }
     
     /**
-     * Get whether the swap system should use randomized intervals
-     * @return True if randomized intervals should be used
-     */
-    public boolean isRandomizeSwap() {
-        return config.getBoolean("swap.randomize", true);
-    }
-    
-    /**
-     * Get whether the swap randomization is enabled
-     * @return True if swap randomization is enabled
-     */
-    public boolean getRandomizeSwap() {
-        return isRandomizeSwap();
-    }
-    
-    /**
-     * Check if swap randomization is enabled
-     * @return True if swap randomization is enabled
-     */
-    public boolean isSwapRandomized() {
-        return isRandomizeSwap();
-    }
-    
-    /**
      * Get whether swap randomization is enabled
      * @return True if swap randomization is enabled
      */
-    public boolean getSwapRandomized() {
-        return isRandomizeSwap();
-    }
-    
-    /**
-     * Get the base swap interval in seconds
-     * @return The base swap interval
-     */
-    public int getSwapInterval() {
-        return config.getInt("swap.interval", 60);
-    }
-    
     /**
      * Get the minimum swap interval in seconds
      * @return The minimum swap interval
@@ -268,40 +290,7 @@ public class ConfigManager {
         return new org.bukkit.Location(world, x, y, z);
     }
 
-    /**
-     * Get whether the swap should be randomized.
-     * @return True if the swap should be randomized.
-     */
-    /**
-     * @deprecated Use {@link #isRandomizeSwap()} instead.
-     * Maintains backward compatibility with legacy config key.
-     */
 
-
-    public void setRandomizeSwap(boolean randomizeSwap) {
-        config.set("swap.randomize", randomizeSwap);
-        plugin.saveConfig();
-    }
-
-    /**
-     * Set whether swap randomization is enabled.
-     * Preferred modern alternative to the deprecated setRandomizeSwap method.
-     * @param randomizeSwap true to randomize swaps, false for fixed intervals
-     */
-    public void setSwapRandomized(boolean randomizeSwap) {
-        setRandomizeSwap(randomizeSwap);
-    }
-    public void setSwapInterval(int interval) {
-        config.set("swap.interval", interval);
-        plugin.saveConfig();
-    }
-
-
-
-    public void setSafeSwapEnabled(boolean safeSwapEnabled) {
-        config.set("safe_swap.enabled", safeSwapEnabled);
-        plugin.saveConfig();
-    }
 
 
 
@@ -373,10 +362,6 @@ public class ConfigManager {
             rgb.size() > 1 ? rgb.get(1) : 0,
             rgb.size() > 2 ? rgb.get(2) : 0
         };
-    }
-
-    public boolean isSafeSwapEnabled() {
-        return config.getBoolean("safe_swap.enabled", true);
     }
 
     public String getGuiMainMenuTitle() {

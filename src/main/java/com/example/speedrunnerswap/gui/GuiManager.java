@@ -581,50 +581,58 @@ swapHeaderLore.add("§7• Hover over options for details");
         ItemStack swapHeader = createItem(Material.BOOK, "§6§lSwap Settings", swapHeaderLore);
         inventory.setItem(9, swapHeader);
         
-        // Enhanced swap interval settings
-        boolean randomize = plugin.getConfigManager().getSwapRandomized();
-        List<String> intervalTypeLore = new ArrayList<>();
-        intervalTypeLore.add("§7Current: " + (randomize ? "§aRandom" : "§bFixed"));
-        intervalTypeLore.add("");
-        intervalTypeLore.add("§7Random Mode:");
-        intervalTypeLore.add("§7• Varies interval within range");
-        intervalTypeLore.add("§7• Adds unpredictability");
-        intervalTypeLore.add("");
-        intervalTypeLore.add("§7Fixed Mode:");
-        intervalTypeLore.add("§7• Consistent timing");
-        intervalTypeLore.add("§7• Predictable swaps");
-        ItemStack swapIntervalType = createItem(
-                randomize ? Material.CLOCK : Material.REPEATER,
-                "§e§lSwap Type: " + (randomize ? "§aRandom" : "§bFixed"),
-                intervalTypeLore);
-        inventory.setItem(10, swapIntervalType);
-        
-    int interval = plugin.getConfigManager().getSwapInterval();
-        List<String> intervalLore = new ArrayList<>();
-        intervalLore.add("§7Current: §f" + interval + "s");
-intervalLore.add("§7Click to toggle randomization");
-        intervalLore.add("");
-        intervalLore.add("§7Adjust using:");
-        intervalLore.add("§a▲ §7Left-click: +30s");
-        intervalLore.add("§c▼ §7Right-click: -30s");
-        intervalLore.add("§e⟲ §7Shift-click: Reset");
-        ItemStack swapInterval = createItem(Material.CLOCK, "§e§lSwap Interval", intervalLore);
-        inventory.setItem(11, swapInterval);
-        
-        // Enhanced safe swap settings
-        boolean safeSwap = plugin.getConfigManager().isSafeSwapEnabled();
+        // Enhanced swap interval settings with unique button IDs
+        boolean isRandomized = plugin.getConfigManager().isSwapRandomized();
+        List<String> randomSwapLore = new ArrayList<>();
+        randomSwapLore.add("§7Current: " + (isRandomized ? "§aRandom" : "§bFixed"));
+        randomSwapLore.add("");
+        randomSwapLore.add("§7Random Mode:");
+        randomSwapLore.add("§7• Varies interval within range");
+        randomSwapLore.add("§7• Adds unpredictability");
+        randomSwapLore.add("");
+        randomSwapLore.add("§7Fixed Mode:");
+        randomSwapLore.add("§7• Consistent timing");
+        randomSwapLore.add("§7• Predictable swaps");
+        ItemStack swapTypeButton = createGuiButton(
+                isRandomized ? Material.CLOCK : Material.REPEATER,
+                "§e§lSwap Type: " + (isRandomized ? "§aRandom" : "§bFixed"),
+                randomSwapLore,
+                "random_swaps");
+        inventory.setItem(10, swapTypeButton);
+
+        // Swap interval button
+        int currentInterval = plugin.getConfigManager().getSwapInterval();
+        List<String> swapIntervalLore = new ArrayList<>();
+        swapIntervalLore.add("§7Current: §e" + currentInterval + " seconds");
+        swapIntervalLore.add("");
+        swapIntervalLore.add("§7Click to change");
+        swapIntervalLore.add("§7• Left-click: +30s");
+        swapIntervalLore.add("§7• Right-click: -30s");
+        swapIntervalLore.add("§7• Shift+click: ±60s");
+        ItemStack intervalButton = createGuiButton(
+                Material.CLOCK,
+                "§e§lSwap Interval",
+                swapIntervalLore,
+                "swap_interval");
+        inventory.setItem(11, intervalButton);
+
+        // Safe swap button
         List<String> safeSwapLore = new ArrayList<>();
-        safeSwapLore.add("§7Current: " + (safeSwap ? "§aEnabled" : "§cDisabled"));
+        boolean isSafeSwapsEnabled = plugin.getConfigManager().isSafeSwapEnabled();
+        safeSwapLore.add("§7Current: " + (isSafeSwapsEnabled ? "§aEnabled" : "§cDisabled"));
         safeSwapLore.add("");
-        safeSwapLore.add("§7Safety Features:");
-        safeSwapLore.add("§7• Combat protection");
-        safeSwapLore.add("§7• Fall damage prevention");
-        safeSwapLore.add("§7• Void protection");
-        ItemStack safeSwapToggle = createItem(
-                safeSwap ? Material.TOTEM_OF_UNDYING : Material.BARRIER,
-                "§e§lSafe Swap: " + (safeSwap ? "§aEnabled" : "§cDisabled"),
-                safeSwapLore);
-        inventory.setItem(12, safeSwapToggle);
+        safeSwapLore.add("§7When enabled:");
+        safeSwapLore.add("§7• Checks for safe landing");
+        safeSwapLore.add("§7• Prevents void/lava deaths");
+        safeSwapLore.add("§7• May delay swaps slightly");
+        ItemStack safeButton = createGuiButton(
+                isSafeSwapsEnabled ? Material.TOTEM_OF_UNDYING : Material.BARRIER,
+                "§e§lSafe Swaps: " + (isSafeSwapsEnabled ? "§aEnabled" : "§cDisabled"),
+                safeSwapLore,
+                "safe_swaps");
+        inventory.setItem(12, safeButton);
+        
+        // Removed duplicate swap interval and safe swap UI blocks
 
         // Timer Visibility Section
         List<String> timerHeaderLore = new ArrayList<>();
@@ -1014,23 +1022,47 @@ intervalLore.add("§7Click to toggle randomization");
         return isItem(item, Material.IRON_SWORD, "§c§lHunters");
     }
     
-    // Helper methods for settings menu
+    private static final String BUTTON_ID_KEY = "ssw_button_id";
+
+    private ItemStack createGuiButton(Material material, String name, List<String> lore, String buttonId) {
+        ItemStack item = createItem(material, name, lore);
+        ItemMeta meta = item.getItemMeta();
+        if (meta != null) {
+            meta.getPersistentDataContainer().set(
+                new org.bukkit.NamespacedKey(plugin, BUTTON_ID_KEY),
+                org.bukkit.persistence.PersistentDataType.STRING,
+                buttonId
+            );
+            item.setItemMeta(meta);
+        }
+        return item;
+    }
+
+    public String getButtonId(ItemStack item) {
+        if (item != null && item.hasItemMeta()) {
+            return item.getItemMeta().getPersistentDataContainer().get(
+                new org.bukkit.NamespacedKey(plugin, BUTTON_ID_KEY),
+                org.bukkit.persistence.PersistentDataType.STRING
+            );
+        }
+        return null;
+    }
+
     public boolean isSwapIntervalButton(ItemStack item) {
-        return item != null && item.getType() == Material.CLOCK && 
-               item.getItemMeta().displayName() != null &&
-               net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer.plainText().serialize(item.getItemMeta().displayName()).contains("Swap Interval");
+        String buttonId = getButtonId(item);
+        return "swap_interval".equals(buttonId) && item != null && item.getType() == Material.CLOCK;
     }
-    
+
     public boolean isRandomizeSwapButton(ItemStack item) {
-        return item != null && (item.getType() == Material.CLOCK || item.getType() == Material.REPEATER) && 
-               item.getItemMeta().displayName() != null &&
-               net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer.plainText().serialize(item.getItemMeta().displayName()).contains("Swap Type");
+        String buttonId = getButtonId(item);
+        return "random_swaps".equals(buttonId) && item != null && 
+               (item.getType() == Material.CLOCK || item.getType() == Material.REPEATER);
     }
-    
+
     public boolean isSafeSwapButton(ItemStack item) {
-        return item != null && (item.getType() == Material.TOTEM_OF_UNDYING || item.getType() == Material.BARRIER) && 
-               item.getItemMeta().displayName() != null &&
-               net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer.plainText().serialize(item.getItemMeta().displayName()).contains("Safe Swap");
+        String buttonId = getButtonId(item);
+        return "safe_swaps".equals(buttonId) && item != null && 
+               (item.getType() == Material.TOTEM_OF_UNDYING || item.getType() == Material.BARRIER);
     }
 
     public boolean isActiveRunnerTimerButton(ItemStack item) {
