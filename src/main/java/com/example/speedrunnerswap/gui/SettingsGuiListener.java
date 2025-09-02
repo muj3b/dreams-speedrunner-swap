@@ -38,6 +38,24 @@ public class SettingsGuiListener implements Listener {
             return;
         }
 
+        // Handle tracker settings
+        Component displayName = clickedItem.getItemMeta().displayName();
+        if (displayName != null) {
+            String itemName = PlainTextComponentSerializer.plainText().serialize(displayName);
+            if (itemName.contains("Distance Display")) {
+                boolean currentState = plugin.getConfigManager().isShowDistance();
+                plugin.getConfigManager().setShowDistance(!currentState);
+                guiManager.openSettingsMenu(player);
+                return;
+            }
+            if (itemName.contains("Particle Trail")) {
+                boolean currentState = plugin.getConfigManager().isShowParticles();
+                plugin.getConfigManager().setShowParticles(!currentState);
+                guiManager.openSettingsMenu(player);
+                return;
+            }
+        }
+
         // Handle different menus
         String titleText = net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer.plainText().serialize(title);
         

@@ -54,7 +54,7 @@ public class TrackerManager {
             }, 0L, updateTicks);
         }
 
-        if (plugin.getConfigManager().isParticleTrailEnabled()) {
+        if (plugin.getConfigManager().isShowParticles()) {
             synchronized (taskLock) {
                 if (particleTask != null) {
                     particleTask.cancel();
@@ -222,8 +222,8 @@ public class TrackerManager {
                         hunter.getInventory().setItem(slot, compass);
                     }
                     
-                    // Send distance message every 5 seconds
-                    if (hunterEnv == targetEnv && System.currentTimeMillis() % 5000 < 50) {
+                    // Send distance message if enabled
+                    if (hunterEnv == targetEnv && plugin.getConfigManager().isShowDistance() && System.currentTimeMillis() % 5000 < 50) {
                         int distance = (int) hunter.getLocation().distance(target.getLocation());
                         hunter.sendActionBar(net.kyori.adventure.text.Component.text()
                             .append(net.kyori.adventure.text.Component.text("Distance to target: ", net.kyori.adventure.text.format.NamedTextColor.YELLOW))

@@ -535,7 +535,7 @@ public class GuiManager {
     public void openSettingsMenu(Player player) {
         String title = plugin.getConfigManager().getGuiSettingsTitle();
         int rows = plugin.getConfigManager().getGuiSettingsRows();
-        rows = Math.max(rows, 4); // ensure enough slots for layout
+        rows = Math.max(rows, 6); // ensure enough slots for layout
         rows = clampRows(rows);
         
         Inventory inventory = Bukkit.createInventory(null, rows * 9, Component.text(title));
@@ -551,6 +551,43 @@ public class GuiManager {
         backLore.add("§7Return to main menu");
         backLore.add("§7Settings will be saved automatically");
         ItemStack back = createItem(Material.ARROW, "§7§lBack", backLore);
+
+        // Tracker Settings Header
+        List<String> trackerHeaderLore = new ArrayList<>();
+        trackerHeaderLore.add("§7Configure compass tracking:");
+        trackerHeaderLore.add("§7• Distance display");
+        trackerHeaderLore.add("§7• Particle trails");
+        trackerHeaderLore.add("§7• Tracking options");
+        ItemStack trackerHeader = createItem(Material.BOOK, "§6§lTracker Settings", trackerHeaderLore);
+        inventory.setItem(27, trackerHeader);
+
+        // Distance Display Toggle
+        boolean showDistance = plugin.getConfigManager().isShowDistance();
+        List<String> distanceLore = new ArrayList<>();
+        distanceLore.add("§7Current: " + (showDistance ? "§aEnabled" : "§cDisabled"));
+        distanceLore.add("");
+        distanceLore.add("§7When enabled:");
+        distanceLore.add("§7• Shows distance to runner");
+        distanceLore.add("§7• Updates in action bar");
+        ItemStack distanceToggle = createItem(
+            showDistance ? Material.PAPER : Material.BARRIER,
+            "§e§lDistance Display: " + (showDistance ? "§aEnabled" : "§cDisabled"),
+            distanceLore);
+        inventory.setItem(28, distanceToggle);
+
+        // Particle Trail Toggle
+        boolean showParticles = plugin.getConfigManager().isShowParticles();
+        List<String> particleLore = new ArrayList<>();
+        particleLore.add("§7Current: " + (showParticles ? "§aEnabled" : "§cDisabled"));
+        particleLore.add("");
+        particleLore.add("§7When enabled:");
+        particleLore.add("§7• Shows particle trail");
+        particleLore.add("§7• Helps track runner");
+        ItemStack particleToggle = createItem(
+            showParticles ? Material.REDSTONE : Material.BARRIER,
+            "§e§lParticle Trail: " + (showParticles ? "§aEnabled" : "§cDisabled"),
+            particleLore);
+        inventory.setItem(29, particleToggle);
         inventory.setItem(0, back);
         
         // Swap Settings Section
