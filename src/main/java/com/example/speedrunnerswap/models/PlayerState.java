@@ -4,9 +4,6 @@ import org.bukkit.GameMode;
 import org.bukkit.Location;
 import org.bukkit.entity.Entity;
 import org.bukkit.inventory.ItemStack;
-
-
-
 import org.bukkit.potion.PotionEffect;
 import java.util.Collection;
 
@@ -115,11 +112,7 @@ public class PlayerState {
         return absorptionAmount;
     }
 
-    public enum Team {
-        RUNNER,
-        HUNTER,
-        NONE;
-    }
+    // Team is defined in com.example.speedrunnerswap.models.Team
 
     public PlayerState(ItemStack[] inventory, ItemStack[] armor, ItemStack offhand, Location location,
                       double health, int foodLevel, float saturation, float exhaustion,

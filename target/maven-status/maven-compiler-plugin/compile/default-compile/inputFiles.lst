@@ -6,7 +6,6 @@
 /Users/mujeb/minecraft-speedrunner-swap-plugin/src/main/java/com/example/speedrunnerswap/models/PlayerState.java
 /Users/mujeb/minecraft-speedrunner-swap-plugin/src/main/java/com/example/speedrunnerswap/game/SuddenDeathManager.java
 /Users/mujeb/minecraft-speedrunner-swap-plugin/src/main/java/com/example/speedrunnerswap/gui/GuiListener.java
-/Users/mujeb/minecraft-speedrunner-swap-plugin/src/main/java/com/example/speedrunnerswap/tasks/SwapTask.java
 /Users/mujeb/minecraft-speedrunner-swap-plugin/src/main/java/com/example/speedrunnerswap/utils/PlayerStateUtil.java
 /Users/mujeb/minecraft-speedrunner-swap-plugin/src/main/java/com/example/speedrunnerswap/tracking/TrackerManager.java
 /Users/mujeb/minecraft-speedrunner-swap-plugin/src/main/java/com/example/speedrunnerswap/gui/SettingsGuiListener.java
@@ -16,10 +15,12 @@
 /Users/mujeb/minecraft-speedrunner-swap-plugin/src/main/java/com/example/speedrunnerswap/game/BountyManager.java
 /Users/mujeb/minecraft-speedrunner-swap-plugin/src/main/java/com/example/speedrunnerswap/game/CompassManager.java
 /Users/mujeb/minecraft-speedrunner-swap-plugin/src/main/java/com/example/speedrunnerswap/SpeedrunnerSwap.java
+/Users/mujeb/minecraft-speedrunner-swap-plugin/src/main/java/com/example/speedrunnerswap/gui/ButtonType.java
 /Users/mujeb/minecraft-speedrunner-swap-plugin/src/main/java/com/example/speedrunnerswap/commands/SwapCommand.java
 /Users/mujeb/minecraft-speedrunner-swap-plugin/src/main/java/com/example/speedrunnerswap/game/GameManager.java
 /Users/mujeb/minecraft-speedrunner-swap-plugin/src/main/java/com/example/speedrunnerswap/config/ConfigManager.java
 /Users/mujeb/minecraft-speedrunner-swap-plugin/src/main/java/com/example/speedrunnerswap/utils/SafeLocationFinder.java
 /Users/mujeb/minecraft-speedrunner-swap-plugin/src/main/java/com/example/speedrunnerswap/utils/ActionBarUtil.java
+/Users/mujeb/minecraft-speedrunner-swap-plugin/src/main/java/com/example/speedrunnerswap/models/Team.java
 /Users/mujeb/minecraft-speedrunner-swap-plugin/src/main/java/com/example/speedrunnerswap/game/WorldBorderManager.java
 /Users/mujeb/minecraft-speedrunner-swap-plugin/src/main/java/com/example/speedrunnerswap/listeners/EventListeners.java

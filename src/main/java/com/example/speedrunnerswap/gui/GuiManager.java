@@ -9,7 +9,7 @@ import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.inventory.meta.SkullMeta;
-import com.example.speedrunnerswap.models.PlayerState;
+import com.example.speedrunnerswap.models.Team;
 import java.util.logging.Level;
 import org.bukkit.enchantments.Enchantment;
 
@@ -25,7 +25,7 @@ public class GuiManager {
         this.plugin = plugin;
     }
 
-    private String formatTime(int seconds) {
+    public String formatTime(int seconds) {
         int minutes = seconds / 60;
         int hours = minutes / 60;
         minutes %= 60;
@@ -100,7 +100,7 @@ public class GuiManager {
         player.openInventory(inventory);
     }
 
-    private ItemStack createEffectItem(Material material, String displayName, String effectId) {
+    public ItemStack createEffectItem(Material material, String displayName, String effectId) {
         List<String> lore = new ArrayList<>();
         lore.add("§7Effect ID: §f" + effectId);
         lore.add("§7Click to toggle this effect");
@@ -278,7 +278,7 @@ public class GuiManager {
             teamSelectorLore.add("§7• Assign players to teams");
             teamSelectorLore.add("§7• View current team assignments");
             teamSelectorLore.add("§7• Manage runner and hunter roles");
-            ItemStack teamSelector = createItem(Material.PLAYER_HEAD, "§e§lTeam Selector", teamSelectorLore);
+            ItemStack teamSelector = createGuiButton(Material.PLAYER_HEAD, "§e§lTeam Selector", teamSelectorLore, "team_selector");
             inventory.setItem(10, teamSelector);
 
     // World Border Settings (Top row)
@@ -287,7 +287,7 @@ public class GuiManager {
         borderLore.add("§7• Set initial and final size");
         borderLore.add("§7• Adjust shrink duration");
         borderLore.add("§7• Toggle border shrinking");
-        ItemStack borderSettings = createItem(Material.BARRIER, "§c§lWorld Border", borderLore);
+        ItemStack borderSettings = createGuiButton(Material.BARRIER, "§c§lWorld Border", borderLore, "world_border");
         inventory.setItem(12, borderSettings);
 
         // Power-ups Settings (Top row)
@@ -296,7 +296,7 @@ public class GuiManager {
         powerupsLore.add("§7• Enable/disable power-ups");
         powerupsLore.add("§7• Customize effects");
         powerupsLore.add("§7• Adjust durations");
-        ItemStack powerupsSettings = createItem(Material.POTION, "§d§lPower-ups", powerupsLore);
+        ItemStack powerupsSettings = createGuiButton(Material.POTION, "§d§lPower-ups", powerupsLore, "power_ups");
         inventory.setItem(14, powerupsSettings);
 
         // Kit Settings (Top row)
@@ -305,7 +305,7 @@ public class GuiManager {
         kitsLore.add("§7• Edit runner kits");
         kitsLore.add("§7• Edit hunter kits");
         kitsLore.add("§7• Manage equipment");
-        ItemStack kitsSettings = createItem(Material.DIAMOND_CHESTPLATE, "§b§lKits", kitsLore);
+        ItemStack kitsSettings = createGuiButton(Material.DIAMOND_CHESTPLATE, "§b§lKits", kitsLore, "kits");
         inventory.setItem(16, kitsSettings);
 
         // Bounty System (Middle row)
@@ -314,7 +314,7 @@ public class GuiManager {
         bountyLore.add("§7• Set bounty rewards");
         bountyLore.add("§7• Adjust durations");
         bountyLore.add("§7• Manage effects");
-        ItemStack bountySettings = createItem(Material.GOLDEN_APPLE, "§6§lBounty System", bountyLore);
+        ItemStack bountySettings = createGuiButton(Material.GOLDEN_APPLE, "§6§lBounty System", bountyLore, "bounty");
         inventory.setItem(28, bountySettings);
 
         // Last Stand Settings (Middle row)
@@ -323,7 +323,7 @@ public class GuiManager {
         lastStandLore.add("§7• Set buff strengths");
         lastStandLore.add("§7• Adjust duration");
         lastStandLore.add("§7• Toggle feature");
-        ItemStack lastStandSettings = createItem(Material.TOTEM_OF_UNDYING, "§e§lLast Stand", lastStandLore);
+        ItemStack lastStandSettings = createGuiButton(Material.TOTEM_OF_UNDYING, "§e§lLast Stand", lastStandLore, "last_stand");
         inventory.setItem(30, lastStandSettings);
 
         // Compass Settings (Middle row)
@@ -332,7 +332,7 @@ public class GuiManager {
         compassLore.add("§7• Set jamming duration");
         compassLore.add("§7• Adjust tracking");
         compassLore.add("§7• Toggle features");
-        ItemStack compassSettings = createItem(Material.COMPASS, "§9§lCompass Settings", compassLore);
+        ItemStack compassSettings = createGuiButton(Material.COMPASS, "§9§lCompass Settings", compassLore, "compass");
         inventory.setItem(32, compassSettings);
 
         // Sudden Death Settings (Middle row)
@@ -341,7 +341,7 @@ public class GuiManager {
         suddenDeathLore.add("§7• Set activation time");
         suddenDeathLore.add("§7• Customize effects");
         suddenDeathLore.add("§7• Set arena location");
-        ItemStack suddenDeathSettings = createItem(Material.DRAGON_HEAD, "§4§lSudden Death", suddenDeathLore);
+        ItemStack suddenDeathSettings = createGuiButton(Material.DRAGON_HEAD, "§4§lSudden Death", suddenDeathLore, "sudden_death");
         inventory.setItem(34, suddenDeathSettings);
 
         // Stats Settings (Bottom row)
@@ -350,7 +350,7 @@ public class GuiManager {
         statsLore.add("§7• Toggle stat tracking");
         statsLore.add("§7• Set display options");
         statsLore.add("§7• View current stats");
-        ItemStack statsSettings = createItem(Material.BOOK, "§a§lStatistics", statsLore);
+        ItemStack statsSettings = createGuiButton(Material.BOOK, "§a§lStatistics", statsLore, "statistics");
         inventory.setItem(48, statsSettings);
         
         // Settings button
@@ -361,7 +361,7 @@ public class GuiManager {
         settingsLore.add("§7• Safety features");
         settingsLore.add("§7• Tracking options");
         settingsLore.add("§7• Game mechanics");
-        ItemStack settings = createItem(Material.COMPARATOR, "§a§lSettings", settingsLore);
+        ItemStack settings = createGuiButton(Material.COMPARATOR, "§a§lSettings", settingsLore, "settings");
         inventory.setItem(15, settings);
         
         // Game control buttons
@@ -461,7 +461,7 @@ public class GuiManager {
         runnerLore.add("§7• Avoid hunters");
         runnerLore.add("§7• Swap between players");
         ItemStack runnerTeam = createItem(Material.DIAMOND_BOOTS, "§b§lRunners", runnerLore);
-        inventory.setItem(2, plugin.getGameManager().getPlayerState(player).getSelectedTeam() == PlayerState.Team.RUNNER ? 
+        inventory.setItem(2, plugin.getGameManager().getPlayerState(player).getSelectedTeam() == Team.RUNNER ? 
             createGlowingItem(runnerTeam) : createNormalItem(runnerTeam));
         
         // Hunter team button with enhanced information
@@ -474,7 +474,7 @@ public class GuiManager {
         hunterLore.add("§7• Eliminate runners");
         hunterLore.add("§7• Prevent objectives");
         ItemStack hunterTeam = createItem(Material.IRON_SWORD, "§c§lHunters", hunterLore);
-        inventory.setItem(6, plugin.getGameManager().getPlayerState(player).getSelectedTeam() == PlayerState.Team.HUNTER ? 
+        inventory.setItem(6, plugin.getGameManager().getPlayerState(player).getSelectedTeam() == Team.HUNTER ? 
             createGlowingItem(hunterTeam) : createNormalItem(hunterTeam));
         
         // Team selection instructions
@@ -495,12 +495,12 @@ public class GuiManager {
             SkullMeta meta = (SkullMeta) playerHead.getItemMeta();
             meta.setOwningPlayer(onlinePlayer);
             
-            PlayerState.Team currentTeam = plugin.getGameManager().getPlayerState(onlinePlayer).getSelectedTeam();
+            Team currentTeam = plugin.getGameManager().getPlayerState(onlinePlayer).getSelectedTeam();
             // Apply team color to player name
-            net.kyori.adventure.text.format.TextColor nameColor = currentTeam == PlayerState.Team.RUNNER ? 
-                net.kyori.adventure.text.format.NamedTextColor.AQUA : 
-                currentTeam == PlayerState.Team.HUNTER ? 
-                net.kyori.adventure.text.format.NamedTextColor.RED : 
+            net.kyori.adventure.text.format.TextColor nameColor = currentTeam == Team.RUNNER ?
+                net.kyori.adventure.text.format.NamedTextColor.AQUA :
+                currentTeam == Team.HUNTER ?
+                net.kyori.adventure.text.format.NamedTextColor.RED :
                 net.kyori.adventure.text.format.NamedTextColor.WHITE;
             meta.displayName(net.kyori.adventure.text.Component.text(onlinePlayer.getName()).color(nameColor));
             
@@ -531,7 +531,7 @@ public class GuiManager {
             playerHead.setItemMeta(meta);
             
             // Add glow effect for current team members
-            if (currentTeam != PlayerState.Team.NONE) {
+            if (currentTeam != Team.NONE) {
                 playerHead = createGlowingItem(playerHead);
             }
             
@@ -873,7 +873,7 @@ swapHeaderLore.add("§7• Hover over options for details");
         return rows;
     }
 
-    private ItemStack createItem(Material material, String name, String... lore) {
+    public ItemStack createItem(Material material, String name, String... lore) {
         ItemStack item = new ItemStack(material);
         ItemMeta meta = item.getItemMeta();
         meta.displayName(Component.text(name));
@@ -890,7 +890,7 @@ swapHeaderLore.add("§7• Hover over options for details");
         return item;
     }
 
-    private ItemStack createGlowingItem(ItemStack item) {
+    public ItemStack createGlowingItem(ItemStack item) {
         ItemStack glowingItem = item.clone();
         ItemMeta meta = glowingItem.getItemMeta();
         meta.addEnchant(Enchantment.UNBREAKING, 1, true);
@@ -899,7 +899,7 @@ swapHeaderLore.add("§7• Hover over options for details");
         return glowingItem;
     }
 
-    private ItemStack createNormalItem(ItemStack item) {
+    public ItemStack createNormalItem(ItemStack item) {
         ItemStack normalItem = item.clone();
         ItemMeta meta = normalItem.getItemMeta();
         meta.removeEnchant(Enchantment.UNBREAKING);
@@ -908,7 +908,7 @@ swapHeaderLore.add("§7• Hover over options for details");
         return normalItem;
     }
     
-    private ItemStack createItem(Material material, String name, List<String> lore) {
+    public ItemStack createItem(Material material, String name, List<String> lore) {
         ItemStack item = new ItemStack(material);
         ItemMeta meta = item.getItemMeta();
         meta.displayName(Component.text(name));
@@ -1024,7 +1024,7 @@ swapHeaderLore.add("§7• Hover over options for details");
     
     private static final String BUTTON_ID_KEY = "ssw_button_id";
 
-    private ItemStack createGuiButton(Material material, String name, List<String> lore, String buttonId) {
+    public ItemStack createGuiButton(Material material, String name, List<String> lore, String buttonId) {
         ItemStack item = createItem(material, name, lore);
         ItemMeta meta = item.getItemMeta();
         if (meta != null) {
@@ -1104,7 +1104,7 @@ swapHeaderLore.add("§7• Hover over options for details");
     }
     
     // Helper methods for team management
-    public void setPlayerTeam(Player player, PlayerState.Team team) {
+    public void setPlayerTeam(Player player, Team team) {
         plugin.getGameManager().getPlayerState(player).setSelectedTeam(team);
         updateTeamSelectors();
     }
@@ -1136,7 +1136,7 @@ swapHeaderLore.add("§7• Hover over options for details");
     
     
     // Fix for missing getSelectedTeam method
-    public PlayerState.Team getSelectedTeam(Player player) {
+    public Team getSelectedTeam(Player player) {
         return plugin.getGameManager().getPlayerState(player).getSelectedTeam();
     }
     

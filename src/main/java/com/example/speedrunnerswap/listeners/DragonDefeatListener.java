@@ -1,7 +1,7 @@
 package com.example.speedrunnerswap.listeners;
 
 import com.example.speedrunnerswap.SpeedrunnerSwap;
-import com.example.speedrunnerswap.models.PlayerState;
+import com.example.speedrunnerswap.models.Team;
 import org.bukkit.Bukkit;
 import org.bukkit.Server;
 import org.bukkit.entity.EnderDragon;
@@ -24,7 +24,7 @@ public class DragonDefeatListener implements Listener {
         }
 
         // End the game with runners as winners
-        plugin.getGameManager().endGame(PlayerState.Team.RUNNER);
+        plugin.getGameManager().endGame(Team.RUNNER);
 
         // Create celebration title for all players
         for (Player player : Bukkit.getOnlinePlayers()) {

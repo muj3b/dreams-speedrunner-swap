@@ -74,9 +74,6 @@ tracker:
   enabled: true
   # How often to update the compass (in ticks, 20 ticks = 1 second)
   update_ticks: 20
-  compass_jamming:
-    enabled: true
-    duration_ticks: 100 # 5 seconds
 
 # GUI Configuration
 gui:
@@ -146,8 +143,9 @@ last_stand:
   speed_amplifier: 1
 
 # Kits Configuration
+# Note: Kits are configured in kits.yml
 kits:
-  enabled: true
+  enabled: true  # Controls whether the kit system is enabled
 
 # Advanced Stats Configuration
 stats:
@@ -196,18 +194,9 @@ sudden_death:
     y: 50
     z: 0
 
-# Compass Jamming Configuration
-tracker:
   compass_jamming:
     enabled: true
     # Duration of compass jamming in ticks (20 ticks = 1 second)
     duration_ticks: 100
     # Maximum distance for random compass pointing when jammed
     max_jam_distance: 100
-  runner_kit:
-    - DIAMOND_SWORD 1
-    - COOKED_BEEF 64
-  hunter_kit:
-    - IRON_SWORD 1
-    - BOW 1
-    - ARROW 64

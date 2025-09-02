@@ -21,6 +21,8 @@ public class TrackerManager {
     private volatile BukkitTask particleTask;
     private boolean isJammed = false;
     private final Object taskLock = new Object();
+    // Cache last known compass slot to avoid full scans each update
+    private final java.util.Map<java.util.UUID, Integer> compassSlotCache = new java.util.HashMap<>();
     
     public TrackerManager(SpeedrunnerSwap plugin) {
         this.plugin = plugin;
@@ -35,8 +37,8 @@ public class TrackerManager {
                 trackerTask.cancel();
             }
             
-            // Force more frequent updates (5 ticks = 0.25 seconds) for smoother tracking
-            int updateTicks = Math.min(5, plugin.getConfigManager().getTrackerUpdateTicks());
+            // Respect configured update rate with a sane minimum
+            int updateTicks = Math.max(10, plugin.getConfigManager().getTrackerUpdateTicks());
             
             trackerTask = Bukkit.getScheduler().runTaskTimer(plugin, () -> {
                 Player activeRunner = plugin.getGameManager().getActiveRunner();
@@ -82,13 +84,14 @@ public class TrackerManager {
             return;
         }
         
-        // Create compass item
-        ItemStack compass = new ItemStack(Material.COMPASS);
-        
-        // Add to inventory
-        hunter.getInventory().addItem(compass);
-        
-        // Update the compass
+        // Avoid duplicates
+        if (!hunter.getInventory().contains(Material.COMPASS)) {
+            ItemStack compass = new ItemStack(Material.COMPASS);
+            hunter.getInventory().addItem(compass);
+            // Reset cache so we find it quickly next time
+            compassSlotCache.remove(hunter.getUniqueId());
+        }
+        // Update the compass target now
         updateCompass(hunter);
     }
     
@@ -115,81 +118,44 @@ public class TrackerManager {
         }
         
         try {
-            // Check if hunter has a compass
-            ItemStack compass = null;
-            int slot = -1;
-            
-            // Check main inventory for compass
-            for (int i = 0; i < hunter.getInventory().getSize(); i++) {
-                ItemStack item = hunter.getInventory().getItem(i);
-                if (item != null && item.getType() == Material.COMPASS) {
-                    compass = item;
-                    slot = i;
-                    break;
-                }
-            }
-            
-            // If no compass found, give one
-            if (compass == null) {
+            // Find an existing compass (use cache first)
+            int slot = findCompassSlot(hunter);
+            if (slot == -1) {
                 giveTrackingCompass(hunter);
-                return;
+                slot = findCompassSlot(hunter);
+                if (slot == -1) return; // couldn't find/give
             }
-            
-            // Update compass target
-            CompassMeta meta = null;
-            if (compass.getItemMeta() instanceof CompassMeta) {
-                meta = (CompassMeta) compass.getItemMeta();
-            }
+            ItemStack compass = hunter.getInventory().getItem(slot);
+            if (compass == null || compass.getType() != Material.COMPASS) return;
 
-            if (meta != null) {
-                if (isJammed) {
-                    meta.setLodestone(new Location(hunter.getWorld(), Math.random() * 1000 - 500, 64, Math.random() * 1000 - 500));
-                    meta.setLodestoneTracked(true);
-                } else if (target.getLocation() != null) {
-                    Location adjustedLoc;
-                    World.Environment hunterEnv = hunter.getWorld().getEnvironment();
-                    World.Environment targetEnv = target.getWorld().getEnvironment();
-                    
-                    if (hunterEnv == targetEnv) {
-                        // Same dimension - direct tracking
-                        adjustedLoc = target.getLocation();
-                    } else if (hunterEnv == World.Environment.NORMAL && targetEnv == World.Environment.NETHER) {
-                        // Overworld to Nether conversion (8:1)
-                        adjustedLoc = new Location(hunter.getWorld(),
-                            target.getLocation().getX() / 8,
-                            Math.min(Math.max(target.getLocation().getY(), 0), 128), // Clamp Y to valid range
-                            target.getLocation().getZ() / 8
-                        );
-                    } else if (hunterEnv == World.Environment.NETHER && targetEnv == World.Environment.NORMAL) {
-                        // Nether to Overworld conversion (1:8)
-                        adjustedLoc = new Location(hunter.getWorld(),
-                            target.getLocation().getX() * 8,
-                            Math.min(Math.max(target.getLocation().getY(), 0), 256), // Clamp Y to valid range
-                            target.getLocation().getZ() * 8
-                        );
-                    } else if (targetEnv == World.Environment.THE_END) {
-                        // Target in End - point to end portal
-                        adjustedLoc = new Location(hunter.getWorld(), 100, 50, 0); // Approximate end portal location
-                        hunter.sendMessage("§eTarget is in The End! Compass points to the End Portal.");
-                    } else {
-                        // Fallback - point to world spawn
-                        adjustedLoc = hunter.getWorld().getSpawnLocation();
-                        hunter.sendMessage(net.kyori.adventure.text.Component.text("§cTarget is in " + targetEnv + ", compass points to spawn."));
-                    }
-                    
-                    // Update compass
-                    hunter.setCompassTarget(adjustedLoc);
-                    meta.setLodestone(null);
-                    meta.setLodestoneTracked(false);
-                    compass.setItemMeta(meta);
-                    
-                    // Update inventory
-                    if (slot != -1) {
-                        hunter.getInventory().setItem(slot, compass);
-                    }
-                    
-                    // Distance display removed intentionally; hunters receive only the compass.
-                }
+            // Compute target location
+            Location adjustedLoc;
+            World.Environment hunterEnv = hunter.getWorld().getEnvironment();
+            World.Environment targetEnv = target.getWorld().getEnvironment();
+
+            if (isJammed) {
+                CompassMeta meta = (CompassMeta) compass.getItemMeta();
+                meta.setLodestone(new Location(hunter.getWorld(), Math.random() * 1000 - 500, 64, Math.random() * 1000 - 500));
+                meta.setLodestoneTracked(false);
+                compass.setItemMeta(meta);
+            } else if (hunterEnv == targetEnv) {
+                adjustedLoc = target.getLocation();
+                hunter.setCompassTarget(adjustedLoc);
+            } else if (hunterEnv == World.Environment.NORMAL && targetEnv == World.Environment.NETHER) {
+                adjustedLoc = new Location(hunter.getWorld(), target.getLocation().getX() / 8,
+                        Math.min(Math.max(target.getLocation().getY(), 0), 128), target.getLocation().getZ() / 8);
+                hunter.setCompassTarget(adjustedLoc);
+            } else if (hunterEnv == World.Environment.NETHER && targetEnv == World.Environment.NORMAL) {
+                adjustedLoc = new Location(hunter.getWorld(), target.getLocation().getX() * 8,
+                        Math.min(Math.max(target.getLocation().getY(), 0), 256), target.getLocation().getZ() * 8);
+                hunter.setCompassTarget(adjustedLoc);
+            } else if (targetEnv == World.Environment.THE_END) {
+                adjustedLoc = new Location(hunter.getWorld(), 100, 50, 0);
+                hunter.setCompassTarget(adjustedLoc);
+                hunter.sendMessage("§eTarget is in The End! Compass points to the End Portal.");
+            } else {
+                adjustedLoc = hunter.getWorld().getSpawnLocation();
+                hunter.setCompassTarget(adjustedLoc);
             }
         } catch (Exception e) {
             plugin.getLogger().warning("Error updating compass for hunter " + hunter.getName() + ": " + e.getMessage());
@@ -215,5 +181,22 @@ public class TrackerManager {
         Bukkit.getScheduler().runTaskLater(plugin, () -> {
             isJammed = false;
         }, durationTicks);
+    }
+
+    private int findCompassSlot(Player hunter) {
+        Integer cached = compassSlotCache.get(hunter.getUniqueId());
+        if (cached != null) {
+            ItemStack cachedItem = hunter.getInventory().getItem(cached);
+            if (cachedItem != null && cachedItem.getType() == Material.COMPASS) return cached;
+        }
+        for (int i = 0; i < hunter.getInventory().getSize(); i++) {
+            ItemStack item = hunter.getInventory().getItem(i);
+            if (item != null && item.getType() == Material.COMPASS) {
+                compassSlotCache.put(hunter.getUniqueId(), i);
+                return i;
+            }
+        }
+        compassSlotCache.remove(hunter.getUniqueId());
+        return -1;
     }
 }

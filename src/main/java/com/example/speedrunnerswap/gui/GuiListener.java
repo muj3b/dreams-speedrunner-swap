@@ -6,415 +6,508 @@ import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
+import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.inventory.ItemStack;
-
-import java.util.List;
+import org.bukkit.persistence.PersistentDataType;
+import org.bukkit.persistence.PersistentDataContainer;
+import org.bukkit.NamespacedKey;
 
 public class GuiListener implements Listener {
     private final SpeedrunnerSwap plugin;
     private final GuiManager guiManager;
-
-    private void handleEffectsMenuClick(InventoryClickEvent event, String title) {
-        event.setCancelled(true);
-        ItemStack clickedItem = event.getCurrentItem();
-        if (clickedItem == null || !clickedItem.hasItemMeta()) return;
-
-        var meta = clickedItem.getItemMeta();
-        if (meta == null || !meta.hasLore()) return;
-        
-        List<Component> loreComponents = meta.lore();
-        if (loreComponents == null) return;
-        
-        String effectId = null;
-        for (Component line : loreComponents) {
-            String plainText = PlainTextComponentSerializer.plainText().serialize(line);
-            if (plainText.startsWith("§7Effect ID: §f")) {
-                effectId = plainText.replace("§7Effect ID: §f", "");
-                break;
-            }
-        }
-
-        if (effectId != null) {
-            boolean isPositive = title.contains("Positive Effects");
-            String configPath = isPositive ? "power_ups.good_effects" : "power_ups.bad_effects";
-            List<String> effects = plugin.getConfig().getStringList(configPath);
-
-            if (effects.contains(effectId)) {
-                effects.remove(effectId);
-            } else {
-                effects.add(effectId);
-            }
-
-            plugin.getConfig().set(configPath, effects);
-            plugin.saveConfig();
-
-            // Refresh the menu
-            Player player = (Player) event.getWhoClicked();
-            if (isPositive) {
-                guiManager.openPositiveEffectsMenu(player);
-            } else {
-                guiManager.openNegativeEffectsMenu(player);
-            }
-        }
-
-        if (clickedItem.getType() == Material.BARRIER) {
-            Player player = (Player) event.getWhoClicked();
-            guiManager.openPowerUpsMenu(player);
-        }
-    }
 
     public GuiListener(SpeedrunnerSwap plugin, GuiManager guiManager) {
         this.plugin = plugin;
         this.guiManager = guiManager;
     }
 
-    @EventHandler(ignoreCancelled = true)
+    @EventHandler(priority = EventPriority.HIGH)
     public void onInventoryClick(InventoryClickEvent event) {
         if (!(event.getWhoClicked() instanceof Player)) return;
         Player player = (Player) event.getWhoClicked();
+        ItemStack clickedItem = event.getCurrentItem();
+        
+        if (clickedItem == null || !clickedItem.hasItemMeta()) return;
 
         String title = PlainTextComponentSerializer.plainText().serialize(event.getView().title());
 
-        // Admin permission check for settings
-        if (!player.hasPermission("speedrunnerswap.admin")) {
-            if (title.contains("Settings") || title.contains("Kits") || title.contains("Bounty") || title.contains("Last Stand") || title.contains("Compass") || title.contains("Sudden Death")) {
-                player.sendMessage("§cYou do not have permission to change these settings.");
-                event.setCancelled(true);
+        // Always cancel clicks in our GUIs
+        if (isPluginGui(title)) {
+            event.setCancelled(true);
+
+            // Admin permission check
+            if (!player.hasPermission("speedrunnerswap.admin") && isAdminMenu(title)) {
+                player.sendMessage(Component.text("§cYou do not have permission to use this menu."));
                 return;
             }
+
+            // Route to appropriate handler
+            handleGuiClick(event, title);
         }
+    }
+
+    private boolean isPluginGui(String title) {
+        return title.contains("SpeedrunnerSwap") || 
+               title.contains("Settings") || 
+               title.contains("Team Selector") ||
+               title.contains("Kits") ||
+               title.contains("Effects") ||
+               title.contains("Power-ups") ||
+               title.contains("World Border") ||
+               title.contains("Bounty") ||
+               title.contains("Last Stand") ||
+               title.contains("Compass") ||
+               title.contains("Sudden Death") ||
+               title.contains("Statistics");
+    }
+
+    private boolean isAdminMenu(String title) {
+        return title.contains("Settings") || 
+               title.contains("Kits") || 
+               title.contains("Effects") ||
+               title.contains("Power-ups") ||
+               title.contains("World Border") ||
+               title.contains("Bounty") ||
+               title.contains("Last Stand") ||
+               title.contains("Compass") ||
+               title.contains("Sudden Death");
+    }
+
+    private void handleGuiClick(InventoryClickEvent event, String title) {
+        Player player = (Player) event.getWhoClicked();
+        ItemStack clickedItem = event.getCurrentItem();
         
-        // Handle effect selection menus
-        if (title.contains("Positive Effects") || title.contains("Negative Effects")) {
-            handleEffectsMenuClick(event, title);
+        // Handle back buttons first
+        if (isBackButton(clickedItem)) {
+            guiManager.openMainMenu(player);
             return;
         }
 
-    // For other menus
-        ItemStack clickedItem = event.getCurrentItem();
+        // Route to specific menu handlers
+        if (title.contains("Main Menu")) {
+            handleMainMenuClick(event);
+        } else if (title.contains("Team Selector")) {
+            handleTeamSelectorClick(event);
+        } else if (title.contains("Settings")) {
+            handleSettingsClick(event);
+        } else if (title.contains("Kits")) {
+            handleKitsMenuClick(event);
+        } else if (title.contains("Power-ups")) {
+            handlePowerUpsMenuClick(event);
+        } else if (title.contains("Effects")) {
+            handleEffectsMenuClick(event, title);
+        } else if (title.contains("World Border")) {
+            handleWorldBorderClick(event);
+        } else if (title.contains("Bounty")) {
+            handleBountyMenuClick(event);
+        } else if (title.contains("Last Stand")) {
+            handleLastStandClick(event);
+        } else if (title.contains("Compass")) {
+            handleCompassSettingsClick(event);
+        } else if (title.contains("Sudden Death")) {
+            handleSuddenDeathClick(event);
+        } else if (title.contains("Statistics")) {
+            handleStatisticsClick(event);
+        }
+    }
 
-        if (clickedItem == null) return;
+    private void handleMainMenuClick(InventoryClickEvent event) {
+        Player player = (Player) event.getWhoClicked();
+        ItemStack clicked = event.getCurrentItem();
 
-        // Handle Settings Menu
-        if (guiManager.isSettingsMenu(event.getInventory())) {
-            event.setCancelled(true);
+        if (clicked == null || !clicked.hasItemMeta()) return;
 
-            // Check if clicked item is valid
-            if (event.getCurrentItem() == null || !event.getCurrentItem().hasItemMeta()) return;
-            
-            String buttonId = guiManager.getButtonId(event.getCurrentItem());
-            if (buttonId == null) return;
-
+        // Prefer explicit button IDs when present
+        String buttonId = getButtonId(clicked);
+        if (buttonId != null) {
             switch (buttonId) {
-                case "back":
-                    guiManager.openMainMenu(player);
-                    break;
-                case "swap_interval":
-                    handleSwapIntervalClick(event);
-                    break;
-                case "random_swaps":
-                    handleRandomizeSwapClick(event);
-                    break;
-                case "safe_swaps":
-                    handleSafeSwapClick(event);
-                    break;
-                case "active_runner_timer":
-                    handleActiveRunnerTimerClick(event);
-                    break;
-                case "waiting_runner_timer":
-                    handleWaitingRunnerTimerClick(event);
-                    break;
-                case "hunter_timer":
-                    handleHunterTimerClick(event);
-                    break;
+                case "team_selector" -> guiManager.openTeamSelector(player);
+                case "settings" -> guiManager.openSettingsMenu(player);
+                case "power_ups" -> guiManager.openPowerUpsMenu(player);
+                case "world_border" -> guiManager.openWorldBorderMenu(player);
+                case "kits" -> guiManager.openKitsMenu(player);
+                case "bounty" -> guiManager.openBountyMenu(player);
+                case "last_stand" -> guiManager.openLastStandMenu(player);
+                case "compass" -> guiManager.openCompassSettingsMenu(player);
+                case "sudden_death" -> guiManager.openSuddenDeathMenu(player);
+                case "statistics" -> guiManager.openStatisticsMenu(player);
             }
-
-            // Apply live refreshes where needed
-            plugin.getGameManager().refreshSwapSchedule();
-            plugin.getGameManager().refreshHunterSwapSchedule();
-            plugin.getGameManager().refreshActionBar();
-            plugin.getGameManager().refreshTracker();
-            // Apply live refreshes where needed
-            plugin.getGameManager().refreshSwapSchedule();
-            plugin.getGameManager().refreshHunterSwapSchedule();
-            plugin.getGameManager().refreshActionBar();
-            plugin.getGameManager().refreshTracker();
+            return;
         }
 
-        // If main menu, route clicks to submenus
-        if (guiManager.isMainMenu(event.getInventory())) {
-            event.setCancelled(true);
-            if (guiManager.isTeamSelectorButton(clickedItem)) {
-                guiManager.openTeamSelector(player);
-            } else if (guiManager.isSettingsButton(clickedItem)) {
-                guiManager.openSettingsMenu(player);
-            } else if (clickedItem.getType() == Material.POTION || clickedItem.getType() == Material.SPLASH_POTION) {
-                guiManager.openPowerUpsMenu(player);
-            } else if (clickedItem.getType() == Material.BARRIER && clickedItem.getItemMeta() != null && clickedItem.getItemMeta().displayName() != null && PlainTextComponentSerializer.plainText().serialize(clickedItem.getItemMeta().displayName()).contains("World Border")) {
-                guiManager.openWorldBorderMenu(player);
-            } else if (clickedItem.getType() == Material.DIAMOND_CHESTPLATE) {
-                guiManager.openKitsMenu(player);
-            } else if (clickedItem.getType() == Material.GOLDEN_APPLE) {
-                guiManager.openBountyMenu(player);
-            } else if (clickedItem.getType() == Material.TOTEM_OF_UNDYING) {
-                guiManager.openLastStandMenu(player);
-            } else if (clickedItem.getType() == Material.COMPASS) {
-                guiManager.openCompassSettingsMenu(player);
-            } else if (clickedItem.getType() == Material.DRAGON_HEAD) {
-                guiManager.openSuddenDeathMenu(player);
-            } else if (clickedItem.getType() == Material.BOOK) {
-                guiManager.openStatisticsMenu(player);
-            }
+        // Fallback: route based on display name text
+        String name = PlainTextComponentSerializer.plainText().serialize(clicked.getItemMeta().displayName());
+        if (guiManager.isTeamSelectorButton(clicked) || name.toLowerCase().contains("team selector")) {
+            guiManager.openTeamSelector(player);
+        } else if (guiManager.isSettingsButton(clicked) || name.toLowerCase().contains("settings")) {
+            guiManager.openSettingsMenu(player);
+        } else if (name.toLowerCase().contains("power-ups") || name.toLowerCase().contains("power ups")) {
+            guiManager.openPowerUpsMenu(player);
+        } else if (name.toLowerCase().contains("world border") || clicked.getType() == Material.BARRIER) {
+            // Note: BARRIER also used for back button; back handled earlier.
+            guiManager.openWorldBorderMenu(player);
+        } else if (name.toLowerCase().contains("kits")) {
+            guiManager.openKitsMenu(player);
+        } else if (name.toLowerCase().contains("bounty")) {
+            guiManager.openBountyMenu(player);
+        } else if (name.toLowerCase().contains("last stand")) {
+            guiManager.openLastStandMenu(player);
+        } else if (name.toLowerCase().contains("compass")) {
+            guiManager.openCompassSettingsMenu(player);
+        } else if (name.toLowerCase().contains("sudden death")) {
+            guiManager.openSuddenDeathMenu(player);
+        } else if (name.toLowerCase().contains("statistics") || name.toLowerCase().contains("status")) {
+            guiManager.openStatisticsMenu(player);
+        }
+    }
+
+    private void handleSettingsClick(InventoryClickEvent event) {
+        Player player = (Player) event.getWhoClicked();
+        ItemStack clicked = event.getCurrentItem();
+
+        if (clicked == null || !clicked.hasItemMeta()) return;
+
+        String buttonId = getButtonId(clicked);
+        if (buttonId == null) return;
+
+        switch (buttonId) {
+            case "swap_interval":
+                cycleSwapInterval(player);
+                break;
+            case "random_swaps":
+                toggleRandomSwaps(player);
+                break;
+            case "safe_swaps":
+                toggleSafeSwaps(player);
+                break;
+            case "timer_visibility":
+                cycleTimerVisibility(player);
+                break;
         }
 
-        // Handle Kits menu clicks
-        if (PlainTextComponentSerializer.plainText().serialize(event.getView().title()).contains("Kits")) {
-            event.setCancelled(true);
-            if (clickedItem.getType() == Material.ARROW) {
-                guiManager.openMainMenu(player);
-                return;
+        // Refresh the settings menu
+        guiManager.openSettingsMenu(player);
+        
+        // Update game state
+        plugin.getGameManager().refreshSwapSchedule();
+        plugin.getGameManager().refreshActionBar();
+    }
+
+    private String getButtonId(ItemStack item) {
+        if (item == null || !item.hasItemMeta()) return null;
+
+        PersistentDataContainer container = item.getItemMeta().getPersistentDataContainer();
+        // Primary key used by current GUI
+        NamespacedKey sswKey = new NamespacedKey(plugin, "ssw_button_id");
+        if (container.has(sswKey, PersistentDataType.STRING)) {
+            return container.get(sswKey, PersistentDataType.STRING);
+        }
+        // Backward compatibility
+        NamespacedKey legacyKey = new NamespacedKey(plugin, "button_id");
+        if (container.has(legacyKey, PersistentDataType.STRING)) {
+            return container.get(legacyKey, PersistentDataType.STRING);
+        }
+        return null;
+    }
+
+    private boolean isBackButton(ItemStack item) {
+        if (item == null || !item.hasItemMeta()) return false;
+        return item.getType() == Material.BARRIER && 
+               item.getItemMeta().displayName() != null &&
+               PlainTextComponentSerializer.plainText().serialize(item.getItemMeta().displayName()).contains("Back");
+    }
+
+    // Helper methods for settings actions
+    private void cycleSwapInterval(Player player) {
+        int current = plugin.getConfigManager().getSwapInterval();
+        int[] intervals = {30, 60, 120, 180, 300}; // 30s, 1m, 2m, 3m, 5m
+        
+        int nextIndex = 0;
+        for (int i = 0; i < intervals.length; i++) {
+            if (current == intervals[i]) {
+                nextIndex = (i + 1) % intervals.length;
+                break;
             }
-            if (clickedItem.getType() == Material.LIME_DYE || clickedItem.getType() == Material.GRAY_DYE) {
-                // Toggle kits
-                boolean current = plugin.getConfigManager().isKitsEnabled();
-                plugin.getConfigManager().setKitsEnabled(!current);
-                guiManager.openKitsMenu(player);
-                return;
-            }
-            if (clickedItem.getType() == Material.DIAMOND_BOOTS) {
-                // Give runner kit to clicking player
-                plugin.getKitManager().applyRunnerKit(player);
-                player.sendMessage("§aRunner kit applied.");
-                return;
-            }
-            if (clickedItem.getType() == Material.IRON_SWORD) {
-                // Give hunter kit
-                plugin.getKitManager().applyHunterKit(player);
-                player.sendMessage("§aHunter kit applied.");
-                return;
-            }
-            if (clickedItem.getType() == Material.CRAFTING_TABLE) {
-                String displayName = PlainTextComponentSerializer.plainText().serialize(clickedItem.getItemMeta().displayName());
-                if (displayName.contains("Runner")) {
-                    guiManager.openKitEditor(player, "runner");
-                } else if (displayName.contains("Hunter")) {
-                    guiManager.openKitEditor(player, "hunter");
+        }
+        
+        plugin.getConfigManager().setSwapInterval(intervals[nextIndex]);
+    }
+
+    private void toggleRandomSwaps(Player player) {
+        boolean current = plugin.getConfigManager().isSwapRandomized();
+        plugin.getConfigManager().setSwapRandomized(!current);
+    }
+
+    private void toggleSafeSwaps(Player player) {
+        boolean current = plugin.getConfigManager().isSafeSwapEnabled();
+        plugin.getConfigManager().setSafeSwapEnabled(!current);
+    }
+
+    private void cycleTimerVisibility(Player player) {
+        String current = plugin.getConfigManager().getRunnerTimerVisibility();
+        String next = switch (current) {
+            case "always" -> "last_10";
+            case "last_10" -> "never";
+            default -> "always";
+        };
+        plugin.getConfigManager().setRunnerTimerVisibility(next);
+    }
+
+    // Other menu handlers
+    private void handleTeamSelectorClick(InventoryClickEvent event) {
+        // Implement team selector click handling
+    }
+
+    // removed duplicate; implemented below
+    
+
+    private void handlePowerUpsMenuClick(InventoryClickEvent event) {
+        Player player = (Player) event.getWhoClicked();
+        ItemStack clicked = event.getCurrentItem();
+        if (clicked == null || !clicked.hasItemMeta()) return;
+
+        String name = PlainTextComponentSerializer.plainText().serialize(clicked.getItemMeta().displayName());
+
+        if (name.contains("Positive Effects")) {
+            guiManager.openPositiveEffectsMenu(player);
+            return;
+        }
+        if (name.contains("Negative Effects")) {
+            guiManager.openNegativeEffectsMenu(player);
+            return;
+        }
+        // Duration UI not implemented yet; ignore clicks safely
+    }
+
+    private void handleWorldBorderClick(InventoryClickEvent event) {
+        Player player = (Player) event.getWhoClicked();
+        ItemStack clicked = event.getCurrentItem();
+        if (clicked == null || !clicked.hasItemMeta()) return;
+
+        String name = PlainTextComponentSerializer.plainText().serialize(clicked.getItemMeta().displayName());
+        boolean changed = false;
+
+        switch (name) {
+            case "§e§lToggle World Border" -> {
+                boolean enabled = plugin.getConfig().getBoolean("world_border.enabled", true);
+                // Flip
+                plugin.getConfig().set("world_border.enabled", !enabled);
+                plugin.saveConfig();
+                // Hook start/stop
+                if (!enabled) {
+                    plugin.getWorldBorderManager().startBorderShrinking();
+                } else {
+                    plugin.getWorldBorderManager().stopBorderShrinking();
                 }
+                changed = true;
             }
+            case "§a§lInitial Border Size" -> {
+                int val = plugin.getConfig().getInt("world_border.initial_size", 2000);
+                if (event.isLeftClick()) val += event.isShiftClick() ? 500 : 100;
+                if (event.isRightClick()) val -= event.isShiftClick() ? 500 : 100;
+                val = Math.max(100, Math.min(29999984, val));
+                plugin.getConfig().set("world_border.initial_size", val);
+                plugin.saveConfig();
+                changed = true;
+            }
+            case "§c§lFinal Border Size" -> {
+                int val = plugin.getConfig().getInt("world_border.final_size", 100);
+                if (event.isLeftClick()) val += event.isShiftClick() ? 100 : 50;
+                if (event.isRightClick()) val -= event.isShiftClick() ? 100 : 50;
+                val = Math.max(50, Math.min(1000, val));
+                plugin.getConfig().set("world_border.final_size", val);
+                plugin.saveConfig();
+                changed = true;
+            }
+            case "§6§lShrink Duration" -> {
+                int val = plugin.getConfig().getInt("world_border.shrink_duration", 1800);
+                if (event.isLeftClick()) val += event.isShiftClick() ? 900 : 300;
+                if (event.isRightClick()) val -= event.isShiftClick() ? 900 : 300;
+                val = Math.max(300, Math.min(7200, val));
+                plugin.getConfig().set("world_border.shrink_duration", val);
+                plugin.saveConfig();
+                changed = true;
+            }
+            default -> {}
         }
 
-        // Handle Kit Editor
-        if (title.startsWith("§e§lEdit")) {
-            event.setCancelled(true);
-            if (clickedItem != null && clickedItem.getType() == Material.GREEN_CONCRETE) {
-                String kitType = title.contains("Runner") ? "runner" : "hunter";
-                ItemStack[] contents = event.getInventory().getContents();
-                ItemStack[] armor = new ItemStack[]{contents[48], contents[47], contents[46], contents[45]};
-                // Clear armor slots and save button from contents
-                contents[45] = null;
-                contents[46] = null;
-                contents[47] = null;
-                contents[48] = null;
-                contents[53] = null;
-                plugin.getKitConfigManager().saveKit(kitType, contents, armor);
-                player.sendMessage("§a" + kitType + " kit saved!");
+        if (changed) {
+            guiManager.openWorldBorderMenu(player);
+        }
+    }
+
+    private void handleKitsMenuClick(InventoryClickEvent event) {
+        Player player = (Player) event.getWhoClicked();
+        ItemStack clicked = event.getCurrentItem();
+        if (clicked == null || !clicked.hasItemMeta()) return;
+
+        String name = PlainTextComponentSerializer.plainText().serialize(clicked.getItemMeta().displayName());
+
+        switch (name) {
+            case "§e§lKits: §aEnabled", "§e§lKits: §cDisabled" -> {
+                boolean enabled = plugin.getConfigManager().isKitsEnabled();
+                plugin.getConfigManager().setKitsEnabled(!enabled);
                 guiManager.openKitsMenu(player);
             }
+            case "§b§lGive Runner Kit" -> plugin.getKitManager().applyRunnerKit(player);
+            case "§c§lGive Hunter Kit" -> plugin.getKitManager().applyHunterKit(player);
+            case "§b§lEdit Runner Kit" -> guiManager.openKitEditor(player, "runner");
+            case "§c§lEdit Hunter Kit" -> guiManager.openKitEditor(player, "hunter");
+            default -> {}
         }
+    }
 
-        // Handle Bounty menu clicks
-        if (PlainTextComponentSerializer.plainText().serialize(event.getView().title()).contains("Bounty")) {
-            event.setCancelled(true);
-            if (clickedItem.getType() == Material.ARROW) {
-                guiManager.openMainMenu(player);
-                return;
-            }
-            if (clickedItem.getType() == Material.GOLDEN_APPLE) {
-                plugin.getBountyManager().assignNewBounty();
-                player.sendMessage("§eNew bounty assigned.");
-                guiManager.openBountyMenu(player);
-                return;
-            }
-            if (clickedItem.getType() == Material.BARRIER) {
-                plugin.getBountyManager().clearBounty();
-                player.sendMessage("§cBounty cleared.");
-                guiManager.openBountyMenu(player);
-                return;
-            }
+    private void handleBountyMenuClick(InventoryClickEvent event) {
+        Player player = (Player) event.getWhoClicked();
+        ItemStack clicked = event.getCurrentItem();
+        if (clicked == null || !clicked.hasItemMeta()) return;
+        String name = PlainTextComponentSerializer.plainText().serialize(clicked.getItemMeta().displayName());
+
+        if (name.contains("Bounty") && name.contains(":")) {
+            boolean enabled = plugin.getConfig().getBoolean("bounty.enabled", true);
+            plugin.getConfig().set("bounty.enabled", !enabled);
+            plugin.saveConfig();
+            guiManager.openBountyMenu(player);
         }
+    }
 
-        // Handle Last Stand menu clicks
-        if (PlainTextComponentSerializer.plainText().serialize(event.getView().title()).contains("Last Stand")) {
-            event.setCancelled(true);
-            if (clickedItem.getType() == Material.ARROW) {
-                guiManager.openMainMenu(player);
-                return;
-            }
-            if (clickedItem.getType() == Material.TOTEM_OF_UNDYING || clickedItem.getType() == Material.BARRIER) {
-                boolean current = plugin.getConfigManager().isLastStandEnabled();
-                plugin.getConfig().set("last_stand.enabled", !current);
+    private void handleLastStandClick(InventoryClickEvent event) {
+        Player player = (Player) event.getWhoClicked();
+        ItemStack clicked = event.getCurrentItem();
+        if (clicked == null || !clicked.hasItemMeta()) return;
+        String name = PlainTextComponentSerializer.plainText().serialize(clicked.getItemMeta().displayName());
+
+        switch (name) {
+            case "§e§lLast Stand: §aEnabled", "§e§lLast Stand: §cDisabled" -> {
+                boolean enabled = plugin.getConfigManager().isLastStandEnabled();
+                plugin.getConfig().set("last_stand.enabled", !enabled);
                 plugin.saveConfig();
                 guiManager.openLastStandMenu(player);
-                return;
             }
-            if (clickedItem.getType() == Material.CLOCK) {
-                // Adjust duration (left/right click)
-                int current = plugin.getConfigManager().getLastStandDuration();
-                if (event.isLeftClick()) plugin.getConfig().set("last_stand.duration_ticks", current + 100);
-                if (event.isRightClick()) plugin.getConfig().set("last_stand.duration_ticks", Math.max(20, current - 100));
+            case "§6§lLast Stand Duration" -> {
+                int duration = plugin.getConfigManager().getLastStandDuration();
+                if (event.isLeftClick()) duration += 100;
+                if (event.isRightClick()) duration -= 100;
+                duration = Math.max(100, duration);
+                plugin.getConfig().set("last_stand.duration_ticks", duration);
                 plugin.saveConfig();
                 guiManager.openLastStandMenu(player);
-                return;
             }
-            if (clickedItem.getType() == Material.BLAZE_POWDER) {
-                int current = plugin.getConfigManager().getLastStandStrengthAmplifier();
-                if (event.isLeftClick()) plugin.getConfig().set("last_stand.strength_amplifier", current + 1);
-                if (event.isRightClick()) plugin.getConfig().set("last_stand.strength_amplifier", Math.max(0, current - 1));
+            case "§e§lStrength Amplifier" -> {
+                int amp = plugin.getConfigManager().getLastStandStrengthAmplifier();
+                if (event.isLeftClick()) amp++;
+                if (event.isRightClick()) amp--;
+                amp = Math.max(0, Math.min(5, amp));
+                plugin.getConfig().set("last_stand.strength_amplifier", amp);
                 plugin.saveConfig();
                 guiManager.openLastStandMenu(player);
-                return;
             }
+            default -> {}
         }
+    }
 
-        // Handle Compass Settings menu
-        if (PlainTextComponentSerializer.plainText().serialize(event.getView().title()).contains("Compass Settings")) {
-            event.setCancelled(true);
-            if (clickedItem.getType() == Material.ARROW) {
-                guiManager.openMainMenu(player);
-                return;
-            }
-            if (clickedItem.getType() == Material.REDSTONE_BLOCK || clickedItem.getType() == Material.GRAY_DYE) {
-                boolean current = plugin.getConfigManager().isCompassJammingEnabled();
-                plugin.getConfig().set("tracker.compass_jamming.enabled", !current);
+    private void handleCompassSettingsClick(InventoryClickEvent event) {
+        Player player = (Player) event.getWhoClicked();
+        ItemStack clicked = event.getCurrentItem();
+        if (clicked == null || !clicked.hasItemMeta()) return;
+        String name = PlainTextComponentSerializer.plainText().serialize(clicked.getItemMeta().displayName());
+
+        switch (name) {
+            case "§e§lCompass Jamming: §aEnabled", "§e§lCompass Jamming: §cDisabled" -> {
+                boolean enabled = plugin.getConfigManager().isCompassJammingEnabled();
+                // Write both paths for robustness
+                plugin.getConfig().set("tracker.compass_jamming.enabled", !enabled);
+                plugin.getConfig().set("sudden_death.compass_jamming.enabled", !enabled);
                 plugin.saveConfig();
                 guiManager.openCompassSettingsMenu(player);
-                return;
             }
-            if (clickedItem.getType() == Material.CLOCK) {
-                int current = plugin.getConfigManager().getCompassJamDuration();
-                if (event.isLeftClick()) plugin.getConfig().set("tracker.compass_jamming.duration_ticks", current + 20);
-                if (event.isRightClick()) plugin.getConfig().set("tracker.compass_jamming.duration_ticks", Math.max(0, current - 20));
+            case "§6§lJam Duration (ticks)" -> {
+                int duration = plugin.getConfigManager().getCompassJamDuration();
+                if (event.isLeftClick()) duration += 20;
+                if (event.isRightClick()) duration -= 20;
+                duration = Math.max(20, duration);
+                plugin.getConfig().set("tracker.compass_jamming.duration_ticks", duration);
+                plugin.getConfig().set("sudden_death.compass_jamming.duration_ticks", duration);
                 plugin.saveConfig();
                 guiManager.openCompassSettingsMenu(player);
-                return;
             }
+            default -> {}
         }
+    }
 
-        // Handle Sudden Death menu
-        if (PlainTextComponentSerializer.plainText().serialize(event.getView().title()).contains("Sudden Death")) {
-            event.setCancelled(true);
-            if (clickedItem.getType() == Material.ARROW) {
-                guiManager.openMainMenu(player);
-                return;
-            }
-            if (clickedItem.getType() == Material.CLOCK && PlainTextComponentSerializer.plainText().serialize(clickedItem.getItemMeta().displayName()).contains("Schedule")) {
-                plugin.getSuddenDeathManager().scheduleSuddenDeath();
-                player.sendMessage("§eSudden Death scheduled.");
-                guiManager.openSuddenDeathMenu(player);
-                return;
-            }
-            if (clickedItem.getType() == Material.DRAGON_HEAD) {
-                plugin.getSuddenDeathManager().activateSuddenDeath();
-                player.sendMessage("§cSudden Death activated.");
-                guiManager.openSuddenDeathMenu(player);
-                return;
-            }
-            if (clickedItem.getType() == Material.CLOCK && PlainTextComponentSerializer.plainText().serialize(clickedItem.getItemMeta().displayName()).contains("Activation Delay")) {
-                long current = plugin.getConfig().getLong("sudden_death.activation_delay", 120);
-                if (event.isLeftClick()) plugin.getConfig().set("sudden_death.activation_delay", Math.max(1, current + 5));
-                if (event.isRightClick()) plugin.getConfig().set("sudden_death.activation_delay", Math.max(1, current - 5));
+    private void handleSuddenDeathClick(InventoryClickEvent event) {
+        Player player = (Player) event.getWhoClicked();
+        ItemStack clicked = event.getCurrentItem();
+        if (clicked == null || !clicked.hasItemMeta()) return;
+        String name = PlainTextComponentSerializer.plainText().serialize(clicked.getItemMeta().displayName());
+
+        switch (name) {
+            case "§e§lSchedule Sudden Death" -> plugin.getSuddenDeathManager().scheduleSuddenDeath();
+            case "§c§lActivate Now" -> plugin.getSuddenDeathManager().activateSuddenDeath();
+            case "§6§lActivation Delay (minutes)" -> {
+                long minutes = plugin.getConfig().getLong("sudden_death.activation_delay", 120);
+                if (event.isLeftClick()) minutes += 5;
+                if (event.isRightClick()) minutes -= 5;
+                minutes = Math.max(5, Math.min(360, minutes));
+                plugin.getConfig().set("sudden_death.activation_delay", minutes);
                 plugin.saveConfig();
-                guiManager.openSuddenDeathMenu(player);
-                return;
+            }
+            default -> {}
+        }
+        // Refresh
+        guiManager.openSuddenDeathMenu(player);
+    }
+
+    private void handleStatisticsClick(InventoryClickEvent event) {
+        Player player = (Player) event.getWhoClicked();
+        ItemStack clicked = event.getCurrentItem();
+        if (clicked == null || !clicked.hasItemMeta()) return;
+        String name = PlainTextComponentSerializer.plainText().serialize(clicked.getItemMeta().displayName());
+
+        switch (name) {
+            case "§e§lDisplay Statistics" -> plugin.getStatsManager().displayStats();
+            case "§a§lStart Tracking" -> plugin.getStatsManager().startTracking();
+            case "§c§lStop Tracking" -> plugin.getStatsManager().stopTracking();
+            default -> {}
+        }
+        guiManager.openStatisticsMenu(player);
+    }
+
+    private void handleEffectsMenuClick(InventoryClickEvent event, String title) {
+        Player player = (Player) event.getWhoClicked();
+        ItemStack clicked = event.getCurrentItem();
+        if (clicked == null || !clicked.hasItemMeta()) return;
+
+        java.util.List<net.kyori.adventure.text.Component> lore = clicked.getItemMeta().lore();
+        if (lore == null) return;
+        String effectId = null;
+        for (net.kyori.adventure.text.Component line : lore) {
+            String text = PlainTextComponentSerializer.plainText().serialize(line);
+            int idx = text.indexOf("Effect ID:");
+            if (idx >= 0) {
+                // format: "Effect ID: <ID>"
+                int split = text.indexOf(':');
+                if (split >= 0 && split + 1 < text.length()) {
+                    effectId = text.substring(split + 1).trim();
+                }
+                break;
             }
         }
+        if (effectId == null || effectId.isEmpty()) return;
 
-        // Handle Statistics menu
-        if (PlainTextComponentSerializer.plainText().serialize(event.getView().title()).contains("Statistics")) {
-            event.setCancelled(true);
-            if (clickedItem.getType() == Material.ARROW) {
-                guiManager.openMainMenu(player);
-                return;
-            }
-            if (clickedItem.getType() == Material.BOOK) {
-                plugin.getStatsManager().displayStats();
-                player.sendMessage("§eStatistics displayed.");
-                return;
-            }
-            if (clickedItem.getType() == Material.GREEN_CONCRETE) {
-                plugin.getStatsManager().startTracking();
-                player.sendMessage("§aStats tracking started.");
-                return;
-            }
-            if (clickedItem.getType() == Material.RED_CONCRETE) {
-                plugin.getStatsManager().stopTracking();
-                player.sendMessage("§cStats tracking stopped and broadcasted.");
-                return;
-            }
-        }
+        boolean positive = title.contains("Positive Effects");
+        java.util.List<String> list = new java.util.ArrayList<>(positive
+            ? plugin.getConfig().getStringList("power_ups.good_effects")
+            : plugin.getConfig().getStringList("power_ups.bad_effects"));
+
+        if (list.contains(effectId)) list.remove(effectId); else list.add(effectId);
+        if (positive) plugin.getConfig().set("power_ups.good_effects", list);
+        else plugin.getConfig().set("power_ups.bad_effects", list);
+        plugin.saveConfig();
+
+        // Refresh menu
+        if (positive) guiManager.openPositiveEffectsMenu(player); else guiManager.openNegativeEffectsMenu(player);
     }
-
-    private void handleSwapIntervalClick(InventoryClickEvent event) {
-        ItemStack clickedItem = event.getCurrentItem();
-        if (clickedItem == null || !guiManager.isSwapIntervalButton(clickedItem)) return;
-        
-        int currentInterval = plugin.getConfigManager().getSwapInterval();
-        if (event.isLeftClick()) {
-            if (event.isShiftClick()) {
-                plugin.getConfigManager().setSwapInterval(currentInterval + 60);
-            } else {
-                plugin.getConfigManager().setSwapInterval(currentInterval + 30);
-            }
-        } else if (event.isRightClick()) {
-            if (event.isShiftClick()) {
-                plugin.getConfigManager().setSwapInterval(Math.max(30, currentInterval - 60));
-            } else {
-                plugin.getConfigManager().setSwapInterval(Math.max(30, currentInterval - 30));
-            }
-        }
-        guiManager.openSettingsMenu((Player) event.getWhoClicked());
-    }
-
-    private void handleRandomizeSwapClick(InventoryClickEvent event) {
-        ItemStack clickedItem = event.getCurrentItem();
-        if (clickedItem == null || !guiManager.isRandomizeSwapButton(clickedItem)) return;
-        
-        boolean currentValue = plugin.getConfigManager().isSwapRandomized();
-        plugin.getConfigManager().setSwapRandomized(!currentValue);
-        guiManager.openSettingsMenu((Player) event.getWhoClicked());
-    }
-
-    private void handleSafeSwapClick(InventoryClickEvent event) {
-        ItemStack clickedItem = event.getCurrentItem();
-        if (clickedItem == null || !guiManager.isSafeSwapButton(clickedItem)) return;
-        
-        boolean currentValue = plugin.getConfigManager().isSafeSwapEnabled();
-        plugin.getConfigManager().setSafeSwapEnabled(!currentValue);
-        guiManager.openSettingsMenu((Player) event.getWhoClicked());
-    }
-
-    private void handleActiveRunnerTimerClick(InventoryClickEvent event) {
-        String currentVisibility = plugin.getConfigManager().getRunnerTimerVisibility();
-        String nextVisibility = guiManager.getNextVisibility(currentVisibility);
-        plugin.getConfigManager().setRunnerTimerVisibility(nextVisibility);
-        guiManager.openSettingsMenu((Player) event.getWhoClicked());
-    }
-
-    private void handleWaitingRunnerTimerClick(InventoryClickEvent event) {
-        String currentVisibility = plugin.getConfigManager().getWaitingTimerVisibility();
-        String nextVisibility = guiManager.getNextVisibility(currentVisibility);
-        plugin.getConfigManager().setWaitingTimerVisibility(nextVisibility);
-        guiManager.openSettingsMenu((Player) event.getWhoClicked());
-    }
-
-    private void handleHunterTimerClick(InventoryClickEvent event) {
-        String currentVisibility = plugin.getConfigManager().getHunterTimerVisibility();
-        String nextVisibility = guiManager.getNextVisibility(currentVisibility);
-        plugin.getConfigManager().setHunterTimerVisibility(nextVisibility);
-        guiManager.openSettingsMenu((Player) event.getWhoClicked());
-    }
-
-
 }

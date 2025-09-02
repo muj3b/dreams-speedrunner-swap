@@ -7,16 +7,11 @@ import org.bukkit.WorldBorder;
 
 public class WorldBorderManager {
     private final SpeedrunnerSwap plugin;
-    private final int initialSize;
-    private final int finalSize;
-    private final long shrinkDuration;
+    // Values are read from config at runtime to reflect GUI changes
     private boolean isActive;
 
     public WorldBorderManager(SpeedrunnerSwap plugin) {
         this.plugin = plugin;
-        this.initialSize = plugin.getConfig().getInt("world_border.initial_size", 2000);
-        this.finalSize = plugin.getConfig().getInt("world_border.final_size", 100);
-        this.shrinkDuration = plugin.getConfig().getLong("world_border.shrink_duration", 1800); // 30 minutes default
         this.isActive = false;
     }
 
@@ -25,6 +20,10 @@ public class WorldBorderManager {
         isActive = true;
 
         // Set up world border for all worlds
+        int initialSize = plugin.getConfig().getInt("world_border.initial_size", 2000);
+        int finalSize = plugin.getConfig().getInt("world_border.final_size", 100);
+        long shrinkDuration = plugin.getConfig().getLong("world_border.shrink_duration", 1800);
+
         for (World world : Bukkit.getWorlds()) {
             WorldBorder border = world.getWorldBorder();
             border.setCenter(0, 0);
@@ -49,6 +48,7 @@ public class WorldBorderManager {
         if (!isActive) return;
         isActive = false;
 
+        int initialSize = plugin.getConfig().getInt("world_border.initial_size", 2000);
         for (World world : Bukkit.getWorlds()) {
             WorldBorder border = world.getWorldBorder();
             border.setSize(initialSize);
@@ -62,6 +62,7 @@ public class WorldBorderManager {
 
             World overworld = Bukkit.getWorlds().get(0);
             double currentSize = overworld.getWorldBorder().getSize();
+            int finalSize = plugin.getConfig().getInt("world_border.final_size", 100);
             
             if (currentSize > finalSize) {
                 Bukkit.broadcast(
