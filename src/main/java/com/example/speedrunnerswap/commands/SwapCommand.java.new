@@ -24,41 +24,34 @@ public class SwapCommand implements CommandExecutor, TabCompleter {
     
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
-        try {
-            if (args.length == 0) {
+        if (args.length == 0) {
+            return handleMainCommand(sender);
+        }
+        
+        String subCommand = args[0].toLowerCase();
+        
+        switch (subCommand) {
+            case "start":
+                return handleStart(sender);
+            case "stop":
+                return handleStop(sender);
+            case "pause":
+                return handlePause(sender);
+            case "resume":
+                return handleResume(sender);
+            case "status":
+                return handleStatus(sender);
+            case "setrunners":
+                return handleSetRunners(sender, Arrays.copyOfRange(args, 1, args.length));
+            case "sethunters":
+                return handleSetHunters(sender, Arrays.copyOfRange(args, 1, args.length));
+            case "reload":
+                return handleReload(sender);
+            case "gui":
                 return handleMainCommand(sender);
-            }
-
-            String subCommand = args[0].toLowerCase();
-
-            switch (subCommand) {
-                case "start":
-                    return handleStart(sender);
-                case "stop":
-                    return handleStop(sender);
-                case "pause":
-                    return handlePause(sender);
-                case "resume":
-                    return handleResume(sender);
-                case "status":
-                    return handleStatus(sender);
-                case "setrunners":
-                    return handleSetRunners(sender, Arrays.copyOfRange(args, 1, args.length));
-                case "sethunters":
-                    return handleSetHunters(sender, Arrays.copyOfRange(args, 1, args.length));
-                case "reload":
-                    return handleReload(sender);
-                case "gui":
-                    return handleMainCommand(sender);
-                default:
-                    sender.sendMessage("§cUnknown subcommand. Use /swap for help.");
-                    return false;
-            }
-        } catch (Exception e) {
-            // Catch any unexpected errors so Bukkit doesn't show the generic message without a stacktrace
-            sender.sendMessage("§cAn internal error occurred while executing that command. Check server logs for details.");
-            plugin.getLogger().log(Level.SEVERE, "Unhandled exception while executing /swap by " + (sender == null ? "UNKNOWN" : sender.getName()), e);
-            return false;
+            default:
+                sender.sendMessage("§cUnknown subcommand. Use /swap for help.");
+                return false;
         }
     }
 

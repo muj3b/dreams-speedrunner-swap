@@ -30,38 +30,23 @@ public class SettingsGuiListener implements Listener {
 
         event.setCancelled(true);
 
-        // Handle back button clicks
-        if (clickedItem.getType() == Material.BARRIER && 
-            clickedItem.getItemMeta().displayName() != null &&
-            clickedItem.getItemMeta().displayName().equals(net.kyori.adventure.text.Component.text("§c§lBack to Main Menu"))) {
-            guiManager.openMainMenu(player);
-            return;
-        }
-
-        // Handle tracker settings
-        Component displayName = clickedItem.getItemMeta().displayName();
-        if (displayName != null) {
-            String itemName = PlainTextComponentSerializer.plainText().serialize(displayName);
-            if (itemName.contains("Distance Display")) {
-                boolean currentState = plugin.getConfigManager().isShowDistance();
-                plugin.getConfigManager().setShowDistance(!currentState);
-                guiManager.openSettingsMenu(player);
-                return;
-            }
-            if (itemName.contains("Particle Trail")) {
-                boolean currentState = plugin.getConfigManager().isShowParticles();
-                plugin.getConfigManager().setShowParticles(!currentState);
-                guiManager.openSettingsMenu(player);
-                return;
+        // Handle back button clicks (arrow)
+        if (clickedItem.getType() == Material.ARROW) {
+            if (clickedItem.hasItemMeta() && clickedItem.getItemMeta().displayName() != null) {
+                String name = PlainTextComponentSerializer.plainText().serialize(clickedItem.getItemMeta().displayName());
+                if (name.contains("Back")) {
+                    guiManager.openMainMenu(player);
+                    return;
+                }
             }
         }
 
-        // Handle different menus
-        String titleText = net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer.plainText().serialize(title);
-        
-        if (titleText.equals("§c§lWorld Border Settings")) {
+        // Handle different menus (match by title contains to be more robust)
+        String titleText = PlainTextComponentSerializer.plainText().serialize(title);
+
+        if (titleText.contains("World Border")) {
             handleWorldBorderClick(event);
-        } else if (titleText.equals("§d§lPower-ups Settings")) {
+        } else if (titleText.contains("Power-ups")) {
             handlePowerUpsClick(event);
         }
         // Add more cases for other menus

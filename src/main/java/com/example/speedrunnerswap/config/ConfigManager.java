@@ -30,15 +30,11 @@ public class ConfigManager {
     private List<String> hunterNames;
     private Set<Material> dangerousBlocks;
     private boolean powerUpsEnabled;
-    private boolean showDistance;
-    private boolean showParticles;
     
     public ConfigManager(SpeedrunnerSwap plugin) {
         this.plugin = plugin;
         loadConfig();
         this.powerUpsEnabled = config.getBoolean("powerups.enabled", true);
-        this.showDistance = config.getBoolean("tracker.show_distance", false);
-        this.showParticles = config.getBoolean("tracker.show_particles", false);
     }
     
     /**
@@ -565,6 +561,15 @@ public class ConfigManager {
         return config.getBoolean("kits.enabled", true);
     }
 
+    /**
+     * Set whether kits are enabled
+     * @param enabled true to enable kits
+     */
+    public void setKitsEnabled(boolean enabled) {
+        config.set("kits.enabled", enabled);
+        plugin.saveConfig();
+    }
+
     public List<String> getRunnerKitItems() {
         return config.getStringList("kits.runner_kit");
     }
@@ -577,41 +582,7 @@ public class ConfigManager {
         return config.getBoolean("swap.hot_potato_mode.enabled", false);
     }
 
-    /**
-     * Get whether to show distance to target in action bar
-     * @return True if distance should be shown
-     */
-    public boolean isShowDistance() {
-        return this.showDistance;
-    }
 
-    /**
-     * Set whether to show distance to target in action bar
-     * @param show True to show distance
-     */
-    public void setShowDistance(boolean show) {
-        this.showDistance = show;
-        config.set("tracker.show_distance", show);
-        saveConfig();
-    }
-
-    /**
-     * Get whether to show particle trails for the runner
-     * @return True if particles should be shown
-     */
-    public boolean isShowParticles() {
-        return this.showParticles;
-    }
-
-    /**
-     * Set whether to show particle trails for the runner
-     * @param show True to show particles
-     */
-    public void setShowParticles(boolean show) {
-        this.showParticles = show;
-        config.set("tracker.show_particles", show);
-        saveConfig();
-    }
 
     /**
      * Set the timer visibility setting for active runners

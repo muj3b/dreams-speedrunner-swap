@@ -74,19 +74,9 @@ tracker:
   enabled: true
   # How often to update the compass (in ticks, 20 ticks = 1 second)
   update_ticks: 20
-  # Whether to show coordinates in action bar for hunters
-  show_coordinates: true
-  # Particle trail for active runner
-  particle_trail:
+  compass_jamming:
     enabled: true
-    type: DUST
-    # For DUST, specify color as RGB (0-255)
-    color: 255,0,0
-    # How often to spawn particles (in ticks)
-    spawn_interval: 10
-    compass_jamming:
-      enabled: true
-      duration_ticks: 100 # 5 seconds
+    duration_ticks: 100 # 5 seconds
 
 # GUI Configuration
 gui:

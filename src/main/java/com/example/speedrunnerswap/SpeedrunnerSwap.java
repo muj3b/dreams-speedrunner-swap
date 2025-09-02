@@ -15,6 +15,7 @@ import com.example.speedrunnerswap.game.WorldBorderManager;
 import com.example.speedrunnerswap.game.BountyManager;
 import com.example.speedrunnerswap.game.SuddenDeathManager;
 import com.example.speedrunnerswap.game.CompassManager;
+import com.example.speedrunnerswap.game.KitConfigManager;
 // Removed unused Bukkit import
 import org.bukkit.plugin.java.JavaPlugin;
 
@@ -32,6 +33,7 @@ public final class SpeedrunnerSwap extends JavaPlugin {
     private BountyManager bountyManager;
     private SuddenDeathManager suddenDeathManager;
     private CompassManager compassManager;
+    private KitConfigManager kitConfigManager;
     
     @Override
     public void onEnable() {
@@ -49,6 +51,7 @@ public final class SpeedrunnerSwap extends JavaPlugin {
         this.bountyManager = new BountyManager(this);
         this.suddenDeathManager = new SuddenDeathManager(this);
         this.compassManager = new CompassManager(this);
+        this.kitConfigManager = new KitConfigManager(this);
         
         // Register commands
         getCommand("swap").setExecutor(new SwapCommand(this));
@@ -143,5 +146,9 @@ public final class SpeedrunnerSwap extends JavaPlugin {
 
     public CompassManager getCompassManager() {
         return compassManager;
+    }
+
+    public KitConfigManager getKitConfigManager() {
+        return kitConfigManager;
     }
 }

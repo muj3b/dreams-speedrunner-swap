@@ -7,8 +7,7 @@ import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.CompassMeta;
 import org.bukkit.scheduler.BukkitTask;
-import org.bukkit.Particle;
-import org.bukkit.Color;
+// Particle functionality removed - imports intentionally omitted
 import org.bukkit.Location;
 import org.bukkit.World;
 
@@ -54,41 +53,8 @@ public class TrackerManager {
             }, 0L, updateTicks);
         }
 
-        if (plugin.getConfigManager().isShowParticles()) {
-            synchronized (taskLock) {
-                if (particleTask != null) {
-                    particleTask.cancel();
-                }
-                int spawnInterval = plugin.getConfigManager().getParticleSpawnInterval();
-                particleTask = Bukkit.getScheduler().runTaskTimer(plugin, () -> {
-                    Player activeRunner = plugin.getGameManager().getActiveRunner();
-                    if (activeRunner == null || !activeRunner.isOnline() || !plugin.getGameManager().isGameRunning()) {
-                        return;
-                    }
-
-                    String particleTypeStr = plugin.getConfigManager().getParticleTrailType();
-                    Particle particleType;
-                    try {
-                        particleType = Particle.valueOf(particleTypeStr);
-                    } catch (IllegalArgumentException e) {
-                        plugin.getLogger().warning("Invalid particle type: " + particleTypeStr);
-                        return;
-                    }
-
-                    Object data = null;
-                    if (particleType == Particle.DUST) {
-                        int[] rgb = plugin.getConfigManager().getParticleTrailColor();
-                        data = new Particle.DustOptions(Color.fromRGB(rgb[0], rgb[1], rgb[2]), 1.0f);
-                    }
-
-                    for (Player hunter : plugin.getGameManager().getHunters()) {
-                        if (hunter.isOnline() && hunter.getWorld().equals(activeRunner.getWorld())) {
-                            hunter.spawnParticle(particleType, activeRunner.getLocation(), 5, 0.5, 0.5, 0.5, 0, data);
-                        }
-                    }
-                }, 0L, spawnInterval);
-            }
-        }
+    // Particle trails have been removed intentionally. Hunters receive only the tracking compass.
+    // If a future toggle is desired, reintroduce scheduled particleTask logic here guarded by config.
     }
     
     /**
@@ -222,14 +188,7 @@ public class TrackerManager {
                         hunter.getInventory().setItem(slot, compass);
                     }
                     
-                    // Send distance message if enabled
-                    if (hunterEnv == targetEnv && plugin.getConfigManager().isShowDistance() && System.currentTimeMillis() % 5000 < 50) {
-                        int distance = (int) hunter.getLocation().distance(target.getLocation());
-                        hunter.sendActionBar(net.kyori.adventure.text.Component.text()
-                            .append(net.kyori.adventure.text.Component.text("Distance to target: ", net.kyori.adventure.text.format.NamedTextColor.YELLOW))
-                            .append(net.kyori.adventure.text.Component.text(distance + " blocks", net.kyori.adventure.text.format.NamedTextColor.WHITE))
-                            .build());
-                    }
+                    // Distance display removed intentionally; hunters receive only the compass.
                 }
             }
         } catch (Exception e) {

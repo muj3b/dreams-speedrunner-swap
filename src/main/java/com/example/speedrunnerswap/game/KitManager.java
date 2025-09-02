@@ -34,10 +34,10 @@ public class KitManager {
         }
 
         String configPath = "kits." + kitType.toLowerCase();
-        ConfigurationSection kitSection = plugin.getConfig().getConfigurationSection(configPath);
+        ConfigurationSection kitSection = plugin.getKitConfigManager().getConfig().getConfigurationSection(configPath);
 
         if (kitSection == null) {
-            logger.warning("Kit section '" + configPath + "' not found in config!");
+            logger.warning("Kit section '" + configPath + "' not found in kits.yml!");
             return;
         }
 
@@ -62,27 +62,40 @@ public class KitManager {
         player.getInventory().setArmorContents(null);
     }
 
-    private List<ItemStack> loadKitItems(ConfigurationSection section) {
+    public List<ItemStack> loadKitItems(ConfigurationSection section) {
         List<ItemStack> items = new ArrayList<>();
-        
-        for (String key : section.getKeys(false)) {
-            if (key.equals("armor")) continue;
-
-            if (section.isConfigurationSection(key)) {
-                ConfigurationSection itemSection = section.getConfigurationSection(key);
-                if (itemSection != null) {
-                    try {
-                        Material material = Material.valueOf(itemSection.getString("material", "").toUpperCase());
-                        int amount = itemSection.getInt("amount", 1);
-                        items.add(new ItemStack(material, amount));
-                    } catch (IllegalArgumentException e) {
-                        logger.warning("Invalid material in kit: " + itemSection.getString("material"));
-                    }
-                }
+        List<String> itemStrings = section.getStringList("items");
+        for (String itemString : itemStrings) {
+            try {
+                String[] parts = itemString.split(" ");
+                Material material = Material.valueOf(parts[0].toUpperCase());
+                int amount = parts.length > 1 ? Integer.parseInt(parts[1]) : 1;
+                items.add(new ItemStack(material, amount));
+            } catch (Exception e) {
+                logger.warning("Invalid item in kit: " + itemString);
             }
         }
-
         return items;
+    }
+
+    public ItemStack[] loadKitArmor(ConfigurationSection section) {
+        ItemStack[] armor = new ItemStack[4];
+        ConfigurationSection armorSection = section.getConfigurationSection("armor");
+        if (armorSection == null) return armor;
+
+        try {
+            String boots = armorSection.getString("boots");
+            if (boots != null) armor[0] = new ItemStack(Material.valueOf(boots.toUpperCase()));
+            String leggings = armorSection.getString("leggings");
+            if (leggings != null) armor[1] = new ItemStack(Material.valueOf(leggings.toUpperCase()));
+            String chestplate = armorSection.getString("chestplate");
+            if (chestplate != null) armor[2] = new ItemStack(Material.valueOf(chestplate.toUpperCase()));
+            String helmet = armorSection.getString("helmet");
+            if (helmet != null) armor[3] = new ItemStack(Material.valueOf(helmet.toUpperCase()));
+        } catch (IllegalArgumentException e) {
+            logger.warning("Invalid armor material in kit: " + e.getMessage());
+        }
+        return armor;
     }
 
     private void giveArmor(Player player, ConfigurationSection section) {
@@ -90,29 +103,6 @@ public class KitManager {
         if (armorSection == null) return;
 
         PlayerInventory inventory = player.getInventory();
-
-        try {
-            String helmet = armorSection.getString("helmet");
-            if (helmet != null) {
-                inventory.setHelmet(new ItemStack(Material.valueOf(helmet.toUpperCase())));
-            }
-
-            String chestplate = armorSection.getString("chestplate");
-            if (chestplate != null) {
-                inventory.setChestplate(new ItemStack(Material.valueOf(chestplate.toUpperCase())));
-            }
-
-            String leggings = armorSection.getString("leggings");
-            if (leggings != null) {
-                inventory.setLeggings(new ItemStack(Material.valueOf(leggings.toUpperCase())));
-            }
-
-            String boots = armorSection.getString("boots");
-            if (boots != null) {
-                inventory.setBoots(new ItemStack(Material.valueOf(boots.toUpperCase())));
-            }
-        } catch (IllegalArgumentException e) {
-            logger.warning("Invalid armor material in kit: " + e.getMessage());
-        }
+        inventory.setArmorContents(loadKitArmor(section));
     }
 }

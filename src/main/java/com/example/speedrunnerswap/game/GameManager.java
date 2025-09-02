@@ -927,6 +927,44 @@ public class GameManager {
     public boolean isGamePaused() {
         return gamePaused;
     }
+
+    /**
+     * Refresh swap scheduling using current config (live apply).
+     */
+    public void refreshSwapSchedule() {
+        // Cancel existing and reschedule using current config
+        scheduleNextSwap();
+    }
+
+    /**
+     * Refresh hunter swap schedule (live apply).
+     */
+    public void refreshHunterSwapSchedule() {
+        scheduleNextHunterSwap();
+    }
+
+    /**
+     * Refresh action bar updater so visibility changes apply immediately.
+     */
+    public void refreshActionBar() {
+        if (actionBarTask != null) {
+            actionBarTask.cancel();
+            actionBarTask = null;
+        }
+        startActionBarUpdates();
+    }
+
+    /**
+     * Refresh tracker (start/stop) to apply tracker-related config changes immediately.
+     */
+    public void refreshTracker() {
+        if (plugin.getConfigManager().isTrackerEnabled()) {
+            plugin.getTrackerManager().stopTracking();
+            plugin.getTrackerManager().startTracking();
+        } else {
+            plugin.getTrackerManager().stopTracking();
+        }
+    }
     
     /**
      * Add a player to the runners team
