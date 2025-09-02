@@ -2,11 +2,10 @@ package com.example.speedrunnerswap.utils;
 
 import com.example.speedrunnerswap.models.PlayerState;
 import org.bukkit.entity.Player;
-import org.bukkit.inventory.ItemStack;
 import org.bukkit.potion.PotionEffect;
+import org.bukkit.attribute.Attribute;
 
 import java.util.ArrayList;
-import java.util.Collection;
 
 /**
  * Utility class for capturing and applying player states
@@ -39,7 +38,16 @@ public class PlayerStateUtil {
                 player.getAllowFlight(),
                 player.isFlying(),
                 new ArrayList<>(player.getActivePotionEffects()),
-                player.getAbsorptionAmount()
+                player.getAbsorptionAmount(),
+                player.getVehicle(),
+                player.isInsideVehicle(),
+                player.getTicksLived(),
+                player.getLastDamage(),
+                player.getNoDamageTicks(),
+                player.isGliding(),
+                player.getWalkSpeed(),
+                player.getFlySpeed(),
+                player.getPortalCooldown()
         );
     }
 
@@ -59,7 +67,7 @@ public class PlayerStateUtil {
         player.teleport(state.getLocation());
         
         // Apply health and food
-        player.setHealth(Math.min(state.getHealth(), player.getMaxHealth()));
+        player.setHealth(Math.min(state.getHealth(), player.getAttribute(Attribute.MAX_HEALTH).getValue()));
         player.setFoodLevel(state.getFoodLevel());
         player.setSaturation(state.getSaturation());
         player.setExhaustion(state.getExhaustion());
@@ -88,6 +96,28 @@ public class PlayerStateUtil {
             player.addPotionEffect(effect);
         }
         
+        // Handle vehicle state
+        if (player.isInsideVehicle() && player.getVehicle() != null) {
+            player.getVehicle().eject();
+        }
+        if (state.isInVehicle() && state.getVehicle() != null) {
+            state.getVehicle().addPassenger(player);
+        }
+
+        // Apply speed settings
+        player.setWalkSpeed(state.getWalkSpeed());
+        player.setFlySpeed(state.getFlySpeed());
+
+        // Apply gliding state
+        player.setGliding(state.isGliding());
+
+        // Apply damage-related stats
+        player.setLastDamage(state.getLastDamage());
+        player.setNoDamageTicks(state.getNoDamageTicks());
+
+        // Apply portal cooldown
+        player.setPortalCooldown(state.getPortalCooldown());
+
         // Update inventory
         player.updateInventory();
     }

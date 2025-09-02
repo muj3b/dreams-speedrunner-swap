@@ -1,0 +1,45 @@
+# Kit Configuration
+kits:
+  enabled: true
+  runner:
+    sword:
+      material: WOODEN_SWORD
+      amount: 1
+    pickaxe:
+      material: WOODEN_PICKAXE
+      amount: 1
+    axe:
+      material: WOODEN_AXE
+      amount: 1
+    food:
+      material: BREAD
+      amount: 16
+    torch:
+      material: TORCH
+      amount: 16
+    armor:
+      helmet: LEATHER_HELMET
+      chestplate: LEATHER_CHESTPLATE
+      leggings: LEATHER_LEGGINGS
+      boots: LEATHER_BOOTS
+  hunter:
+    sword:
+      material: STONE_SWORD
+      amount: 1
+    bow:
+      material: BOW
+      amount: 1
+    arrows:
+      material: ARROW
+      amount: 32
+    food:
+      material: COOKED_BEEF
+      amount: 16
+    compass:
+      material: COMPASS
+      amount: 1
+    armor:
+      helmet: IRON_HELMET
+      chestplate: IRON_CHESTPLATE
+      leggings: IRON_LEGGINGS
+      boots: IRON_BOOTS

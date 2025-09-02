@@ -1,0 +1,79 @@
+package com.example.speedrunnerswap.game;
+
+import com.example.speedrunnerswap.SpeedrunnerSwap;
+import org.bukkit.Bukkit;
+import org.bukkit.World;
+import org.bukkit.WorldBorder;
+
+public class WorldBorderManager {
+    private final SpeedrunnerSwap plugin;
+    private final int initialSize;
+    private final int finalSize;
+    private final long shrinkDuration;
+    private boolean isActive;
+
+    public WorldBorderManager(SpeedrunnerSwap plugin) {
+        this.plugin = plugin;
+        this.initialSize = plugin.getConfig().getInt("world_border.initial_size", 2000);
+        this.finalSize = plugin.getConfig().getInt("world_border.final_size", 100);
+        this.shrinkDuration = plugin.getConfig().getLong("world_border.shrink_duration", 1800); // 30 minutes default
+        this.isActive = false;
+    }
+
+    public void startBorderShrinking() {
+        if (isActive) return;
+        isActive = true;
+
+        // Set up world border for all worlds
+        for (World world : Bukkit.getWorlds()) {
+            WorldBorder border = world.getWorldBorder();
+            border.setCenter(0, 0);
+            border.setSize(initialSize);
+            
+            // Start shrinking
+            border.setSize(finalSize, shrinkDuration);
+
+            // Broadcast border start message
+            Bukkit.broadcast(
+                net.kyori.adventure.text.Component.text("§c§lWorld Border will shrink from " + 
+                    initialSize + " blocks to " + finalSize + " blocks over " + 
+                    (shrinkDuration / 60) + " minutes!")
+            );
+        }
+
+        // Schedule warning messages
+        scheduleBorderWarnings();
+    }
+
+    public void stopBorderShrinking() {
+        if (!isActive) return;
+        isActive = false;
+
+        for (World world : Bukkit.getWorlds()) {
+            WorldBorder border = world.getWorldBorder();
+            border.setSize(initialSize);
+        }
+    }
+
+    private void scheduleBorderWarnings() {
+        // Schedule periodic warnings about border size
+        Bukkit.getScheduler().runTaskTimer(plugin, () -> {
+            if (!isActive) return;
+
+            World overworld = Bukkit.getWorlds().get(0);
+            double currentSize = overworld.getWorldBorder().getSize();
+            
+            if (currentSize > finalSize) {
+                Bukkit.broadcast(
+                    net.kyori.adventure.text.Component.text(
+                        String.format("§e§lWorld Border: §r§e%.0f blocks and shrinking!", currentSize)
+                    )
+                );
+            }
+        }, 20 * 60 * 5, 20 * 60 * 5); // Every 5 minutes
+    }
+
+    public boolean isActive() {
+        return isActive;
+    }
+}

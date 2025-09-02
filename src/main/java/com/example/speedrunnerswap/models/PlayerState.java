@@ -2,6 +2,7 @@ package com.example.speedrunnerswap.models;
 
 import org.bukkit.GameMode;
 import org.bukkit.Location;
+import org.bukkit.entity.Entity;
 import org.bukkit.inventory.ItemStack;
 
 
@@ -31,6 +32,15 @@ public class PlayerState {
     private final boolean flying;
     private final Collection<PotionEffect> activePotionEffects;
     private final double absorptionAmount;
+    private final Entity vehicle;
+    private final boolean inVehicle;
+    private final int ticksLived;
+    private final double lastDamage;
+    private final int noDamageTicks;
+    private final boolean gliding;
+    private final float walkSpeed;
+    private final float flySpeed;
+    private final int portalCooldown;
     private Team selectedTeam;
 
     public int getFireTicks() {
@@ -43,6 +53,42 @@ public class PlayerState {
 
     public int getMaximumAir() {
         return maximumAir;
+    }
+
+    public Entity getVehicle() {
+        return vehicle;
+    }
+
+    public boolean isInVehicle() {
+        return inVehicle;
+    }
+
+    public int getTicksLived() {
+        return ticksLived;
+    }
+
+    public double getLastDamage() {
+        return lastDamage;
+    }
+
+    public int getNoDamageTicks() {
+        return noDamageTicks;
+    }
+
+    public boolean isGliding() {
+        return gliding;
+    }
+
+    public float getWalkSpeed() {
+        return walkSpeed;
+    }
+
+    public float getFlySpeed() {
+        return flySpeed;
+    }
+
+    public int getPortalCooldown() {
+        return portalCooldown;
     }
 
     public GameMode getGameMode() {
@@ -80,7 +126,9 @@ public class PlayerState {
                       int totalExperience, float exp, int level, int fireTicks,
                       int remainingAir, int maximumAir, GameMode gameMode, float fallDistance,
                       boolean allowFlight, boolean flying, Collection<PotionEffect> activePotionEffects,
-                      double absorptionAmount) {
+                      double absorptionAmount, Entity vehicle, boolean inVehicle, int ticksLived,
+                      double lastDamage, int noDamageTicks, boolean gliding, float walkSpeed,
+                      float flySpeed, int portalCooldown) {
         this.inventory = inventory;
         this.armor = armor;
         this.offhand = offhand;
@@ -101,6 +149,15 @@ public class PlayerState {
         this.flying = flying;
         this.activePotionEffects = activePotionEffects;
         this.absorptionAmount = absorptionAmount;
+        this.vehicle = vehicle;
+        this.inVehicle = inVehicle;
+        this.ticksLived = ticksLived;
+        this.lastDamage = lastDamage;
+        this.noDamageTicks = noDamageTicks;
+        this.gliding = gliding;
+        this.walkSpeed = walkSpeed;
+        this.flySpeed = flySpeed;
+        this.portalCooldown = portalCooldown;
         this.selectedTeam = Team.NONE; // Default to NONE if not provided
     }
 

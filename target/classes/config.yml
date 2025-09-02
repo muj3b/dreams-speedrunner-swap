@@ -25,6 +25,11 @@ swap:
   grace_period_ticks: 40
   # Auto-pause if a runner disconnects
   pause_on_disconnect: true
+  hunter_swap:
+    enabled: true
+    interval: 60
+  hot_potato_mode:
+    enabled: false
 
 # Safe Swap Configuration
 safe_swap:
@@ -46,8 +51,15 @@ safe_swap:
     - POINTED_DRIPSTONE
 
 # Freeze Mode for Inactive Runners
-# Options: EFFECTS, SPECTATOR
-freeze_mode: EFFECTS
+# Options: EFFECTS, SPECTATOR, LIMBO
+freeze_mode: LIMBO
+
+# Limbo configuration
+limbo:
+  world: "world"
+  x: 0.5
+  y: 200.0
+  z: 0.5
 
 # Movement and Interaction Control
 cancel:
@@ -72,6 +84,9 @@ tracker:
     color: 255,0,0
     # How often to spawn particles (in ticks)
     spawn_interval: 10
+    compass_jamming:
+      enabled: true
+      duration_ticks: 100 # 5 seconds
 
 # GUI Configuration
 gui:
@@ -116,3 +131,93 @@ voice_chat:
   enabled: true
   # Whether to mute inactive runners
   mute_inactive_runners: true
+
+# Power-ups Configuration
+power_ups:
+  enabled: true
+  good_effects:
+    - SPEED
+    - DOLPHINS_GRACE
+    - REGENERATION
+    - NIGHT_VISION
+    - ABSORPTION
+  bad_effects:
+    - SLOWNESS
+    - WEAKNESS
+    - HUNGER
+    - DARKNESS
+    - GLOWING
+
+# Last Stand Configuration
+last_stand:
+  enabled: true
+  duration_ticks: 600 # 30 seconds
+  strength_amplifier: 1
+  speed_amplifier: 1
+
+# Kits Configuration
+kits:
+  enabled: true
+
+# Advanced Stats Configuration
+stats:
+  enabled: true
+  # How often to update distance traveled (in ticks)
+  distance_update_ticks: 20
+  # Whether to display stats periodically during the game
+  periodic_display: false
+  periodic_display_interval: 300 # 5 minutes
+
+# World Border Configuration
+world_border:
+  enabled: true
+  initial_size: 2000
+  final_size: 100
+  # Time in seconds for the border to shrink
+  shrink_duration: 1800 # 30 minutes
+  warning_distance: 50
+  # How often to display border warnings (in seconds)
+  warning_interval: 300 # 5 minutes
+
+# Bounty System Configuration
+bounty:
+  enabled: true
+  # Minimum time between bounties (in seconds)
+  cooldown: 300
+  # Duration of the glowing effect on the target (in seconds)
+  glow_duration: 300
+  # Rewards for successful bounty completion
+  rewards:
+    strength_duration: 300 # 5 minutes
+    speed_duration: 300 # 5 minutes
+
+# Sudden Death Configuration
+sudden_death:
+  enabled: true
+  # Time before sudden death activates (in seconds)
+  activation_delay: 1200 # 20 minutes
+  # Effects given to players in sudden death
+  effects:
+    resistance_duration: 200
+    regeneration_duration: 200
+  # Coordinates for the sudden death arena in The End
+  arena:
+    x: 100
+    y: 50
+    z: 0
+
+# Compass Jamming Configuration
+tracker:
+  compass_jamming:
+    enabled: true
+    # Duration of compass jamming in ticks (20 ticks = 1 second)
+    duration_ticks: 100
+    # Maximum distance for random compass pointing when jammed
+    max_jam_distance: 100
+  runner_kit:
+    - DIAMOND_SWORD 1
+    - COOKED_BEEF 64
+  hunter_kit:
+    - IRON_SWORD 1
+    - BOW 1
+    - ARROW 64

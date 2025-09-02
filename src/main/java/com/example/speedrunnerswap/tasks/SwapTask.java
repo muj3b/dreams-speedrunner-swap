@@ -2,21 +2,25 @@ package com.example.speedrunnerswap.tasks;
 
 import com.example.speedrunnerswap.SpeedrunnerSwap;
 import org.bukkit.Bukkit;
+import net.kyori.adventure.text.Component;
 import org.bukkit.entity.Player;
 import org.bukkit.scheduler.BukkitRunnable;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
+import com.example.speedrunnerswap.game.LastStandManager;
 
 public class SwapTask extends BukkitRunnable {
     private final SpeedrunnerSwap plugin;
     private int timeUntilNextSwap;
     private final Random random = new Random();
+    private final LastStandManager lastStandManager;
 
     public SwapTask(SpeedrunnerSwap plugin) {
         this.plugin = plugin;
         this.timeUntilNextSwap = plugin.getConfigManager().getSwapInterval();
+        this.lastStandManager = new LastStandManager(plugin);
     }
 
     @Override
@@ -26,7 +30,7 @@ public class SwapTask extends BukkitRunnable {
             resetTimer();
         } else {
             if (timeUntilNextSwap <= 5) {
-                Bukkit.broadcastMessage("§e§lSwap in " + timeUntilNextSwap + " seconds!");
+                Bukkit.broadcast(Component.text("§e§lSwap in " + timeUntilNextSwap + " seconds!"));
             }
             timeUntilNextSwap--;
         }
@@ -41,12 +45,22 @@ public class SwapTask extends BukkitRunnable {
         }
 
         if (onlineRunners.isEmpty()) {
-            Bukkit.broadcastMessage("§cNo online runners to swap with!");
+            Bukkit.broadcast(Component.text("§cNo online runners to swap with!"));
             return;
         }
 
         Player currentRunner = plugin.getGameManager().getActiveRunner();
+        
+        // Apply powerup to the new runner if enabled
+        if (plugin.getConfigManager().isPowerUpsEnabled()) {
+            plugin.getPowerUpManager().applyRandomEffect(currentRunner);
+        }
         Player nextRunner;
+        
+        // Check for Last Stand conditions
+        if (onlineRunners.size() == 1 && plugin.getConfigManager().isLastStandEnabled()) {
+            lastStandManager.activateLastStand(onlineRunners.get(0));
+        }
 
         if (plugin.getConfigManager().isSwapRandomized()) {
             // Random selection
@@ -64,7 +78,7 @@ public class SwapTask extends BukkitRunnable {
         }
 
         plugin.getGameManager().setActiveRunner(nextRunner);
-        Bukkit.broadcastMessage("§a§lSwap! §fNew runner is §b" + nextRunner.getName());
+        Bukkit.broadcast(Component.text("§a§lSwap! §fNew runner is §b" + nextRunner.getName()));
     }
 
     private void resetTimer() {

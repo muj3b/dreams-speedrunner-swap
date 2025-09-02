@@ -1,30 +1,23 @@
 package com.example.speedrunnerswap.listeners;
 
 import com.example.speedrunnerswap.SpeedrunnerSwap;
+import com.example.speedrunnerswap.models.PlayerState;
+import io.papermc.paper.event.player.AsyncChatEvent;
+import org.bukkit.Bukkit;
+import org.bukkit.Material;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
+import org.bukkit.event.entity.EntityDamageEvent;
+import org.bukkit.event.entity.EntityPickupItemEvent;
 import org.bukkit.event.inventory.InventoryClickEvent;
-import org.bukkit.event.player.AsyncPlayerChatEvent;
-import org.bukkit.event.player.PlayerChangedWorldEvent;
-import org.bukkit.event.player.PlayerInteractEvent;
-import org.bukkit.event.player.PlayerJoinEvent;
-import org.bukkit.event.player.PlayerMoveEvent;
-import org.bukkit.event.player.PlayerQuitEvent;
-import org.bukkit.event.player.PlayerRespawnEvent;
-import org.bukkit.event.player.PlayerDropItemEvent;
-import org.bukkit.event.player.PlayerTeleportEvent;
-import org.bukkit.event.player.PlayerPortalEvent;
-import org.bukkit.Material;
-import org.bukkit.inventory.ItemStack;
-import org.bukkit.event.inventory.InventoryClickEvent;
+import org.bukkit.event.inventory.InventoryDragEvent;
+import org.bukkit.event.player.*;
 import org.bukkit.inventory.Inventory;
-import org.bukkit.Bukkit;
-import org.bukkit.entity.EntityType;
-import org.bukkit.event.entity.EntityDeathEvent;
-import org.bukkit.event.entity.PlayerDeathEvent;
-import com.example.speedrunnerswap.models.PlayerState;
+import org.bukkit.inventory.ItemStack;
+import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 
 public class EventListeners implements Listener {
     
@@ -39,8 +32,15 @@ public class EventListeners implements Listener {
         Player player = event.getPlayer();
         
         // If the player is a hunter, give them a tracking compass
-        if (plugin.getGameManager().isGameRunning() && plugin.getGameManager().isHunter(player)) {
-            plugin.getTrackerManager().giveTrackingCompass(player);
+        if (plugin.getGameManager().isGameRunning()) {
+            if (plugin.getGameManager() != null) {
+                plugin.getGameManager().updateTeams();
+            }
+            if (plugin.getGameManager().isHunter(player)) {
+                plugin.getTrackerManager().giveTrackingCompass(player);
+            }
+        } else {
+            // Do nothing if game is not running
         }
     }
 
@@ -53,7 +53,7 @@ public class EventListeners implements Listener {
             plugin.getGameManager().isHunter(player) &&
             droppedItem.getType() == Material.COMPASS) {
             event.setCancelled(true);
-            player.sendMessage("§cYou cannot drop your tracking compass!");
+            player.sendMessage(Component.text("§cYou cannot drop your tracking compass!"));
         }
     }
 
@@ -71,6 +71,7 @@ public class EventListeners implements Listener {
     public void onPlayerQuit(PlayerQuitEvent event) {
         Player player = event.getPlayer();
         plugin.getGameManager().handlePlayerQuit(player);
+        plugin.getGameManager().updateTeams();
     }
 
     @EventHandler
@@ -82,11 +83,27 @@ public class EventListeners implements Listener {
 
         if (inventory == null || clickedItem == null || clickedItem.getType() == Material.AIR) return;
 
-        String title = event.getView().getTitle();
-        event.setCancelled(true);
+        Component viewTitle = event.getView().title();
+        Component mainMenuTitle = Component.text(plugin.getConfigManager().getGuiMainMenuTitle());
+        Component teamSelectorTitle = Component.text(plugin.getConfigManager().getGuiTeamSelectorTitle());
+        Component settingsTitle = Component.text(plugin.getConfigManager().getGuiSettingsTitle());
+        // Only cancel clicks in plugin GUIs
+        if (viewTitle.equals(mainMenuTitle) ||
+            viewTitle.equals(teamSelectorTitle) ||
+            viewTitle.equals(settingsTitle)) {
+            event.setCancelled(true);
+        } else {
+            // For non-GUI inventories, check if the player is an inactive runner
+            if (plugin.getGameManager().isGameRunning() && plugin.getGameManager().isRunner(player) && plugin.getGameManager().getActiveRunner() != player && event.getInventory() != null) {
+                event.setCancelled(true);
+                player.sendMessage(Component.text("§cYou cannot interact with items while inactive!"));
+                return;
+            }
+            return; // Allow normal inventory interaction
+        }
 
         // Main Menu
-        if (title.equals(plugin.getConfigManager().getGuiMainMenuTitle())) {
+        if (viewTitle.equals(mainMenuTitle)) {
             switch (clickedItem.getType()) {
                 case PLAYER_HEAD:
                     plugin.getGuiManager().openTeamSelector(player);
@@ -121,10 +138,12 @@ public class EventListeners implements Listener {
                         player.closeInventory();
                     }
                     break;
+                default:
+                    break;
             }
         }
         // Team Selector
-        else if (title.equals(plugin.getConfigManager().getGuiTeamSelectorTitle())) {
+        else if (viewTitle.equals(teamSelectorTitle)) {
             switch (clickedItem.getType()) {
                 case ARROW:
                     plugin.getGuiManager().openMainMenu(player);
@@ -138,7 +157,8 @@ public class EventListeners implements Listener {
                     plugin.getGuiManager().openTeamSelector(player);
                     break;
                 case PLAYER_HEAD:
-                    String targetName = clickedItem.getItemMeta().getDisplayName().substring(2);
+                    Component nameComponent = clickedItem.getItemMeta().displayName();
+                    String targetName = nameComponent != null ? PlainTextComponentSerializer.plainText().serialize(nameComponent).substring(2) : "";
                     Player targetPlayer = Bukkit.getPlayer(targetName);
                     if (targetPlayer != null) {
                         PlayerState.Team selectedTeam = plugin.getGameManager().getPlayerState(player).getSelectedTeam();
@@ -154,17 +174,19 @@ public class EventListeners implements Listener {
                         }
                     }
                     break;
+                default:
+                    break;
             }
         }
         // Settings Menu
-        else if (title.equals(plugin.getConfigManager().getGuiSettingsTitle())) {
+        else if (viewTitle.equals(settingsTitle)) {
             switch (clickedItem.getType()) {
                 case ARROW:
                     plugin.getGuiManager().openMainMenu(player);
                     break;
                 case CLOCK:
                 case REPEATER:
-                    plugin.getConfigManager().setRandomizeSwap(!plugin.getConfigManager().isRandomizeSwap());
+                    plugin.getConfigManager().setSwapRandomized(!plugin.getConfigManager().isSwapRandomized());
                     plugin.getGuiManager().openSettingsMenu(player);
                     break;
                 case LIME_WOOL:
@@ -197,12 +219,52 @@ public class EventListeners implements Listener {
                     plugin.getConfigManager().setFreezeMode(currentMode.equals("SPECTATOR") ? "EFFECTS" : "SPECTATOR");
                     plugin.getGuiManager().openSettingsMenu(player);
                     break;
+                // Add cases for all other materials that might be clicked
+                case BOLT_ARMOR_TRIM_SMITHING_TEMPLATE:
+                case BONE:
+                 case WATER_BUCKET:
+                case SMOOTH_SANDSTONE_STAIRS:
+                case RED_SANDSTONE_WALL:
+                case GOLDEN_SHOVEL:
+                case GOLDEN_APPLE:
+                case RESIN_BRICK_STAIRS:
+                case ACACIA_SAPLING:
+                case DRAGON_WALL_HEAD:
+                case BRICKS:
+                case LANTERN:
+                case SANDSTONE:
+                case GRAY_GLAZED_TERRACOTTA:
+                case COOKED_SALMON:
+                case STRUCTURE_VOID:
+                case SMALL_AMETHYST_BUD:
+                case REDSTONE_ORE:
+                case YELLOW_GLAZED_TERRACOTTA:
+                case BRAIN_CORAL:
+                case LIGHT_WEIGHTED_PRESSURE_PLATE:
+                case SANDSTONE_WALL:
+                case ACACIA_WALL_SIGN:
+                case NETHERITE_SWORD:
+                case SPRUCE_FENCE:
+                case LEATHER_BOOTS:
+                case FISHING_ROD:
+                case DIAMOND:
+                case NETHER_BRICK:
+                case BAMBOO_RAFT:
+                case ELYTRA:
+                case BOOK:
+                case WEATHERED_CHISELED_COPPER:
+                case FRIEND_POTTERY_SHERD:
+                    // Ignore clicks on these items
+                    break;
+                default:
+                    // Handle any other materials not explicitly listed
+                    break;
             }
         }
     }
     
     @EventHandler(priority = EventPriority.HIGHEST)
-    public void onPlayerChat(AsyncPlayerChatEvent event) {
+    public void onPlayerChat(AsyncChatEvent event) {
         Player player = event.getPlayer();
         
         // If the player is an inactive runner, cancel their chat messages
@@ -211,7 +273,7 @@ public class EventListeners implements Listener {
             plugin.getGameManager().getActiveRunner() != player) {
             
             // Only send message to the player
-            player.sendMessage("§c[SpeedrunnerSwap] You cannot chat while inactive.");
+            player.sendMessage(Component.text("§c[SpeedrunnerSwap] You cannot chat while inactive."));
             event.setCancelled(true);
         }
     }
@@ -262,6 +324,78 @@ public class EventListeners implements Listener {
                 if (hunter.isOnline()) {
                     plugin.getTrackerManager().updateCompass(hunter);
                 }
+            }
+        }
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    public void onInventoryDrag(InventoryDragEvent event) {
+        if (!(event.getWhoClicked() instanceof Player)) return;
+        Player player = (Player) event.getWhoClicked();
+        
+        // Only sync for active runner
+        if (plugin.getGameManager().isGameRunning() &&
+            plugin.getGameManager().isRunner(player) &&
+            plugin.getGameManager().getActiveRunner() == player) {
+            syncRunnerInventories(player);
+        }
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    public void onEntityPickupItem(EntityPickupItemEvent event) {
+        if (!(event.getEntity() instanceof Player)) return;
+        Player player = (Player) event.getEntity();
+        
+        // Only sync for active runner
+        if (plugin.getGameManager().isGameRunning() &&
+            plugin.getGameManager().isRunner(player) &&
+            plugin.getGameManager().getActiveRunner() == player) {
+            // Schedule sync for next tick to ensure inventory is updated
+            Bukkit.getScheduler().runTask(plugin, () -> syncRunnerInventories(player));
+        }
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    public void onEntityDamage(EntityDamageEvent event) {
+        if (!(event.getEntity() instanceof Player)) return;
+        Player player = (Player) event.getEntity();
+        
+        // Prevent inactive runners from taking any damage
+        if (plugin.getGameManager().isGameRunning() &&
+            plugin.getGameManager().isRunner(player) &&
+            !player.equals(plugin.getGameManager().getActiveRunner())) {
+            event.setCancelled(true);
+        }
+        
+        // Sync health from active runner to inactive runners
+        if (plugin.getGameManager().isGameRunning() &&
+            player.equals(plugin.getGameManager().getActiveRunner())) {
+            double health = player.getHealth();
+            for (Player runner : plugin.getGameManager().getRunners()) {
+                if (runner != player && runner.isOnline()) {
+                    runner.setHealth(health);
+                }
+            }
+        }
+    }
+
+    /**
+     * Synchronize inventories between all runners
+     * @param sourcePlayer The player whose inventory should be copied to others
+     */
+    private void syncRunnerInventories(Player sourcePlayer) {
+        if (!plugin.getGameManager().isGameRunning() || !plugin.getGameManager().isRunner(sourcePlayer)) return;
+        
+        ItemStack[] contents = sourcePlayer.getInventory().getContents();
+        ItemStack[] armor = sourcePlayer.getInventory().getArmorContents();
+        ItemStack offhand = sourcePlayer.getInventory().getItemInOffHand();
+        
+        for (Player runner : plugin.getGameManager().getRunners()) {
+            if (runner != sourcePlayer && runner.isOnline()) {
+                runner.getInventory().setContents(contents.clone());
+                runner.getInventory().setArmorContents(armor.clone());
+                runner.getInventory().setItemInOffHand(offhand.clone());
+                runner.updateInventory();
             }
         }
     }

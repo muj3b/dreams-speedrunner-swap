@@ -2,19 +2,13 @@ package com.example.speedrunnerswap.listeners;
 
 import com.example.speedrunnerswap.SpeedrunnerSwap;
 import com.example.speedrunnerswap.models.PlayerState;
-import net.md_5.bungee.api.chat.ClickEvent;
-import net.md_5.bungee.api.chat.ComponentBuilder;
-import net.md_5.bungee.api.chat.HoverEvent;
-import net.md_5.bungee.api.chat.TextComponent;
 import org.bukkit.Bukkit;
+import org.bukkit.Server;
 import org.bukkit.entity.EnderDragon;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.entity.EntityDeathEvent;
-import org.bukkit.inventory.ItemStack;
-import org.bukkit.Material;
-import org.bukkit.inventory.meta.ItemMeta;
 
 public class DragonDefeatListener implements Listener {
     private final SpeedrunnerSwap plugin;
@@ -35,11 +29,15 @@ public class DragonDefeatListener implements Listener {
         // Create celebration title for all players
         for (Player player : Bukkit.getOnlinePlayers()) {
             // Show title
-            player.sendTitle(
-                "§6§lCONGRATULATIONS!",
-                "§a§lRunners have defeated the Ender Dragon!",
-                10, 100, 20
-            );
+            player.showTitle(net.kyori.adventure.title.Title.title(
+                net.kyori.adventure.text.Component.text("CONGRATULATIONS!", net.kyori.adventure.text.format.NamedTextColor.GOLD, net.kyori.adventure.text.format.TextDecoration.BOLD),
+                net.kyori.adventure.text.Component.text("Runners have defeated the Ender Dragon!", net.kyori.adventure.text.format.NamedTextColor.GREEN, net.kyori.adventure.text.format.TextDecoration.BOLD),
+                net.kyori.adventure.title.Title.Times.times(
+                    java.time.Duration.ofMillis(10 * 50),
+                    java.time.Duration.ofMillis(100 * 50),
+                    java.time.Duration.ofMillis(20 * 50)
+                )
+            ));
 
             // Different messages based on team
             if (plugin.getGameManager().isRunner(player)) {
@@ -55,20 +53,28 @@ public class DragonDefeatListener implements Listener {
 
         // Broadcast donation message
         Bukkit.getScheduler().runTaskLater(plugin, () -> {
-            Bukkit.broadcastMessage("\n§6§l=== Support the Creator ===");
-            Bukkit.broadcastMessage("§eEnjoy the plugin? Consider supporting the creator (muj3b)!");
+            Bukkit.broadcast(net.kyori.adventure.text.Component.text("\n=== Support the Creator ===")
+                .color(net.kyori.adventure.text.format.NamedTextColor.GOLD)
+                .decorate(net.kyori.adventure.text.format.TextDecoration.BOLD), Server.BROADCAST_CHANNEL_USERS);
+            Bukkit.broadcast(net.kyori.adventure.text.Component.text("Enjoy the plugin? Consider supporting the creator (muj3b)!")
+                .color(net.kyori.adventure.text.format.NamedTextColor.YELLOW), Server.BROADCAST_CHANNEL_USERS);
             
-            // Create clickable donation link
-            TextComponent donateMessage = new TextComponent("§a§l[Click here to donate]");
-            donateMessage.setClickEvent(new ClickEvent(ClickEvent.Action.OPEN_URL, "https://donate.stripe.com/cNicN5gG3f8ocU4cjN0Ba00"));
-            donateMessage.setHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT, 
-                new ComponentBuilder("§eClick to support the creator!").create()));
+            // Create clickable donation link using Adventure API
+            net.kyori.adventure.text.Component donateMessage = net.kyori.adventure.text.Component.text("[Click here to donate]")
+                .color(net.kyori.adventure.text.format.NamedTextColor.GREEN)
+                .decorate(net.kyori.adventure.text.format.TextDecoration.BOLD)
+                .clickEvent(net.kyori.adventure.text.event.ClickEvent.openUrl("https://donate.stripe.com/cNicN5gG3f8ocU4cjN0Ba00"))
+                .hoverEvent(net.kyori.adventure.text.event.HoverEvent.showText(
+                    net.kyori.adventure.text.Component.text("Click to support the creator!")
+                        .color(net.kyori.adventure.text.format.NamedTextColor.YELLOW)
+                ));
             
             // Send to all players
             for (Player player : Bukkit.getOnlinePlayers()) {
-                player.spigot().sendMessage(donateMessage);
+                player.sendMessage(donateMessage);
             }
-            Bukkit.broadcastMessage("§6Thank you for playing SpeedrunnerSwap!");
+            Bukkit.broadcast(net.kyori.adventure.text.Component.text("Thank you for playing SpeedrunnerSwap!")
+                .color(net.kyori.adventure.text.format.NamedTextColor.GOLD), Server.BROADCAST_CHANNEL_USERS);
         }, 100L); // 5 seconds after victory message
     }
 }

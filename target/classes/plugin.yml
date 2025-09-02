@@ -3,7 +3,16 @@ version: '1.2'
 main: com.example.speedrunnerswap.SpeedrunnerSwap
 api-version: '1.21'
 authors: [YourName]
-description: Dream-style "Speedrunner Swap" challenge where speedrunners share the same state and swap control on a timer
+description: |
+  Dream-style "Speedrunner Swap" challenge where speedrunners share the same state and swap control on a timer.
+  Features include:
+  - Random power-ups on swap
+  - Last Stand mode for final runner
+  - Custom kits for runners and hunters
+  - Configurable swap intervals
+  - Safe swap locations
+  - Hunter swap system
+  - Compass tracking system
 website: https://github.com/yourusername/speedrunnerswap
 
 commands:

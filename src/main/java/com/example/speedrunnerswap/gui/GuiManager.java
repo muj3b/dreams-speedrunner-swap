@@ -1,6 +1,7 @@
 package com.example.speedrunnerswap.gui;
 
 import com.example.speedrunnerswap.SpeedrunnerSwap;
+import net.kyori.adventure.text.Component;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
@@ -17,18 +18,250 @@ import java.util.List;
 public class GuiManager {
     
     private final SpeedrunnerSwap plugin;
+    private final String BACK_BUTTON_TITLE = "§c§lBack to Main Menu";
     
     public GuiManager(SpeedrunnerSwap plugin) {
         this.plugin = plugin;
     }
+
+    private String formatTime(int seconds) {
+        int minutes = seconds / 60;
+        int hours = minutes / 60;
+        minutes %= 60;
+        seconds %= 60;
+
+        if (hours > 0) {
+            return String.format("%dh %dm %ds", hours, minutes, seconds);
+        } else if (minutes > 0) {
+            return String.format("%dm %ds", minutes, seconds);
+        } else {
+            return String.format("%ds", seconds);
+        }
+    }
     
+    public void openPositiveEffectsMenu(Player player) {
+        Inventory inventory = Bukkit.createInventory(null, 36, Component.text("§a§lPositive Effects"));
+        
+        // Fill with glass panes
+        ItemStack filler = createItem(Material.BLACK_STAINED_GLASS_PANE, " ");
+        for (int i = 0; i < inventory.getSize(); i++) {
+            inventory.setItem(i, filler);
+        }
+
+        // Add all available positive effects
+        List<ItemStack> effectItems = new ArrayList<>();
+        effectItems.add(createEffectItem(Material.POTION, "Speed", "SPEED"));
+        effectItems.add(createEffectItem(Material.POTION, "Jump Boost", "JUMP"));
+        effectItems.add(createEffectItem(Material.POTION, "Strength", "INCREASE_DAMAGE"));
+        effectItems.add(createEffectItem(Material.POTION, "Regeneration", "REGENERATION"));
+        effectItems.add(createEffectItem(Material.POTION, "Resistance", "DAMAGE_RESISTANCE"));
+        effectItems.add(createEffectItem(Material.POTION, "Fire Resistance", "FIRE_RESISTANCE"));
+        effectItems.add(createEffectItem(Material.POTION, "Water Breathing", "WATER_BREATHING"));
+        effectItems.add(createEffectItem(Material.POTION, "Night Vision", "NIGHT_VISION"));
+
+        for (int i = 0; i < effectItems.size(); i++) {
+            inventory.setItem(10 + i, effectItems.get(i));
+        }
+
+        // Back button
+        inventory.setItem(35, createItem(Material.BARRIER, BACK_BUTTON_TITLE));
+
+        player.openInventory(inventory);
+    }
+
+    public void openNegativeEffectsMenu(Player player) {
+        Inventory inventory = Bukkit.createInventory(null, 36, Component.text("§c§lNegative Effects"));
+        
+        // Fill with glass panes
+        ItemStack filler = createItem(Material.BLACK_STAINED_GLASS_PANE, " ");
+        for (int i = 0; i < inventory.getSize(); i++) {
+            inventory.setItem(i, filler);
+        }
+
+        // Add all available negative effects
+        List<ItemStack> effectItems = new ArrayList<>();
+        effectItems.add(createEffectItem(Material.POTION, "Slowness", "SLOW"));
+        effectItems.add(createEffectItem(Material.POTION, "Weakness", "WEAKNESS"));
+        effectItems.add(createEffectItem(Material.POTION, "Poison", "POISON"));
+        effectItems.add(createEffectItem(Material.POTION, "Blindness", "BLINDNESS"));
+        effectItems.add(createEffectItem(Material.POTION, "Hunger", "HUNGER"));
+        effectItems.add(createEffectItem(Material.POTION, "Mining Fatigue", "SLOW_DIGGING"));
+        effectItems.add(createEffectItem(Material.POTION, "Nausea", "CONFUSION"));
+        effectItems.add(createEffectItem(Material.POTION, "Glowing", "GLOWING"));
+
+        for (int i = 0; i < effectItems.size(); i++) {
+            inventory.setItem(10 + i, effectItems.get(i));
+        }
+
+        // Back button
+        inventory.setItem(35, createItem(Material.BARRIER, BACK_BUTTON_TITLE));
+
+        player.openInventory(inventory);
+    }
+
+    private ItemStack createEffectItem(Material material, String displayName, String effectId) {
+        List<String> lore = new ArrayList<>();
+        lore.add("§7Effect ID: §f" + effectId);
+        lore.add("§7Click to toggle this effect");
+        boolean isEnabled = plugin.getConfig().getStringList("power_ups.good_effects").contains(effectId) ||
+                          plugin.getConfig().getStringList("power_ups.bad_effects").contains(effectId);
+        lore.add(isEnabled ? "§aCurrently enabled" : "§cCurrently disabled");
+        
+        return createItem(material, "§e§l" + displayName, lore);
+    }
+
+    public void openPowerUpsMenu(Player player) {
+        Inventory inventory = Bukkit.createInventory(null, 36, Component.text("§e§lPower-ups Menu"));
+        
+        // Fill with glass panes
+        ItemStack filler = createItem(Material.BLACK_STAINED_GLASS_PANE, " ");
+        for (int i = 0; i < inventory.getSize(); i++) {
+            inventory.setItem(i, filler);
+        }
+
+        // Good effects button
+        List<String> goodEffectsLore = new ArrayList<>();
+        List<String> enabledGoodEffects = plugin.getConfig().getStringList("power_ups.good_effects");
+        goodEffectsLore.add("§7Click to manage positive effects");
+        goodEffectsLore.add("§7Current enabled effects: §f" + enabledGoodEffects.size());
+        inventory.setItem(11, createItem(Material.SPLASH_POTION, "§a§lPositive Effects", goodEffectsLore));
+
+        // Bad effects button
+        List<String> badEffectsLore = new ArrayList<>();
+        List<String> enabledBadEffects = plugin.getConfig().getStringList("power_ups.bad_effects");
+        badEffectsLore.add("§7Click to manage negative effects");
+        badEffectsLore.add("§7Current enabled effects: §f" + enabledBadEffects.size());
+        inventory.setItem(15, createItem(Material.LINGERING_POTION, "§c§lNegative Effects", badEffectsLore));
+
+        // Back button
+        inventory.setItem(31, createItem(Material.BARRIER, BACK_BUTTON_TITLE));
+
+        // Add toggle button
+        List<String> powerUpToggleLore = new ArrayList<>();
+        boolean powerUpsEnabled = plugin.getConfig().getBoolean("power_ups.enabled", true);
+        powerUpToggleLore.add("§7Current status: " + (powerUpsEnabled ? "§aEnabled" : "§cDisabled"));
+        powerUpToggleLore.add("§7Click to toggle");
+        ItemStack toggleItem = createItem(
+            powerUpsEnabled ? Material.LIME_DYE : Material.GRAY_DYE,
+            "§e§lToggle Power-ups",
+            powerUpToggleLore
+        );
+        inventory.setItem(4, toggleItem);
+
+        player.openInventory(inventory);
+        List<String> positiveEffectsLore = new ArrayList<>();
+        positiveEffectsLore.add("§7Current effects:");
+        for (String effect : plugin.getConfig().getStringList("power_ups.good_effects")) {
+            positiveEffectsLore.add("§a• " + effect.toLowerCase());
+        }
+        positiveEffectsLore.add("");
+        positiveEffectsLore.add("§7Click to modify");
+        ItemStack goodEffectsItem = createItem(Material.SPLASH_POTION, "§a§lPositive Effects", positiveEffectsLore);
+        inventory.setItem(11, goodEffectsItem);
+
+        // Bad effects section
+        List<String> negativeEffectsLore = new ArrayList<>();
+        negativeEffectsLore.add("§7Current effects:");
+        for (String effect : plugin.getConfig().getStringList("power_ups.bad_effects")) {
+            negativeEffectsLore.add("§c• " + effect.toLowerCase());
+        }
+        negativeEffectsLore.add("");
+        negativeEffectsLore.add("§7Click to modify");
+        ItemStack badEffectsItem = createItem(Material.LINGERING_POTION, "§c§lNegative Effects", negativeEffectsLore);
+        inventory.setItem(15, badEffectsItem);
+
+        // Duration settings
+        List<String> durationLore = new ArrayList<>();
+        durationLore.add("§7Base duration: §e10-20 seconds");
+        durationLore.add("§7Effect level: §eI-II");
+        durationLore.add("");
+        durationLore.add("§7Click to modify timings");
+        ItemStack durationItem = createItem(Material.CLOCK, "§6§lEffect Durations", durationLore);
+        inventory.setItem(22, durationItem);
+
+        // Back button
+        inventory.setItem(35, createItem(Material.BARRIER, BACK_BUTTON_TITLE));
+
+        player.openInventory(inventory);
+    }
+
+    public void openWorldBorderMenu(Player player) {
+        Inventory inventory = Bukkit.createInventory(null, 27, Component.text("§c§lWorld Border Settings"));
+        
+        // Fill with glass panes
+        ItemStack filler = createItem(Material.BLACK_STAINED_GLASS_PANE, " ");
+        for (int i = 0; i < inventory.getSize(); i++) {
+            inventory.setItem(i, filler);
+        }
+
+        // Toggle button
+        boolean isEnabled = plugin.getConfig().getBoolean("world_border.enabled", true);
+        List<String> toggleLore = new ArrayList<>();
+        toggleLore.add("§7Current status: " + (isEnabled ? "§aEnabled" : "§cDisabled"));
+        toggleLore.add("§7Click to toggle");
+        ItemStack toggleItem = createItem(
+            isEnabled ? Material.LIME_DYE : Material.GRAY_DYE,
+            "§e§lToggle World Border",
+            toggleLore
+        );
+        inventory.setItem(4, toggleItem);
+
+        // Initial size setting
+        int initialSize = plugin.getConfig().getInt("world_border.initial_size", 2000);
+        List<String> initialSizeLore = new ArrayList<>();
+        initialSizeLore.add("§7Current size: §e" + initialSize + " blocks");
+        initialSizeLore.add("§7Left-click: §a+100 blocks");
+        initialSizeLore.add("§7Right-click: §c-100 blocks");
+        initialSizeLore.add("§7Shift + Left-click: §a+500 blocks");
+        initialSizeLore.add("§7Shift + Right-click: §c-500 blocks");
+        ItemStack initialSizeItem = createItem(Material.GRASS_BLOCK, "§a§lInitial Border Size", initialSizeLore);
+        inventory.setItem(11, initialSizeItem);
+
+        // Final size setting
+        int finalSize = plugin.getConfig().getInt("world_border.final_size", 100);
+        List<String> finalSizeLore = new ArrayList<>();
+        finalSizeLore.add("§7Current size: §e" + finalSize + " blocks");
+        finalSizeLore.add("§7Left-click: §a+50 blocks");
+        finalSizeLore.add("§7Right-click: §c-50 blocks");
+        finalSizeLore.add("§7Shift + Left-click: §a+100 blocks");
+        finalSizeLore.add("§7Shift + Right-click: §c-100 blocks");
+        ItemStack finalSizeItem = createItem(Material.BEDROCK, "§c§lFinal Border Size", finalSizeLore);
+        inventory.setItem(13, finalSizeItem);
+
+        // Shrink duration setting
+        int shrinkDuration = plugin.getConfig().getInt("world_border.shrink_duration", 1800);
+        List<String> durationLore = new ArrayList<>();
+        durationLore.add("§7Current duration: §e" + formatTime(shrinkDuration));
+        durationLore.add("§7Left-click: §a+5 minutes");
+        durationLore.add("§7Right-click: §c-5 minutes");
+        durationLore.add("§7Shift + Left-click: §a+15 minutes");
+        durationLore.add("§7Shift + Right-click: §c-15 minutes");
+        ItemStack durationItem = createItem(Material.CLOCK, "§6§lShrink Duration", durationLore);
+        inventory.setItem(15, durationItem);
+
+        // Warning settings
+        int warningDistance = plugin.getConfig().getInt("world_border.warning_distance", 50);
+        List<String> warningLore = new ArrayList<>();
+        warningLore.add("§7Warning distance: §e" + warningDistance + " blocks");
+        warningLore.add("§7Warning interval: §e" + 
+            plugin.getConfig().getInt("world_border.warning_interval", 300) + " seconds");
+        warningLore.add("§7Click to modify warnings");
+        ItemStack warningItem = createItem(Material.BELL, "§e§lWarning Settings", warningLore);
+        inventory.setItem(22, warningItem);
+
+        // Back button
+        inventory.setItem(26, createItem(Material.BARRIER, BACK_BUTTON_TITLE));
+
+        player.openInventory(inventory);
+    }
+
     public void openMainMenu(Player player) {
         String title = plugin.getConfigManager().getGuiMainMenuTitle();
         int rows = plugin.getConfigManager().getGuiMainMenuRows();
         rows = Math.max(rows, 5); // ensure enough space for layout
         rows = clampRows(rows);
         
-        Inventory inventory = Bukkit.createInventory(null, rows * 9, title);
+        Inventory inventory = Bukkit.createInventory(null, rows * 9, Component.text(title));
         
         // Fill with glass panes for better visual organization
         ItemStack filler = createItem(Material.BLACK_STAINED_GLASS_PANE, " ");
@@ -36,7 +269,7 @@ public class GuiManager {
             inventory.setItem(i, filler);
         }
         
-        // Team selector button
+        // Team selector button (Top row)
         List<String> teamSelectorLore = new ArrayList<>();
         teamSelectorLore.add("§7Click to open the team selection menu");
         teamSelectorLore.add("§7Here you can:");
@@ -44,7 +277,79 @@ public class GuiManager {
         teamSelectorLore.add("§7• View current team assignments");
         teamSelectorLore.add("§7• Manage runner and hunter roles");
         ItemStack teamSelector = createItem(Material.PLAYER_HEAD, "§e§lTeam Selector", teamSelectorLore);
-        inventory.setItem(11, teamSelector);
+        inventory.setItem(10, teamSelector);
+
+        // World Border Settings (Top row)
+        List<String> borderLore = new ArrayList<>();
+        borderLore.add("§7Configure world border settings:");
+        borderLore.add("§7• Set initial and final size");
+        borderLore.add("§7• Adjust shrink duration");
+        borderLore.add("§7• Toggle border shrinking");
+        ItemStack borderSettings = createItem(Material.BARRIER, "§c§lWorld Border", borderLore);
+        inventory.setItem(12, borderSettings);
+
+        // Power-ups Settings (Top row)
+        List<String> powerupsLore = new ArrayList<>();
+        powerupsLore.add("§7Configure power-up settings:");
+        powerupsLore.add("§7• Enable/disable power-ups");
+        powerupsLore.add("§7• Customize effects");
+        powerupsLore.add("§7• Adjust durations");
+        ItemStack powerupsSettings = createItem(Material.POTION, "§d§lPower-ups", powerupsLore);
+        inventory.setItem(14, powerupsSettings);
+
+        // Kit Settings (Top row)
+        List<String> kitsLore = new ArrayList<>();
+        kitsLore.add("§7Configure custom kits:");
+        kitsLore.add("§7• Edit runner kits");
+        kitsLore.add("§7• Edit hunter kits");
+        kitsLore.add("§7• Manage equipment");
+        ItemStack kitsSettings = createItem(Material.DIAMOND_CHESTPLATE, "§b§lKits", kitsLore);
+        inventory.setItem(16, kitsSettings);
+
+        // Bounty System (Middle row)
+        List<String> bountyLore = new ArrayList<>();
+        bountyLore.add("§7Configure bounty system:");
+        bountyLore.add("§7• Set bounty rewards");
+        bountyLore.add("§7• Adjust durations");
+        bountyLore.add("§7• Manage effects");
+        ItemStack bountySettings = createItem(Material.GOLDEN_APPLE, "§6§lBounty System", bountyLore);
+        inventory.setItem(28, bountySettings);
+
+        // Last Stand Settings (Middle row)
+        List<String> lastStandLore = new ArrayList<>();
+        lastStandLore.add("§7Configure Last Stand mode:");
+        lastStandLore.add("§7• Set buff strengths");
+        lastStandLore.add("§7• Adjust duration");
+        lastStandLore.add("§7• Toggle feature");
+        ItemStack lastStandSettings = createItem(Material.TOTEM_OF_UNDYING, "§e§lLast Stand", lastStandLore);
+        inventory.setItem(30, lastStandSettings);
+
+        // Compass Settings (Middle row)
+        List<String> compassLore = new ArrayList<>();
+        compassLore.add("§7Configure compass settings:");
+        compassLore.add("§7• Set jamming duration");
+        compassLore.add("§7• Adjust tracking");
+        compassLore.add("§7• Toggle features");
+        ItemStack compassSettings = createItem(Material.COMPASS, "§9§lCompass Settings", compassLore);
+        inventory.setItem(32, compassSettings);
+
+        // Sudden Death Settings (Middle row)
+        List<String> suddenDeathLore = new ArrayList<>();
+        suddenDeathLore.add("§7Configure Sudden Death mode:");
+        suddenDeathLore.add("§7• Set activation time");
+        suddenDeathLore.add("§7• Customize effects");
+        suddenDeathLore.add("§7• Set arena location");
+        ItemStack suddenDeathSettings = createItem(Material.DRAGON_HEAD, "§4§lSudden Death", suddenDeathLore);
+        inventory.setItem(34, suddenDeathSettings);
+
+        // Stats Settings (Bottom row)
+        List<String> statsLore = new ArrayList<>();
+        statsLore.add("§7Configure statistics:");
+        statsLore.add("§7• Toggle stat tracking");
+        statsLore.add("§7• Set display options");
+        statsLore.add("§7• View current stats");
+        ItemStack statsSettings = createItem(Material.BOOK, "§a§lStatistics", statsLore);
+        inventory.setItem(48, statsSettings);
         
         // Settings button
         List<String> settingsLore = new ArrayList<>();
@@ -122,7 +427,7 @@ public class GuiManager {
         rows = Math.max(rows, 4); // ensure space for selector + player heads row
         rows = clampRows(rows);
         
-        Inventory inventory = Bukkit.createInventory(null, rows * 9, title);
+        Inventory inventory = Bukkit.createInventory(null, rows * 9, Component.text(title));
         
         // Fill with glass panes for better visual organization
         ItemStack filler = createItem(Material.BLACK_STAINED_GLASS_PANE, " ");
@@ -182,9 +487,13 @@ public class GuiManager {
             meta.setOwningPlayer(onlinePlayer);
             
             PlayerState.Team currentTeam = plugin.getGameManager().getPlayerState(onlinePlayer).getSelectedTeam();
-            String teamColor = currentTeam == PlayerState.Team.RUNNER ? "§b" : 
-                             currentTeam == PlayerState.Team.HUNTER ? "§c" : "§f";
-            meta.setDisplayName(teamColor + onlinePlayer.getName());
+            // Apply team color to player name
+            net.kyori.adventure.text.format.TextColor nameColor = currentTeam == PlayerState.Team.RUNNER ? 
+                net.kyori.adventure.text.format.NamedTextColor.AQUA : 
+                currentTeam == PlayerState.Team.HUNTER ? 
+                net.kyori.adventure.text.format.NamedTextColor.RED : 
+                net.kyori.adventure.text.format.NamedTextColor.WHITE;
+            meta.displayName(net.kyori.adventure.text.Component.text(onlinePlayer.getName()).color(nameColor));
             
             List<String> lore = new ArrayList<>();
             if (plugin.getGameManager().isRunner(onlinePlayer)) {
@@ -205,7 +514,11 @@ public class GuiManager {
             lore.add("");
             lore.add(onlinePlayer.isOnline() ? "§a✔ Online" : "§c✘ Offline");
             
-            meta.setLore(lore);
+            List<net.kyori.adventure.text.Component> componentLore = new ArrayList<>();
+            for (String line : lore) {
+                componentLore.add(net.kyori.adventure.text.Component.text(line));
+            }
+            meta.lore(componentLore);
             playerHead.setItemMeta(meta);
             
             // Add glow effect for current team members
@@ -225,7 +538,7 @@ public class GuiManager {
         rows = Math.max(rows, 4); // ensure enough slots for layout
         rows = clampRows(rows);
         
-        Inventory inventory = Bukkit.createInventory(null, rows * 9, title);
+        Inventory inventory = Bukkit.createInventory(null, rows * 9, Component.text(title));
         
         // Fill with glass panes for better organization
         ItemStack filler = createItem(Material.BLACK_STAINED_GLASS_PANE, " ");
@@ -246,11 +559,13 @@ public class GuiManager {
         swapHeaderLore.add("§7• Intervals and timing");
         swapHeaderLore.add("§7• Randomization options");
         swapHeaderLore.add("§7• Safety features");
+swapHeaderLore.add("§7• Randomized intervals");
+swapHeaderLore.add("§7• Hover over options for details");
         ItemStack swapHeader = createItem(Material.BOOK, "§6§lSwap Settings", swapHeaderLore);
         inventory.setItem(9, swapHeader);
         
         // Enhanced swap interval settings
-        boolean randomize = plugin.getConfigManager().isSwapRandomized();
+        boolean randomize = plugin.getConfigManager().getSwapRandomized();
         List<String> intervalTypeLore = new ArrayList<>();
         intervalTypeLore.add("§7Current: " + (randomize ? "§aRandom" : "§bFixed"));
         intervalTypeLore.add("");
@@ -268,8 +583,10 @@ public class GuiManager {
         inventory.setItem(10, swapIntervalType);
         
         int interval = plugin.getConfigManager().getSwapInterval();
+plugin.getConfigManager().setSwapRandomized(!plugin.getConfigManager().isSwapRandomized());
         List<String> intervalLore = new ArrayList<>();
         intervalLore.add("§7Current: §f" + interval + "s");
+intervalLore.add("§7Click to toggle randomization");
         intervalLore.add("");
         intervalLore.add("§7Adjust using:");
         intervalLore.add("§a▲ §7Left-click: +30s");
@@ -356,14 +673,14 @@ public class GuiManager {
     private ItemStack createItem(Material material, String name, String... lore) {
         ItemStack item = new ItemStack(material);
         ItemMeta meta = item.getItemMeta();
-        meta.setDisplayName(name);
+        meta.displayName(Component.text(name));
 
         if (lore.length > 0) {
-            List<String> loreList = new ArrayList<>();
+            List<Component> loreList = new ArrayList<>();
             for (String line : lore) {
-                loreList.add(line);
+                loreList.add(Component.text(line));
             }
-            meta.setLore(loreList);
+            meta.lore(loreList);
         }
 
         item.setItemMeta(meta);
@@ -391,10 +708,14 @@ public class GuiManager {
     private ItemStack createItem(Material material, String name, List<String> lore) {
         ItemStack item = new ItemStack(material);
         ItemMeta meta = item.getItemMeta();
-        meta.setDisplayName(name);
+        meta.displayName(Component.text(name));
         
         if (lore != null && !lore.isEmpty()) {
-            meta.setLore(lore);
+            List<Component> componentLore = new ArrayList<>();
+            for (String line : lore) {
+                componentLore.add(Component.text(line));
+            }
+            meta.lore(componentLore);
         }
         
         item.setItemMeta(meta);
@@ -432,65 +753,65 @@ public class GuiManager {
     public boolean isMainMenu(Inventory inventory) {
         return inventory != null && inventory.getHolder() == null && 
                inventory.equals(inventory.getViewers().get(0).getOpenInventory().getTopInventory()) &&
-               plugin.getConfigManager().getGuiMainMenuTitle().equals(inventory.getViewers().get(0).getOpenInventory().getTitle());
+               Component.text(plugin.getConfigManager().getGuiMainMenuTitle()).equals(inventory.getViewers().get(0).getOpenInventory().title());
     }
     
     public boolean isTeamSelector(Inventory inventory) {
         return inventory != null && inventory.getHolder() == null && 
                inventory.equals(inventory.getViewers().get(0).getOpenInventory().getTopInventory()) &&
-               plugin.getConfigManager().getGuiTeamSelectorTitle().equals(inventory.getViewers().get(0).getOpenInventory().getTitle());
+               Component.text(plugin.getConfigManager().getGuiTeamSelectorTitle()).equals(inventory.getViewers().get(0).getOpenInventory().title());
     }
     
     public boolean isSettingsMenu(Inventory inventory) {
         return inventory != null && inventory.getHolder() == null && 
                inventory.equals(inventory.getViewers().get(0).getOpenInventory().getTopInventory()) &&
-               plugin.getConfigManager().getGuiSettingsTitle().equals(inventory.getViewers().get(0).getOpenInventory().getTitle());
+               Component.text(plugin.getConfigManager().getGuiSettingsTitle()).equals(inventory.getViewers().get(0).getOpenInventory().title());
     }
     
     // Helper methods for item identification
     public boolean isBackButton(ItemStack item) {
         return item != null && item.getType() == Material.ARROW && 
-               item.getItemMeta().getDisplayName().equals("§7§lBack");
+               Component.text("§7§lBack").equals(item.getItemMeta().displayName());
     }
     
     public boolean isStartButton(ItemStack item) {
         return item != null && item.getType() == Material.GREEN_CONCRETE && 
-               item.getItemMeta().getDisplayName().equals("§a§lStart Game");
+               Component.text("§a§lStart Game").equals(item.getItemMeta().displayName());
     }
     
     public boolean isStopButton(ItemStack item) {
         return item != null && item.getType() == Material.RED_CONCRETE && 
-               item.getItemMeta().getDisplayName().equals("§c§lStop Game");
+               Component.text("§c§lStop Game").equals(item.getItemMeta().displayName());
     }
     
     public boolean isPauseButton(ItemStack item) {
         return item != null && item.getType() == Material.YELLOW_CONCRETE && 
-               item.getItemMeta().getDisplayName().equals("§e§lPause Game");
+               Component.text("§e§lPause Game").equals(item.getItemMeta().displayName());
     }
     
     public boolean isResumeButton(ItemStack item) {
         return item != null && item.getType() == Material.LIME_CONCRETE && 
-               item.getItemMeta().getDisplayName().equals("§a§lResume Game");
+               Component.text("§a§lResume Game").equals(item.getItemMeta().displayName());
     }
     
     public boolean isTeamSelectorButton(ItemStack item) {
         return item != null && item.getType() == Material.PLAYER_HEAD && 
-               item.getItemMeta().getDisplayName().equals("§e§lTeam Selector");
+               Component.text("§e§lTeam Selector").equals(item.getItemMeta().displayName());
     }
     
     public boolean isSettingsButton(ItemStack item) {
         return item != null && item.getType() == Material.COMPARATOR && 
-               item.getItemMeta().getDisplayName().equals("§a§lSettings");
+               Component.text("§a§lSettings").equals(item.getItemMeta().displayName());
     }
     
     public boolean isRunnerTeamButton(ItemStack item) {
         return item != null && item.getType() == Material.DIAMOND_BOOTS && 
-               item.getItemMeta().getDisplayName().equals("§b§lRunners");
+               Component.text("§b§lRunners").equals(item.getItemMeta().displayName());
     }
     
     public boolean isHunterTeamButton(ItemStack item) {
         return item != null && item.getType() == Material.IRON_SWORD && 
-               item.getItemMeta().getDisplayName().equals("§c§lHunters");
+               Component.text("§c§lHunters").equals(item.getItemMeta().displayName());
     }
     
     public boolean isPlayerHead(ItemStack item) {
@@ -500,32 +821,35 @@ public class GuiManager {
     // Helper methods for settings menu
     public boolean isSwapIntervalButton(ItemStack item) {
         return item != null && item.getType() == Material.CLOCK && 
-               item.getItemMeta().getDisplayName().startsWith("§e§lSwap Interval");
+               item.getItemMeta().displayName() != null &&
+               item.getItemMeta().displayName().toString().contains("§e§lSwap Interval");
     }
     
     public boolean isRandomizeSwapButton(ItemStack item) {
         return item != null && (item.getType() == Material.CLOCK || item.getType() == Material.REPEATER) && 
-               item.getItemMeta().getDisplayName().startsWith("§e§lSwap Type");
+               item.getItemMeta().displayName() != null &&
+               item.getItemMeta().displayName().toString().contains("§e§lSwap Type");
     }
     
     public boolean isSafeSwapButton(ItemStack item) {
         return item != null && (item.getType() == Material.TOTEM_OF_UNDYING || item.getType() == Material.BARRIER) && 
-               item.getItemMeta().getDisplayName().startsWith("§e§lSafe Swap");
+               item.getItemMeta().displayName() != null &&
+               item.getItemMeta().displayName().toString().contains("§e§lSafe Swap");
     }
 
     public boolean isActiveRunnerTimerButton(ItemStack item) {
         return item != null && item.getType() == Material.CLOCK &&
-               item.getItemMeta().getDisplayName().equals("§e§lActive Runner Timer");
+               Component.text("§e§lActive Runner Timer").equals(item.getItemMeta().displayName());
     }
 
     public boolean isWaitingRunnerTimerButton(ItemStack item) {
         return item != null && item.getType() == Material.CLOCK &&
-               item.getItemMeta().getDisplayName().equals("§e§lWaiting Runner Timer");
+               Component.text("§e§lWaiting Runner Timer").equals(item.getItemMeta().displayName());
     }
 
     public boolean isHunterTimerButton(ItemStack item) {
         return item != null && item.getType() == Material.CLOCK &&
-               item.getItemMeta().getDisplayName().equals("§e§lHunter Timer");
+               Component.text("§e§lHunter Timer").equals(item.getItemMeta().displayName());
     }
 
     private String getVisibilityDisplay(String visibility) {
@@ -541,7 +865,7 @@ public class GuiManager {
         }
     }
 
-    private String getNextVisibility(String current) {
+    public String getNextVisibility(String current) {
         switch (current) {
             case "always":
                 return "last_10";
@@ -585,11 +909,6 @@ public class GuiManager {
         }
     }
     
-    // Helper method for time formatting
-    private String formatTime(long seconds) {
-        if (seconds < 0) return "0:00";
-        return String.format("%d:%02d", seconds / 60, seconds % 60);
-    }
     
     // Fix for missing getSelectedTeam method
     public PlayerState.Team getSelectedTeam(Player player) {

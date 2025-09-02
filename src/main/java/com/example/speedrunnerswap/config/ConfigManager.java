@@ -1,5 +1,7 @@
 package com.example.speedrunnerswap.config;
 
+import org.bukkit.Location;
+import org.bukkit.World;
 import com.example.speedrunnerswap.SpeedrunnerSwap;
 import org.bukkit.Material;
 import org.bukkit.configuration.file.FileConfiguration;
@@ -11,16 +13,28 @@ import java.util.List;
 import java.util.Set;
 
 public class ConfigManager {
+
+        public boolean isLocationSafe(Location location) {
+        // Placeholder logic for checking if a location is safe
+        return location.getBlock().getType().isAir();
+    }
+
+    public void initializeDangerousBlocks() {
+        // Placeholder logic for initializing dangerous blocks
+        plugin.getLogger().info("Dangerous blocks initialized.");
+    }
     
     private final SpeedrunnerSwap plugin;
     private FileConfiguration config;
     private List<String> runnerNames;
     private List<String> hunterNames;
     private Set<Material> dangerousBlocks;
+    private boolean powerUpsEnabled;
     
     public ConfigManager(SpeedrunnerSwap plugin) {
         this.plugin = plugin;
         loadConfig();
+        this.powerUpsEnabled = config.getBoolean("powerups.enabled", true);
     }
     
     /**
@@ -45,6 +59,10 @@ public class ConfigManager {
                 plugin.getLogger().warning("Invalid material in dangerous_blocks: " + blockName);
             }
         }
+
+        // Load powerups settings
+        this.powerUpsEnabled = config.getBoolean("powerups.enabled", true);
+        config.set("powerups.enabled", this.powerUpsEnabled); // Ensure config is in sync
     }
     
     /**
@@ -77,6 +95,17 @@ public class ConfigManager {
      */
     public void removeRunner(Player player) {
         runnerNames.remove(player.getName());
+    }
+
+    // PowerUps management methods
+    public boolean isPowerUpsEnabled() {
+        return this.powerUpsEnabled;
+    }
+
+    public void setPowerUpsEnabled(boolean enabled) {
+        this.powerUpsEnabled = enabled;
+        config.set("powerups.enabled", enabled);
+        saveConfig();
     }
     
     /**
@@ -140,6 +169,30 @@ public class ConfigManager {
      */
     public boolean isRandomizeSwap() {
         return config.getBoolean("swap.randomize", true);
+    }
+    
+    /**
+     * Get whether the swap randomization is enabled
+     * @return True if swap randomization is enabled
+     */
+    public boolean getRandomizeSwap() {
+        return isRandomizeSwap();
+    }
+    
+    /**
+     * Check if swap randomization is enabled
+     * @return True if swap randomization is enabled
+     */
+    public boolean isSwapRandomized() {
+        return isRandomizeSwap();
+    }
+    
+    /**
+     * Get whether swap randomization is enabled
+     * @return True if swap randomization is enabled
+     */
+    public boolean getSwapRandomized() {
+        return isRandomizeSwap();
     }
     
     /**
@@ -219,15 +272,25 @@ public class ConfigManager {
      * Get whether the swap should be randomized.
      * @return True if the swap should be randomized.
      */
-    public boolean isSwapRandomized() {
-        return config.getBoolean("swap.randomized", false);
-    }
+    /**
+     * @deprecated Use {@link #isRandomizeSwap()} instead.
+     * Maintains backward compatibility with legacy config key.
+     */
+
 
     public void setRandomizeSwap(boolean randomizeSwap) {
         config.set("swap.randomize", randomizeSwap);
         plugin.saveConfig();
     }
 
+    /**
+     * Set whether swap randomization is enabled.
+     * Preferred modern alternative to the deprecated setRandomizeSwap method.
+     * @param randomizeSwap true to randomize swaps, false for fixed intervals
+     */
+    public void setSwapRandomized(boolean randomizeSwap) {
+        setRandomizeSwap(randomizeSwap);
+    }
     public void setSwapInterval(int interval) {
         config.set("swap.interval", interval);
         plugin.saveConfig();
@@ -257,7 +320,20 @@ public class ConfigManager {
     }
 
     public String getFreezeMode() {
-        return config.getString("freeze.mode", "SPECTATOR");
+        return config.getString("freeze.mode", "LIMBO");
+    }
+
+    public Location getLimboLocation() {
+        double x = config.getDouble("limbo.x", 0.5);
+        double y = config.getDouble("limbo.y", 200.0);
+        double z = config.getDouble("limbo.z", 0.5);
+        String worldName = config.getString("limbo.world", "world");
+        World world = plugin.getServer().getWorld(worldName);
+        if (world == null) {
+            world = plugin.getServer().getWorlds().get(0);
+            plugin.getLogger().warning("Limbo world '" + worldName + "' not found. Using default world: " + world.getName());
+        }
+        return new Location(world, x, y, z);
     }
 
     public void setFreezeMode(String mode) {
@@ -439,6 +515,62 @@ public class ConfigManager {
      */
     public String getHunterTimerVisibility() {
         return config.getString("timer_visibility.hunter_visibility", "never");
+    }
+
+    public boolean isCompassJammingEnabled() {
+        return config.getBoolean("tracker.compass_jamming.enabled", true);
+    }
+
+    public int getCompassJamDuration() {
+        return config.getInt("tracker.compass_jamming.duration_ticks", 100);
+    }
+
+    public boolean isHunterSwapEnabled() {
+        return config.getBoolean("swap.hunter_swap.enabled", true);
+    }
+
+    public int getHunterSwapInterval() {
+        return config.getInt("swap.hunter_swap.interval", 60);
+    }
+
+    public List<String> getGoodPowerUps() {
+        return config.getStringList("power_ups.good_effects");
+    }
+
+    public List<String> getBadPowerUps() {
+        return config.getStringList("power_ups.bad_effects");
+    }
+
+    public boolean isLastStandEnabled() {
+        return config.getBoolean("last_stand.enabled", true);
+    }
+
+    public int getLastStandDuration() {
+        return config.getInt("last_stand.duration_ticks", 600); // 30 seconds
+    }
+
+    public int getLastStandStrengthAmplifier() {
+        return config.getInt("last_stand.strength_amplifier", 1);
+    }
+
+    public int getLastStandSpeedAmplifier() {
+        return config.getInt("last_stand.speed_amplifier", 1);
+    }
+
+    public boolean isKitsEnabled() {
+        return config.getBoolean("kits.enabled", true);
+    }
+
+    public List<String> getRunnerKitItems() {
+        return config.getStringList("kits.runner_kit");
+    }
+
+    public List<String> getHunterKitItems() {
+        return config.getStringList("kits.hunter_kit");
+    }
+
+    public boolean isHotPotatoModeEnabled() {
+        return config.getBoolean("swap.hot_potato_mode.enabled", false);
     }
 
     /**
