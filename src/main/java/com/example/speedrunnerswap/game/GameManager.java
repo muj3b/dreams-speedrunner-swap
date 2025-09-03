@@ -123,64 +123,64 @@ public class GameManager {
             return;
         }
 
-        // Announce winner with a title
         Component titleText;
-        Component subtitleText;
-        
-        if (winner == Team.RUNNER) {
-            titleText = Component.text("RUNNERS WIN!")
-                .color(NamedTextColor.GREEN)
-                .decorate(TextDecoration.BOLD);
-            subtitleText = Component.text("Congratulations!")
-                .color(NamedTextColor.YELLOW);
-        } else if (winner == Team.HUNTER) {
-            titleText = Component.text("HUNTERS WIN!")
-                .color(NamedTextColor.RED)
-                .decorate(TextDecoration.BOLD);
-            subtitleText = Component.text("Better luck next time, runners!")
-                .color(NamedTextColor.YELLOW);
-        } else {
-            titleText = Component.text("GAME OVER")
-                .color(NamedTextColor.RED)
-                .decorate(TextDecoration.BOLD);
-            subtitleText = Component.text("No winner declared.")
-                .color(NamedTextColor.YELLOW);
-        }
+        String runnerSubtitle = "";
+        String hunterSubtitle = "";
 
-        Title endTitle = Title.title(
-            titleText,
-            subtitleText,
-            Title.Times.times(Duration.ofMillis(500), Duration.ofMillis(5000), Duration.ofMillis(500))
-        );
+        if (winner == Team.RUNNER) {
+            titleText = Component.text("RUNNERS WIN!", NamedTextColor.GREEN, TextDecoration.BOLD);
+            runnerSubtitle = "bro y'all are locked in, good stuff";
+            hunterSubtitle = "bro y'all are locked in, good stuff";
+        } else if (winner == Team.HUNTER) {
+            titleText = Component.text("HUNTERS WIN!", NamedTextColor.RED, TextDecoration.BOLD);
+            runnerSubtitle = "you ain't the main character unc";
+            hunterSubtitle = "bro those speedrunners are trash asf";
+        } else {
+            titleText = Component.text("GAME OVER", NamedTextColor.RED, TextDecoration.BOLD);
+            runnerSubtitle = "No winner declared.";
+            hunterSubtitle = "No winner declared.";
+        }
 
         for (Player player : Bukkit.getOnlinePlayers()) {
-            player.showTitle(endTitle);
-        }    // Cancel all game tasks
-    if (swapTask != null) swapTask.cancel();
-    if (hunterSwapTask != null) hunterSwapTask.cancel();
-    if (actionBarTask != null) actionBarTask.cancel();
-    if (freezeCheckTask != null) freezeCheckTask.cancel();
-    plugin.getTrackerManager().stopTracking();
-
-    // Delay before resetting players and broadcasting final messages
-    new BukkitRunnable() {
-        @Override
-        public void run() {
-            restoreAllPlayerStates();
-            
-            gameRunning = false;
-            gamePaused = false;
-            activeRunner = null;
-            
-            if (plugin.getConfigManager().isBroadcastGameEvents()) {
-                String winnerMessage = (winner != null) ? winner.name() + " team won!" : "Game ended!";
-                Bukkit.broadcast(net.kyori.adventure.text.Component.text("§a[SpeedrunnerSwap] Game ended! " + winnerMessage), Server.BROADCAST_CHANNEL_USERS);
+            Component subtitleText;
+            if (isRunner(player)) {
+                subtitleText = Component.text(runnerSubtitle, NamedTextColor.YELLOW);
+            } else {
+                subtitleText = Component.text(hunterSubtitle, NamedTextColor.YELLOW);
             }
 
-            broadcastDonationMessage();
+            Title endTitle = Title.title(
+                titleText,
+                subtitleText,
+                Title.Times.times(Duration.ofMillis(500), Duration.ofMillis(5000), Duration.ofMillis(500))
+            );
+            player.showTitle(endTitle);
         }
-    }.runTaskLater(plugin, 200L); // 10-second delay (20 ticks/sec * 10 sec)
-}
+
+        if (swapTask != null) swapTask.cancel();
+        if (hunterSwapTask != null) hunterSwapTask.cancel();
+        if (actionBarTask != null) actionBarTask.cancel();
+        if (freezeCheckTask != null) freezeCheckTask.cancel();
+        plugin.getTrackerManager().stopTracking();
+
+        new BukkitRunnable() {
+            @Override
+            public void run() {
+                restoreAllPlayerStates();
+                
+                gameRunning = false;
+                gamePaused = false;
+                activeRunner = null;
+                
+                if (plugin.getConfigManager().isBroadcastGameEvents()) {
+                    String winnerMessage = (winner != null) ? winner.name() + " team won!" : "Game ended!";
+                    Bukkit.broadcast(net.kyori.adventure.text.Component.text("§a[SpeedrunnerSwap] Game ended! " + winnerMessage), Server.BROADCAST_CHANNEL_USERS);
+                }
+
+                broadcastDonationMessage();
+            }
+        }.runTaskLater(plugin, 200L);
+    }
 
     private void broadcastDonationMessage() {
         // Add some spacing

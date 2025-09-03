@@ -71,7 +71,9 @@ public class ConfigManager {
     /**
      * Backward-compatibility alias for legacy callers
      * @return True if swaps should be randomized
+     * @deprecated Use {@link #isSwapRandomized()} instead.
      */
+    @Deprecated
     public boolean isRandomizeSwap() {
         return isSwapRandomized();
     }
