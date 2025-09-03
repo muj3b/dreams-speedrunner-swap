@@ -10,26 +10,37 @@ import org.bukkit.potion.PotionEffectType;
 import org.bukkit.Sound;
 
 import java.util.Collection;
+import org.bukkit.scheduler.BukkitTask;
 
 public class SuddenDeathManager {
     private final SpeedrunnerSwap plugin;
     private boolean isActive;
-    private final long activationDelay;
+    private BukkitTask scheduledTask;
 
     public SuddenDeathManager(SpeedrunnerSwap plugin) {
         this.plugin = plugin;
         this.isActive = false;
-        this.activationDelay = plugin.getConfig().getLong("sudden_death.activation_delay", 1200) * 20; // Convert to ticks
+        this.scheduledTask = null;
     }
 
     public void scheduleSuddenDeath() {
         if (isActive) return;
 
+        // Cancel previous schedule if any
+        if (scheduledTask != null) {
+            scheduledTask.cancel();
+            scheduledTask = null;
+        }
+
+        // Read seconds from config and convert to ticks; display minutes
+        long seconds = plugin.getConfig().getLong("sudden_death.activation_delay", 1200);
+        long minutes = Math.max(1, seconds) / 60L;
+        long activationDelayTicks = Math.max(1L, seconds) * 20L;
+
         // Schedule sudden death activation
-        Bukkit.getScheduler().runTaskLater(plugin, this::activateSuddenDeath, activationDelay);
+        scheduledTask = Bukkit.getScheduler().runTaskLater(plugin, this::activateSuddenDeath, activationDelayTicks);
 
         // Announce scheduled activation
-        long minutes = activationDelay / (20 * 60);
         Bukkit.broadcast(
             net.kyori.adventure.text.Component.text("\n§4§l=== SUDDEN DEATH SCHEDULED ===")
         );
@@ -41,6 +52,11 @@ public class SuddenDeathManager {
     public void activateSuddenDeath() {
         if (isActive) return;
         isActive = true;
+        // Clear any pending schedule
+        if (scheduledTask != null) {
+            scheduledTask.cancel();
+            scheduledTask = null;
+        }
 
         // Find The End dimension
         World endWorld = Bukkit.getWorlds().stream()
@@ -72,19 +88,16 @@ public class SuddenDeathManager {
             player.playSound(player.getLocation(), Sound.ENTITY_ENDER_DRAGON_GROWL, 1.0f, 1.0f);
         }
 
-        // Schedule periodic lightning for dramatic effect
-        Bukkit.getScheduler().runTaskTimer(plugin, () -> {
-            if (!isActive) return;
-            for (Player player : Bukkit.getOnlinePlayers()) {
-                if (player.getWorld().getEnvironment() == World.Environment.THE_END) {
-                    endWorld.strikeLightningEffect(player.getLocation().add(
-                        Math.random() * 20 - 10,
-                        0,
-                        Math.random() * 20 - 10
-                    ));
-                }
+        // One-time lightning effect near each player in The End (no repeating)
+        for (Player player : Bukkit.getOnlinePlayers()) {
+            if (player.getWorld().getEnvironment() == World.Environment.THE_END) {
+                endWorld.strikeLightningEffect(player.getLocation().add(
+                    Math.random() * 6 - 3,
+                    0,
+                    Math.random() * 6 - 3
+                ));
             }
-        }, 0L, 60L); // Every 3 seconds
+        }
     }
 
     private void announceSuddenDeath() {
@@ -100,9 +113,31 @@ public class SuddenDeathManager {
 
     public void deactivate() {
         isActive = false;
+        if (scheduledTask != null) {
+            scheduledTask.cancel();
+            scheduledTask = null;
+        }
     }
 
     public boolean isActive() {
         return isActive;
+    }
+
+    /**
+     * Cancel a pending scheduled activation, if any
+     */
+    public void cancelSchedule() {
+        if (scheduledTask != null) {
+            scheduledTask.cancel();
+            scheduledTask = null;
+            Bukkit.broadcast(net.kyori.adventure.text.Component.text("§eSudden Death schedule cancelled."));
+        }
+    }
+
+    /**
+     * Whether a schedule is pending
+     */
+    public boolean isScheduled() {
+        return scheduledTask != null && !isActive;
     }
 }

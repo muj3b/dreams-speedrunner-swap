@@ -43,11 +43,9 @@ public class GuiManager {
     public void openPositiveEffectsMenu(Player player) {
         Inventory inventory = Bukkit.createInventory(null, 36, Component.text("§a§lPositive Effects"));
         
-        // Fill with glass panes
+        // Border-only filler for cleaner look
         ItemStack filler = createItem(Material.BLACK_STAINED_GLASS_PANE, " ");
-        for (int i = 0; i < inventory.getSize(); i++) {
-            inventory.setItem(i, filler);
-        }
+        fillBorder(inventory, filler);
 
         // Add all available positive effects
         List<ItemStack> effectItems = new ArrayList<>();
@@ -73,11 +71,9 @@ public class GuiManager {
     public void openNegativeEffectsMenu(Player player) {
         Inventory inventory = Bukkit.createInventory(null, 36, Component.text("§c§lNegative Effects"));
         
-        // Fill with glass panes
+        // Border-only filler for cleaner look
         ItemStack filler = createItem(Material.BLACK_STAINED_GLASS_PANE, " ");
-        for (int i = 0; i < inventory.getSize(); i++) {
-            inventory.setItem(i, filler);
-        }
+        fillBorder(inventory, filler);
 
         // Add all available negative effects
         List<ItemStack> effectItems = new ArrayList<>();
@@ -114,11 +110,9 @@ public class GuiManager {
     public void openPowerUpsMenu(Player player) {
         Inventory inventory = Bukkit.createInventory(null, 36, Component.text("§e§lPower-ups Menu"));
         
-        // Fill with glass panes
+        // Border-only filler for cleaner look
         ItemStack filler = createItem(Material.BLACK_STAINED_GLASS_PANE, " ");
-        for (int i = 0; i < inventory.getSize(); i++) {
-            inventory.setItem(i, filler);
-        }
+        fillBorder(inventory, filler);
 
         // Toggle button
         List<String> powerUpToggleLore = new ArrayList<>();
@@ -155,9 +149,13 @@ public class GuiManager {
         inventory.setItem(15, badEffectsItem);
 
         // Duration settings
+        int minSec = plugin.getConfigManager().getPowerUpsMinSeconds();
+        int maxSec = plugin.getConfigManager().getPowerUpsMaxSeconds();
+        int minLvl = plugin.getConfigManager().getPowerUpsMinLevel();
+        int maxLvl = plugin.getConfigManager().getPowerUpsMaxLevel();
         List<String> durationLore = new ArrayList<>();
-        durationLore.add("§7Base duration: §e10-20 seconds");
-        durationLore.add("§7Effect level: §eI-II");
+        durationLore.add("§7Duration: §e" + minSec + "-" + maxSec + "s");
+        durationLore.add("§7Level: §e" + minLvl + "-" + maxLvl);
         durationLore.add("");
         durationLore.add("§7Click to modify timings");
         ItemStack durationItem = createItem(Material.CLOCK, "§6§lEffect Durations", durationLore);
@@ -169,14 +167,38 @@ public class GuiManager {
         player.openInventory(inventory);
     }
 
+    public void openPowerUpDurationsMenu(Player player) {
+        Inventory inv = Bukkit.createInventory(null, 27, Component.text("§6§lPower-up Durations"));
+        ItemStack filler = createItem(Material.GRAY_STAINED_GLASS_PANE, " ");
+        fillBorder(inv, filler);
+
+        ItemStack back = createItem(Material.ARROW, "§7§lBack", List.of("§7Return to power-ups"));
+        inv.setItem(0, back);
+
+        int minSec = plugin.getConfigManager().getPowerUpsMinSeconds();
+        int maxSec = plugin.getConfigManager().getPowerUpsMaxSeconds();
+        int minLvl = plugin.getConfigManager().getPowerUpsMinLevel();
+        int maxLvl = plugin.getConfigManager().getPowerUpsMaxLevel();
+
+        ItemStack minDur = createItem(Material.CLOCK, "§e§lMin Duration (s)", List.of("§7Current: §f" + minSec, "§7Left/Right: ±5"));
+        ItemStack maxDur = createItem(Material.CLOCK, "§e§lMax Duration (s)", List.of("§7Current: §f" + maxSec, "§7Left/Right: ±5"));
+        ItemStack minLvlItem = createItem(Material.EXPERIENCE_BOTTLE, "§e§lMin Level", List.of("§7Current: §f" + minLvl, "§7Left/Right: ±1"));
+        ItemStack maxLvlItem = createItem(Material.EXPERIENCE_BOTTLE, "§e§lMax Level", List.of("§7Current: §f" + maxLvl, "§7Left/Right: ±1"));
+
+        inv.setItem(10, minDur);
+        inv.setItem(12, maxDur);
+        inv.setItem(14, minLvlItem);
+        inv.setItem(16, maxLvlItem);
+
+        player.openInventory(inv);
+    }
+
     public void openWorldBorderMenu(Player player) {
         Inventory inventory = Bukkit.createInventory(null, 27, Component.text("§c§lWorld Border Settings"));
         
-        // Fill with glass panes
+        // Border-only filler for cleaner look
         ItemStack filler = createItem(Material.BLACK_STAINED_GLASS_PANE, " ");
-        for (int i = 0; i < inventory.getSize(); i++) {
-            inventory.setItem(i, filler);
-        }
+        fillBorder(inventory, filler);
 
         // Toggle button
         boolean isEnabled = plugin.getConfig().getBoolean("world_border.enabled", true);
@@ -248,11 +270,9 @@ public class GuiManager {
 
             Inventory inventory = Bukkit.createInventory(null, rows * 9, Component.text(title));
 
-            // Fill with glass panes for better visual organization
+            // Border-only filler for better visual organization
             ItemStack filler = createItem(Material.BLACK_STAINED_GLASS_PANE, " ");
-            for (int i = 0; i < inventory.getSize(); i++) {
-                inventory.setItem(i, filler);
-            }
+            fillBorder(inventory, filler);
 
             // Team selector button (Top row)
             List<String> teamSelectorLore = new ArrayList<>();
@@ -421,11 +441,9 @@ public class GuiManager {
         
         Inventory inventory = Bukkit.createInventory(null, rows * 9, Component.text(title));
         
-        // Fill with glass panes for better visual organization
+        // Border-only filler for better visual organization
         ItemStack filler = createItem(Material.BLACK_STAINED_GLASS_PANE, " ");
-        for (int i = 0; i < inventory.getSize(); i++) {
-            inventory.setItem(i, filler);
-        }
+        fillBorder(inventory, filler);
         
         // Back button with enhanced tooltip
         List<String> backLore = new ArrayList<>();
@@ -538,11 +556,9 @@ public class GuiManager {
         
         Inventory inventory = Bukkit.createInventory(null, rows * 9, Component.text(title));
         
-        // Fill with glass panes for better organization
+        // Border-only filler for cleaner layout
         ItemStack filler = createItem(Material.BLACK_STAINED_GLASS_PANE, " ");
-        for (int i = 0; i < inventory.getSize(); i++) {
-            inventory.setItem(i, filler);
-        }
+        fillBorder(inventory, filler);
         
         // Back button with enhanced tooltip
         List<String> backLore = new ArrayList<>();
@@ -564,8 +580,7 @@ public class GuiManager {
         swapHeaderLore.add("§7• Intervals and timing");
         swapHeaderLore.add("§7• Randomization options");
         swapHeaderLore.add("§7• Safety features");
-swapHeaderLore.add("§7• Randomized intervals");
-swapHeaderLore.add("§7• Hover over options for details");
+        swapHeaderLore.add("§7• Hover over options for details");
         ItemStack swapHeader = createItem(Material.BOOK, "§6§lSwap Settings", swapHeaderLore);
         inventory.setItem(9, swapHeader);
         
@@ -793,9 +808,9 @@ swapHeaderLore.add("§7• Hover over options for details");
     // Placeholder menus for items referenced in main menu. These should be expanded later.
     public void openKitsMenu(Player player) {
     Inventory inv = Bukkit.createInventory(null, 27, Component.text("§b§lKits"));
-    // Fill with filler
+    // Border-only filler
     ItemStack filler = createItem(Material.BLACK_STAINED_GLASS_PANE, " ");
-    for (int i = 0; i < inv.getSize(); i++) inv.setItem(i, filler);
+    fillBorder(inv, filler);
 
     ItemStack back = createItem(Material.ARROW, "§7§lBack", List.of("§7Return to main menu"));
     inv.setItem(0, back);
@@ -852,7 +867,7 @@ swapHeaderLore.add("§7• Hover over options for details");
     public void openBountyMenu(Player player) {
     Inventory inv = Bukkit.createInventory(null, 27, Component.text("§6§lBounty System"));
     ItemStack filler = createItem(Material.BLACK_STAINED_GLASS_PANE, " ");
-    for (int i = 0; i < inv.getSize(); i++) inv.setItem(i, filler);
+    fillBorder(inv, filler);
 
     ItemStack back = createItem(Material.ARROW, "§7§lBack", List.of("§7Return to main menu"));
     inv.setItem(0, back);
@@ -878,7 +893,7 @@ swapHeaderLore.add("§7• Hover over options for details");
     public void openLastStandMenu(Player player) {
     Inventory inv = Bukkit.createInventory(null, 27, Component.text("§e§lLast Stand"));
     ItemStack filler = createItem(Material.BLACK_STAINED_GLASS_PANE, " ");
-    for (int i = 0; i < inv.getSize(); i++) inv.setItem(i, filler);
+    fillBorder(inv, filler);
 
     ItemStack back = createItem(Material.ARROW, "§7§lBack", List.of("§7Return to main menu"));
     inv.setItem(0, back);
@@ -904,7 +919,7 @@ swapHeaderLore.add("§7• Hover over options for details");
     public void openCompassSettingsMenu(Player player) {
     Inventory inv = Bukkit.createInventory(null, 27, Component.text("§9§lCompass Settings"));
     ItemStack filler = createItem(Material.BLACK_STAINED_GLASS_PANE, " ");
-    for (int i = 0; i < inv.getSize(); i++) inv.setItem(i, filler);
+    fillBorder(inv, filler);
 
     ItemStack back = createItem(Material.ARROW, "§7§lBack", List.of("§7Return to main menu"));
     inv.setItem(0, back);
@@ -919,13 +934,22 @@ swapHeaderLore.add("§7• Hover over options for details");
     ItemStack jamDurationItem = createItem(Material.CLOCK, "§6§lJam Duration (ticks)", List.of("§7Current: §f" + jamDuration, "§7Left/Right click to +/- 20 ticks"));
     inv.setItem(15, jamDurationItem);
 
+    // End Portal hint controls (per-world)
+    org.bukkit.World world = player.getWorld();
+    org.bukkit.Location hint = plugin.getConfigManager().getEndPortalHint(world);
+    String hintLine = hint != null ? ("§aSet at §f" + hint.getBlockX() + ", " + hint.getBlockY() + ", " + hint.getBlockZ()) : "§cNot set";
+    ItemStack setHint = createItem(Material.LODESTONE, "§e§lSet End Portal Hint (this world)", List.of("§7Used when target is in The End", hintLine));
+    ItemStack clearHint = createItem(Material.BARRIER, "§c§lClear End Portal Hint (this world)", List.of("§7Remove stored hint for this world"));
+    inv.setItem(20, setHint);
+    inv.setItem(22, clearHint);
+
     player.openInventory(inv);
     }
 
     public void openSuddenDeathMenu(Player player) {
     Inventory inv = Bukkit.createInventory(null, 27, Component.text("§4§lSudden Death"));
     ItemStack filler = createItem(Material.BLACK_STAINED_GLASS_PANE, " ");
-    for (int i = 0; i < inv.getSize(); i++) inv.setItem(i, filler);
+    fillBorder(inv, filler);
 
     ItemStack back = createItem(Material.ARROW, "§7§lBack", List.of("§7Return to main menu"));
     inv.setItem(0, back);
@@ -935,14 +959,20 @@ swapHeaderLore.add("§7• Hover over options for details");
         "§4§lSudden Death: " + (active ? "§aActive" : "§cInactive"), List.of("§7Control sudden death behavior"));
     inv.setItem(4, status);
 
+    boolean scheduled = plugin.getSuddenDeathManager().isScheduled();
     ItemStack schedule = createItem(Material.CLOCK, "§e§lSchedule Sudden Death", List.of("§7Left-click to schedule using config delay", "§7Click to schedule now"));
     inv.setItem(11, schedule);
 
     ItemStack activate = createItem(Material.DRAGON_HEAD, "§c§lActivate Now", List.of("§7Activate sudden death immediately"));
     inv.setItem(15, activate);
 
+    // Cancel schedule button (shown regardless; will no-op when none)
+    ItemStack cancel = createItem(Material.BARRIER, "§e§lCancel Scheduled Sudden Death", List.of(scheduled ? "§7A schedule is pending" : "§7No schedule pending"));
+    inv.setItem(13, cancel);
+
     // Activation delay display (in minutes)
-    long delayMinutes = plugin.getConfig().getLong("sudden_death.activation_delay", 120);
+    long delaySeconds = plugin.getConfig().getLong("sudden_death.activation_delay", 1200);
+    long delayMinutes = Math.max(1L, delaySeconds) / 60L;
     ItemStack delayItem = createItem(Material.CLOCK, "§6§lActivation Delay (minutes)", List.of("§7Current: §f" + delayMinutes + " minutes", "§7Left/Right to +/- 5 minutes"));
     inv.setItem(22, delayItem);
 
@@ -952,7 +982,7 @@ swapHeaderLore.add("§7• Hover over options for details");
     public void openStatisticsMenu(Player player) {
     Inventory inv = Bukkit.createInventory(null, 27, Component.text("§a§lStatistics"));
     ItemStack filler = createItem(Material.BLACK_STAINED_GLASS_PANE, " ");
-    for (int i = 0; i < inv.getSize(); i++) inv.setItem(i, filler);
+    fillBorder(inv, filler);
 
     ItemStack back = createItem(Material.ARROW, "§7§lBack", List.of("§7Return to main menu"));
     inv.setItem(0, back);
@@ -1025,6 +1055,24 @@ swapHeaderLore.add("§7• Hover over options for details");
         
         item.setItemMeta(meta);
         return item;
+    }
+
+    // Visual utility: fill only the outer border of an inventory with a filler item
+    private void fillBorder(Inventory inv, ItemStack filler) {
+        if (inv == null || filler == null) return;
+        int size = inv.getSize();
+        if (size < 9) return;
+        int rows = size / 9;
+        // Top and bottom rows
+        for (int c = 0; c < 9; c++) {
+            inv.setItem(c, filler);
+            inv.setItem((rows - 1) * 9 + c, filler);
+        }
+        // Left and right columns
+        for (int r = 0; r < rows; r++) {
+            inv.setItem(r * 9, filler);
+            inv.setItem(r * 9 + 8, filler);
+        }
     }
     
     private List<String> getStatusLore() {

@@ -50,12 +50,16 @@ public class GuiListener implements Listener {
     }
 
     private boolean isPluginGui(String title) {
-        return title.contains("SpeedrunnerSwap") || 
-               title.contains("Settings") || 
+        if (title == null || title.isEmpty()) return false;
+        // Include all plugin menus and the kit editor
+        return title.contains("SpeedrunnerSwap") ||
+               title.contains("Main Menu") ||
                title.contains("Team Selector") ||
                title.contains("Kits") ||
+               (title.contains("Edit ") && title.contains(" Kit")) ||
                title.contains("Effects") ||
                title.contains("Power-ups") ||
+               title.contains("Power-up Durations") ||
                title.contains("World Border") ||
                title.contains("Bounty") ||
                title.contains("Last Stand") ||
@@ -65,10 +69,13 @@ public class GuiListener implements Listener {
     }
 
     private boolean isAdminMenu(String title) {
-        return title.contains("Settings") || 
-               title.contains("Kits") || 
+        if (title == null || title.isEmpty()) return false;
+        return title.contains("Settings") ||
+               title.contains("Kits") ||
+               (title.contains("Edit ") && title.contains(" Kit")) ||
                title.contains("Effects") ||
                title.contains("Power-ups") ||
+               title.contains("Power-up Durations") ||
                title.contains("World Border") ||
                title.contains("Bounty") ||
                title.contains("Last Stand") ||
@@ -86,13 +93,24 @@ public class GuiListener implements Listener {
             return;
         }
 
+        // Special-case handling for submenus not covered by a general section
+        if (maybeHandlePowerUpDurationsMenu(event, title)) return;
+
         // Route to specific menu handlers
         // Main menu: support both legacy "Main Menu" and configurable titles like "SpeedrunnerSwap Menu"
         if (title.contains("Main Menu") || title.contains("SpeedrunnerSwap")) {
             handleMainMenuClick(event);
         } else if (title.contains("Team Selector")) {
             handleTeamSelectorClick(event);
+        // Check specific "... Settings" menus BEFORE the generic settings title
+        } else if (title.contains("World Border")) {
+            handleWorldBorderClick(event);
+        } else if (title.contains("Compass")) {
+            handleCompassSettingsClick(event);
+        } else if (title.contains("Sudden Death")) {
+            handleSuddenDeathClick(event);
         } else if (title.contains("Settings")) {
+            // Only the main settings menu should land here; specific menus are handled above
             handleSettingsClick(event);
         } else if (title.contains("Edit ") && title.contains(" Kit")) {
             handleKitEditorClick(event, title);
@@ -102,16 +120,10 @@ public class GuiListener implements Listener {
             handlePowerUpsMenuClick(event);
         } else if (title.contains("Effects")) {
             handleEffectsMenuClick(event, title);
-        } else if (title.contains("World Border")) {
-            handleWorldBorderClick(event);
         } else if (title.contains("Bounty")) {
             handleBountyMenuClick(event);
         } else if (title.contains("Last Stand")) {
             handleLastStandClick(event);
-        } else if (title.contains("Compass")) {
-            handleCompassSettingsClick(event);
-        } else if (title.contains("Sudden Death")) {
-            handleSuddenDeathClick(event);
         } else if (title.contains("Statistics")) {
             handleStatisticsClick(event);
         }
@@ -499,7 +511,68 @@ public class GuiListener implements Listener {
             guiManager.openNegativeEffectsMenu(player);
             return;
         }
-        // Duration UI not implemented yet; ignore clicks safely
+        if (name.contains("Effect Durations")) {
+            guiManager.openPowerUpDurationsMenu(player);
+            return;
+        }
+        // Other clicks: ignore safely
+    }
+
+    // Recognize and handle clicks inside the Power-up Durations menu
+    // Title: "§6§lPower-up Durations"
+    private boolean maybeHandlePowerUpDurationsMenu(InventoryClickEvent event, String title) {
+        if (!title.contains("Power-up Durations")) return false;
+        handlePowerUpDurationsClick(event);
+        return true;
+    }
+
+    private void handlePowerUpDurationsClick(InventoryClickEvent event) {
+        Player player = (Player) event.getWhoClicked();
+        ItemStack clicked = event.getCurrentItem();
+        if (clicked == null || !clicked.hasItemMeta()) return;
+        String name = PlainTextComponentSerializer.plainText().serialize(clicked.getItemMeta().displayName());
+
+        boolean changed = false;
+        switch (name) {
+            case "§e§lMin Duration (s)" -> {
+                int val = plugin.getConfigManager().getPowerUpsMinSeconds();
+                if (event.isLeftClick()) val += 5;
+                if (event.isRightClick()) val -= 5;
+                val = Math.max(1, Math.min(600, val));
+                plugin.getConfigManager().setPowerUpsMinSeconds(val);
+                changed = true;
+            }
+            case "§e§lMax Duration (s)" -> {
+                int val = plugin.getConfigManager().getPowerUpsMaxSeconds();
+                if (event.isLeftClick()) val += 5;
+                if (event.isRightClick()) val -= 5;
+                val = Math.max(1, Math.min(1800, val));
+                plugin.getConfigManager().setPowerUpsMaxSeconds(val);
+                changed = true;
+            }
+            case "§e§lMin Level" -> {
+                int val = plugin.getConfigManager().getPowerUpsMinLevel();
+                if (event.isLeftClick()) val += 1;
+                if (event.isRightClick()) val -= 1;
+                val = Math.max(1, Math.min(5, val));
+                plugin.getConfigManager().setPowerUpsMinLevel(val);
+                changed = true;
+            }
+            case "§e§lMax Level" -> {
+                int val = plugin.getConfigManager().getPowerUpsMaxLevel();
+                if (event.isLeftClick()) val += 1;
+                if (event.isRightClick()) val -= 1;
+                val = Math.max(1, Math.min(5, val));
+                plugin.getConfigManager().setPowerUpsMaxLevel(val);
+                changed = true;
+            }
+            default -> {}
+        }
+        if (isBackButton(clicked)) {
+            guiManager.openPowerUpsMenu(player);
+        } else if (changed) {
+            guiManager.openPowerUpDurationsMenu(player);
+        }
     }
 
     private void handleWorldBorderClick(InventoryClickEvent event) {
@@ -681,6 +754,16 @@ public class GuiListener implements Listener {
                 plugin.saveConfig();
                 guiManager.openCompassSettingsMenu(player);
             }
+            case "§e§lSet End Portal Hint (this world)" -> {
+                plugin.getConfigManager().setEndPortalHint(player.getWorld(), player.getLocation());
+                player.sendMessage(Component.text("§aSet End Portal hint for world §f" + player.getWorld().getName()));
+                guiManager.openCompassSettingsMenu(player);
+            }
+            case "§c§lClear End Portal Hint (this world)" -> {
+                plugin.getConfigManager().clearEndPortalHint(player.getWorld());
+                player.sendMessage(Component.text("§eCleared End Portal hint for world §f" + player.getWorld().getName()));
+                guiManager.openCompassSettingsMenu(player);
+            }
             default -> {}
         }
     }
@@ -692,14 +775,25 @@ public class GuiListener implements Listener {
         String name = PlainTextComponentSerializer.plainText().serialize(clicked.getItemMeta().displayName());
 
         switch (name) {
+            case "§4§lSudden Death: §aActive" -> {
+                // Toggle off
+                plugin.getSuddenDeathManager().deactivate();
+            }
+            case "§4§lSudden Death: §cInactive" -> {
+                // No immediate action; user can Schedule or Activate explicitly
+            }
+            case "§e§lCancel Scheduled Sudden Death" -> plugin.getSuddenDeathManager().cancelSchedule();
             case "§e§lSchedule Sudden Death" -> plugin.getSuddenDeathManager().scheduleSuddenDeath();
             case "§c§lActivate Now" -> plugin.getSuddenDeathManager().activateSuddenDeath();
             case "§6§lActivation Delay (minutes)" -> {
-                long minutes = plugin.getConfig().getLong("sudden_death.activation_delay", 120);
-                if (event.isLeftClick()) minutes += 5;
-                if (event.isRightClick()) minutes -= 5;
-                minutes = Math.max(5, Math.min(360, minutes));
-                plugin.getConfig().set("sudden_death.activation_delay", minutes);
+                long seconds = plugin.getConfig().getLong("sudden_death.activation_delay", 1200);
+                long delta = 5 * 60L;
+                if (event.isLeftClick()) seconds += delta;
+                if (event.isRightClick()) seconds -= delta;
+                long min = 5 * 60L; // 5 minutes
+                long max = 360 * 60L; // 6 hours
+                seconds = Math.max(min, Math.min(max, seconds));
+                plugin.getConfig().set("sudden_death.activation_delay", seconds);
                 plugin.saveConfig();
             }
             default -> {}
@@ -780,6 +874,8 @@ public class GuiListener implements Listener {
                 int split = text.indexOf(':');
                 if (split >= 0 && split + 1 < text.length()) {
                     effectId = text.substring(split + 1).trim();
+                    // Strip legacy color/formatting codes to get the raw ID
+                    effectId = effectId.replaceAll("§[0-9A-FK-ORa-fk-or]", "");
                 }
                 break;
             }

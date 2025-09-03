@@ -45,10 +45,10 @@ public class TrackerManager {
                 if (activeRunner == null || !activeRunner.isOnline() || !plugin.getGameManager().isGameRunning()) {
                     return;
                 }
-                
-                // Update compass for all hunters
+
+                // Update compass for all hunters regardless of dimension
                 for (Player hunter : plugin.getGameManager().getHunters()) {
-                    if (hunter.isOnline() && hunter.getWorld().equals(activeRunner.getWorld())) {
+                    if (hunter.isOnline()) {
                         updateHunterCompass(hunter, activeRunner);
                     }
                 }
@@ -128,7 +128,7 @@ public class TrackerManager {
             ItemStack compass = hunter.getInventory().getItem(slot);
             if (compass == null || compass.getType() != Material.COMPASS) return;
 
-            // Compute target location
+            // Compute target location or apply jamming
             Location adjustedLoc;
             World.Environment hunterEnv = hunter.getWorld().getEnvironment();
             World.Environment targetEnv = target.getWorld().getEnvironment();
@@ -139,6 +139,7 @@ public class TrackerManager {
                 meta.setLodestoneTracked(false);
                 compass.setItemMeta(meta);
             } else if (hunterEnv == targetEnv) {
+                // Same dimension: track exact target
                 adjustedLoc = target.getLocation();
                 hunter.setCompassTarget(adjustedLoc);
             } else if (hunterEnv == World.Environment.NORMAL && targetEnv == World.Environment.NETHER) {
@@ -150,9 +151,11 @@ public class TrackerManager {
                         Math.min(Math.max(target.getLocation().getY(), 0), 256), target.getLocation().getZ() * 8);
                 hunter.setCompassTarget(adjustedLoc);
             } else if (targetEnv == World.Environment.THE_END) {
-                adjustedLoc = new Location(hunter.getWorld(), 100, 50, 0);
+                // Point towards a configured hint if available (per hunter's current world)
+                Location hint = plugin.getConfigManager().getEndPortalHint(hunter.getWorld());
+                adjustedLoc = hint != null ? hint : hunter.getWorld().getSpawnLocation();
                 hunter.setCompassTarget(adjustedLoc);
-                hunter.sendMessage("§eTarget is in The End! Compass points to the End Portal.");
+                hunter.sendMessage("§eTarget is in The End! Compass points to the End Portal hint.");
             } else {
                 adjustedLoc = hunter.getWorld().getSpawnLocation();
                 hunter.setCompassTarget(adjustedLoc);

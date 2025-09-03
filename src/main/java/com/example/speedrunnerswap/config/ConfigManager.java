@@ -507,6 +507,33 @@ public class ConfigManager {
         return config.getInt("tracker.compass_jamming.duration_ticks", 100);
     }
 
+    // End portal hint per-world (used when target is in THE_END)
+    public org.bukkit.Location getEndPortalHint(org.bukkit.World world) {
+        if (world == null) return null;
+        String base = "tracker.end_portal_hint." + world.getName();
+        if (!config.contains(base + ".x")) return null;
+        double x = config.getDouble(base + ".x", world.getSpawnLocation().getX());
+        double y = config.getDouble(base + ".y", world.getSpawnLocation().getY());
+        double z = config.getDouble(base + ".z", world.getSpawnLocation().getZ());
+        return new org.bukkit.Location(world, x, y, z);
+    }
+
+    public void setEndPortalHint(org.bukkit.World world, org.bukkit.Location loc) {
+        if (world == null || loc == null) return;
+        String base = "tracker.end_portal_hint." + world.getName();
+        config.set(base + ".x", loc.getX());
+        config.set(base + ".y", loc.getY());
+        config.set(base + ".z", loc.getZ());
+        plugin.saveConfig();
+    }
+
+    public void clearEndPortalHint(org.bukkit.World world) {
+        if (world == null) return;
+        String base = "tracker.end_portal_hint." + world.getName();
+        config.set(base, null);
+        plugin.saveConfig();
+    }
+
     public boolean isHunterSwapEnabled() {
         return config.getBoolean("swap.hunter_swap.enabled", false);
     }
@@ -521,6 +548,59 @@ public class ConfigManager {
 
     public List<String> getBadPowerUps() {
         return config.getStringList("power_ups.bad_effects");
+    }
+
+    // Power-up timing and level ranges
+    public int getPowerUpsMinSeconds() {
+        return Math.max(1, config.getInt("power_ups.duration.min_seconds", 10));
+    }
+
+    public int getPowerUpsMaxSeconds() {
+        int min = getPowerUpsMinSeconds();
+        int max = config.getInt("power_ups.duration.max_seconds", 20);
+        return Math.max(min, max);
+    }
+
+    public void setPowerUpsMinSeconds(int seconds) {
+        seconds = Math.max(1, seconds);
+        int max = getPowerUpsMaxSeconds();
+        if (seconds > max) {
+            config.set("power_ups.duration.max_seconds", seconds);
+        }
+        config.set("power_ups.duration.min_seconds", seconds);
+        plugin.saveConfig();
+    }
+
+    public void setPowerUpsMaxSeconds(int seconds) {
+        seconds = Math.max(getPowerUpsMinSeconds(), seconds);
+        config.set("power_ups.duration.max_seconds", seconds);
+        plugin.saveConfig();
+    }
+
+    public int getPowerUpsMinLevel() {
+        return Math.max(1, config.getInt("power_ups.level.min", 1));
+    }
+
+    public int getPowerUpsMaxLevel() {
+        int min = getPowerUpsMinLevel();
+        int max = config.getInt("power_ups.level.max", 2);
+        return Math.max(min, max);
+    }
+
+    public void setPowerUpsMinLevel(int level) {
+        level = Math.max(1, level);
+        int max = getPowerUpsMaxLevel();
+        if (level > max) {
+            config.set("power_ups.level.max", level);
+        }
+        config.set("power_ups.level.min", level);
+        plugin.saveConfig();
+    }
+
+    public void setPowerUpsMaxLevel(int level) {
+        level = Math.max(getPowerUpsMinLevel(), level);
+        config.set("power_ups.level.max", level);
+        plugin.saveConfig();
     }
 
     public boolean isLastStandEnabled() {

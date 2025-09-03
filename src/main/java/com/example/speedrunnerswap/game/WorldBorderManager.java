@@ -4,15 +4,18 @@ import com.example.speedrunnerswap.SpeedrunnerSwap;
 import org.bukkit.Bukkit;
 import org.bukkit.World;
 import org.bukkit.WorldBorder;
+import org.bukkit.scheduler.BukkitTask;
 
 public class WorldBorderManager {
     private final SpeedrunnerSwap plugin;
     // Values are read from config at runtime to reflect GUI changes
     private boolean isActive;
+    private BukkitTask borderWarningTask;
 
     public WorldBorderManager(SpeedrunnerSwap plugin) {
         this.plugin = plugin;
         this.isActive = false;
+        this.borderWarningTask = null;
     }
 
     public void startBorderShrinking() {
@@ -53,11 +56,23 @@ public class WorldBorderManager {
             WorldBorder border = world.getWorldBorder();
             border.setSize(initialSize);
         }
+
+        // Cancel warnings task if running
+        if (borderWarningTask != null) {
+            borderWarningTask.cancel();
+            borderWarningTask = null;
+        }
     }
 
     private void scheduleBorderWarnings() {
+        // Cancel any previous task
+        if (borderWarningTask != null) {
+            borderWarningTask.cancel();
+            borderWarningTask = null;
+        }
+
         // Schedule periodic warnings about border size
-        Bukkit.getScheduler().runTaskTimer(plugin, () -> {
+        borderWarningTask = Bukkit.getScheduler().runTaskTimer(plugin, () -> {
             if (!isActive) return;
 
             World overworld = Bukkit.getWorlds().get(0);

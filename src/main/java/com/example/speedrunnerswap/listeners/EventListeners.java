@@ -10,6 +10,7 @@ import org.bukkit.event.Listener;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.inventory.InventoryType;
 import org.bukkit.event.player.*;
+import org.bukkit.event.player.PlayerChangedWorldEvent;
 import org.bukkit.event.entity.PlayerDeathEvent;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
@@ -77,6 +78,23 @@ public class EventListeners implements Listener {
         plugin.getGameManager().updateTeams();
     }
 
+    @EventHandler
+    public void onPlayerChangedWorld(PlayerChangedWorldEvent event) {
+        Player player = event.getPlayer();
+        if (!plugin.getGameManager().isGameRunning()) return;
+
+        // If a hunter changes world, (re)give/update their compass
+        if (plugin.getGameManager().isHunter(player)) {
+            plugin.getTrackerManager().giveTrackingCompass(player);
+        }
+
+        // If the active runner changes world, push updates to all hunters
+        Player active = plugin.getGameManager().getActiveRunner();
+        if (active != null && active.equals(player)) {
+            plugin.getTrackerManager().updateAllHunterCompasses();
+        }
+    }
+
     @EventHandler(priority = EventPriority.HIGHEST)
     public void onInventoryClick(InventoryClickEvent event) {
         if (!(event.getWhoClicked() instanceof Player)) return;
@@ -118,6 +136,7 @@ public class EventListeners implements Listener {
                title.contains("Kits") ||
                title.contains("Effects") ||
                title.contains("Power-ups") ||
+               title.contains("Power-up Durations") ||
                title.contains("World Border") ||
                title.contains("Bounty") ||
                title.contains("Last Stand") ||
