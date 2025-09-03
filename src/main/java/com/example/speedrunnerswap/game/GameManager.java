@@ -166,6 +166,18 @@ public class GameManager {
         new BukkitRunnable() {
             @Override
             public void run() {
+                // Capture final progress of the active runner and apply to all runners
+                try {
+                    if (activeRunner != null && activeRunner.isOnline() && !runners.isEmpty()) {
+                        com.example.speedrunnerswap.models.PlayerState finalState = PlayerStateUtil.capturePlayerState(activeRunner);
+                        for (Player r : runners) {
+                            playerStates.put(r.getUniqueId(), finalState);
+                        }
+                    }
+                } catch (Exception ex) {
+                    plugin.getLogger().warning("Failed to capture/apply final runner state: " + ex.getMessage());
+                }
+
                 restoreAllPlayerStates();
                 
                 gameRunning = false;
@@ -326,8 +338,19 @@ public class GameManager {
         runners = newRunners;
         hunters = newHunters;
 
+        // If a team becomes empty due to disconnects, pause instead of ending the game
         if (gameRunning && (runners.isEmpty() || hunters.isEmpty())) {
-            endGame(null);
+            if (plugin.getConfigManager().isPauseOnDisconnect()) {
+                pauseGame();
+                if (plugin.getConfigManager().isBroadcastGameEvents()) {
+                    Bukkit.broadcast(net.kyori.adventure.text.Component.text(
+                            "§e[SpeedrunnerSwap] Game paused: waiting for players to return."),
+                            Server.BROADCAST_CHANNEL_USERS);
+                }
+            } else {
+                // Keep running but log a warning for admins
+                plugin.getLogger().warning("A team is empty; game continues (pause_on_disconnect=false)");
+            }
         }
     }
 
@@ -506,33 +529,47 @@ public class GameManager {
         if (!gameRunning || gamePaused) {
             return;
         }
-    
+
         int timeLeft = getTimeUntilNextSwap();
-        String timeMessage = String.format("§eTime until next swap: §c%ds", timeLeft);
-    
         for (Player player : Bukkit.getOnlinePlayers()) {
             String visibility;
-            
+            boolean isWaitingRunner = false;
+
             if (player.equals(activeRunner)) {
                 visibility = plugin.getConfigManager().getRunnerTimerVisibility();
             } else if (runners.contains(player)) {
                 visibility = plugin.getConfigManager().getWaitingTimerVisibility();
+                isWaitingRunner = true;
             } else {
                 visibility = plugin.getConfigManager().getHunterTimerVisibility();
             }
-    
+
             boolean showTimer = switch (visibility) {
                 case "always" -> true;
                 case "last_10" -> timeLeft <= 10;
                 case "never" -> false;
                 default -> false;
             };
-    
-            if (showTimer) {
-                player.sendActionBar(net.kyori.adventure.text.Component.text(timeMessage));
-            } else {
+
+            if (!showTimer) {
                 player.sendActionBar(net.kyori.adventure.text.Component.text(""));
+                continue;
             }
+
+            String message;
+            if (isWaitingRunner && activeRunner != null) {
+                String dim = switch (activeRunner.getWorld().getEnvironment()) {
+                    case NETHER -> "Nether";
+                    case THE_END -> "End";
+                    default -> "Overworld";
+                };
+                message = String.format("§eActive: §b%s §7in §d%s §7| §eSwap in: §c%ds",
+                        activeRunner.getName(), dim, timeLeft);
+            } else {
+                message = String.format("§eTime until next swap: §c%ds", timeLeft);
+            }
+
+            player.sendActionBar(net.kyori.adventure.text.Component.text(message));
         }
     }
     
@@ -614,42 +651,43 @@ public class GameManager {
     }
     
     private void performSwap() {
-        if (!gameRunning || gamePaused || runners.size() < 1) {
+        if (!gameRunning || gamePaused || runners.isEmpty()) {
             return;
         }
-        
+
+        // Persist the current active runner's state before swapping
         if (activeRunner != null && activeRunner.isOnline()) {
             savePlayerState(activeRunner);
         }
-        
-        // Find next online runner
+
+        // Advance to next online runner
         int attempts = 0;
-        // removed unused variable originalIndex
         do {
             activeRunnerIndex = (activeRunnerIndex + 1) % runners.size();
             attempts++;
-            
-            // Prevent infinite loop if no runners are online
             if (attempts >= runners.size()) {
                 plugin.getLogger().warning("No online runners found during swap - pausing game");
                 pauseGame();
                 return;
             }
         } while (!runners.get(activeRunnerIndex).isOnline());
-        
+
         Player nextRunner = runners.get(activeRunnerIndex);
-        
-        if (plugin.getConfigManager().isSafeSwapEnabled()) {
-            Location safeLocation = SafeLocationFinder.findSafeLocation(nextRunner.getLocation(), 
-                    plugin.getConfigManager().getSafeSwapHorizontalRadius(),
-                    plugin.getConfigManager().getSafeSwapVerticalDistance(),
-                    plugin.getConfigManager().getDangerousBlocks());
-            
-            if (safeLocation != null) {
-                nextRunner.teleport(safeLocation);
+        Player previousRunner = activeRunner;
+
+        // Handle single-runner scenario gracefully: just refresh timers/powerups
+        if (previousRunner != null && previousRunner.equals(nextRunner)) {
+            // Keep the same active runner; just reschedule next swap and apply optional power-up
+            scheduleNextSwap();
+            if (plugin.getConfigManager().isPowerUpsEnabled()) {
+                applyRandomPowerUp(nextRunner);
             }
+            return;
         }
-        
+
+        activeRunner = nextRunner;
+
+        // Grace period for the new active runner
         int gracePeriodTicks = plugin.getConfigManager().getGracePeriodTicks();
         if (gracePeriodTicks > 0) {
             nextRunner.setInvulnerable(true);
@@ -660,64 +698,60 @@ public class GameManager {
                 }
             }, gracePeriodTicks);
         }
-        
-        Player previousRunner = activeRunner;
-        activeRunner = nextRunner;
 
         if (previousRunner != null && previousRunner.isOnline()) {
-            Location swapLocation = previousRunner.getLocation();
+            // Capture full state (includes potion effects, XP, etc.) from the previous runner
+            com.example.speedrunnerswap.models.PlayerState prevState = PlayerStateUtil.capturePlayerState(previousRunner);
+
+            // Apply to the next runner
+            PlayerStateUtil.applyPlayerState(nextRunner, prevState);
+
+            // Teleport adjustment for safe swap near the previous runner's location
             if (plugin.getConfigManager().isSafeSwapEnabled()) {
-                Location safeLocation = SafeLocationFinder.findSafeLocation(swapLocation,
+                Location swapLocation = previousRunner.getLocation();
+                Location safeLocation = SafeLocationFinder.findSafeLocation(
+                        swapLocation,
                         plugin.getConfigManager().getSafeSwapHorizontalRadius(),
                         plugin.getConfigManager().getSafeSwapVerticalDistance(),
                         plugin.getConfigManager().getDangerousBlocks());
                 if (safeLocation != null) {
-                    swapLocation = safeLocation;
+                    nextRunner.teleport(safeLocation);
                 }
             }
-            activeRunner.teleport(swapLocation);
-            ItemStack[] invContents = previousRunner.getInventory().getContents();
-            ItemStack[] armorContents = previousRunner.getInventory().getArmorContents();
-            ItemStack offHand = previousRunner.getInventory().getItemInOffHand();
-            
-            activeRunner.getInventory().setContents(invContents);
-            activeRunner.getInventory().setArmorContents(armorContents);
-            activeRunner.getInventory().setItemInOffHand(offHand);
-            
-            activeRunner.setHealth(Math.min(previousRunner.getHealth(), previousRunner.getAttribute(Attribute.MAX_HEALTH).getValue()));
-            activeRunner.setFoodLevel(previousRunner.getFoodLevel());
-            activeRunner.setSaturation(previousRunner.getSaturation());
-            
-            activeRunner.setTotalExperience(previousRunner.getTotalExperience());
-            activeRunner.setLevel(previousRunner.getLevel());
-            activeRunner.setExp(previousRunner.getExp());
-            
+
+            // Remove all active potion effects from the previous runner
+            for (PotionEffect effect : previousRunner.getActivePotionEffects()) {
+                previousRunner.removePotionEffect(effect.getType());
+            }
+
+            // Clear previous runner's inventory to prevent duplication exploits
             previousRunner.getInventory().clear();
             previousRunner.getInventory().setArmorContents(new ItemStack[]{});
             previousRunner.getInventory().setItemInOffHand(null);
+            previousRunner.updateInventory();
         } else {
-            // Only clear/give kit if kits are enabled; otherwise leave inventory unchanged
+            // First-time activation (no previous runner). If kits enabled, give runner kit.
             if (plugin.getConfigManager().isKitsEnabled()) {
-                activeRunner.getInventory().clear();
-                plugin.getKitManager().giveKit(activeRunner, "runner");
+                nextRunner.getInventory().clear();
+                plugin.getKitManager().giveKit(nextRunner, "runner");
             }
         }
-        
+
         applyInactiveEffects();
         scheduleNextSwap();
-        
+
         if (plugin.getConfigManager().isBroadcastsEnabled() && previousRunner != null) {
-            Bukkit.broadcast(net.kyori.adventure.text.Component.text("§6[SpeedrunnerSwap] Swapped from " + previousRunner.getName() + " to " + activeRunner.getName() + "!"), Server.BROADCAST_CHANNEL_USERS);
+            Bukkit.broadcast(net.kyori.adventure.text.Component.text(
+                    "§6[SpeedrunnerSwap] Swapped from " + previousRunner.getName() + " to " + nextRunner.getName() + "!"),
+                    Server.BROADCAST_CHANNEL_USERS);
         }
 
         if (plugin.getConfigManager().isPowerUpsEnabled()) {
-            applyRandomPowerUp(activeRunner);
+            applyRandomPowerUp(nextRunner);
         }
 
-        // Optionally jam hunter compasses right after a swap to give the new runner a window
         if (plugin.getConfigManager().isCompassJammingEnabled()) {
             long duration = plugin.getConfigManager().getCompassJamDuration();
-            // Guard against non-positive durations
             if (duration > 0) {
                 plugin.getTrackerManager().jamCompasses(duration);
             }
@@ -865,26 +899,27 @@ public class GameManager {
 
     /** Replace runners list and update config team names */
     public void setRunners(java.util.List<Player> players) {
-        // Clear existing names in config
-        for (String name : new java.util.ArrayList<>(plugin.getConfigManager().getRunnerNames())) {
-            Player p = Bukkit.getPlayerExact(name);
-            if (p != null) plugin.getConfigManager().removeRunner(p);
-        }
-        // Add all provided
-        for (Player p : players) plugin.getConfigManager().addRunner(p);
-        plugin.getConfigManager().saveConfig();
+        java.util.List<String> names = new java.util.ArrayList<>();
+        for (Player p : players) names.add(p.getName());
+        // Clear and set in config atomically
+        plugin.getConfigManager().setRunnerNames(names);
+        // Also ensure no overlap: remove these names from hunters in config
+        java.util.List<String> currentHunters = plugin.getConfigManager().getHunterNames();
+        currentHunters.removeAll(names);
+        plugin.getConfigManager().setHunterNames(currentHunters);
         // Update runtime list
         this.runners = new java.util.ArrayList<>(players);
     }
 
     /** Replace hunters list and update config team names */
     public void setHunters(java.util.List<Player> players) {
-        for (String name : new java.util.ArrayList<>(plugin.getConfigManager().getHunterNames())) {
-            Player p = Bukkit.getPlayerExact(name);
-            if (p != null) plugin.getConfigManager().removeHunter(p);
-        }
-        for (Player p : players) plugin.getConfigManager().addHunter(p);
-        plugin.getConfigManager().saveConfig();
+        java.util.List<String> names = new java.util.ArrayList<>();
+        for (Player p : players) names.add(p.getName());
+        plugin.getConfigManager().setHunterNames(names);
+        // Ensure no overlap: remove from runners
+        java.util.List<String> currentRunners = plugin.getConfigManager().getRunnerNames();
+        currentRunners.removeAll(names);
+        plugin.getConfigManager().setRunnerNames(currentRunners);
         this.hunters = new java.util.ArrayList<>(players);
     }
 }

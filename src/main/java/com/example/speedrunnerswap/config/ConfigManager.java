@@ -195,6 +195,28 @@ public class ConfigManager {
     public List<String> getHunterNames() {
         return new ArrayList<>(hunterNames);
     }
+
+    /**
+     * Replace the entire runners name list in memory and persist
+     * @param names list of player names
+     */
+    public void setRunnerNames(java.util.List<String> names) {
+        if (names == null) names = java.util.Collections.emptyList();
+        this.runnerNames.clear();
+        this.runnerNames.addAll(names);
+        saveConfig();
+    }
+
+    /**
+     * Replace the entire hunters name list in memory and persist
+     * @param names list of player names
+     */
+    public void setHunterNames(java.util.List<String> names) {
+        if (names == null) names = java.util.Collections.emptyList();
+        this.hunterNames.clear();
+        this.hunterNames.addAll(names);
+        saveConfig();
+    }
     
     /**
      * Check if a player is a runner
