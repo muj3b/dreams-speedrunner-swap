@@ -116,28 +116,7 @@ public class EventListeners implements Listener {
                title.contains("Edit ") && title.contains(" Kit");
     }
 
-    @EventHandler
-    private void handleGuiClick(InventoryClickEvent event) {
-        ItemStack clickedItem = event.getCurrentItem();
-        String viewTitle = PlainTextComponentSerializer.plainText().serialize(event.getView().title());
-
-        if (clickedItem == null || !clickedItem.hasItemMeta()) return;
-
-        if (viewTitle.contains("Team Selector")) {
-            handleTeamSelectorClick(event);
-        } else if (viewTitle.contains("Settings")) {
-            handleSettingsClick(event);
-        }
-        // Add other menu handlers as needed
-    }
-
-    private void handleTeamSelectorClick(InventoryClickEvent event) {
-        // Team selector click logic
-    }
-
-    private void handleSettingsClick(InventoryClickEvent event) {
-        // Settings menu click logic
-    }
+    // GUI clicks are exclusively handled by GuiListener to avoid duplication.
 
     @EventHandler(priority = EventPriority.HIGHEST)
     public void onPlayerChat(AsyncChatEvent event) {
