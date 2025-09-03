@@ -55,6 +55,7 @@ public class GuiListener implements Listener {
         return title.contains("SpeedrunnerSwap") ||
                title.contains("Main Menu") ||
                title.contains("Team Selector") ||
+               title.contains("Settings") ||
                title.contains("Kits") ||
                (title.contains("Edit ") && title.contains(" Kit")) ||
                title.contains("Effects") ||
