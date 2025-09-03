@@ -663,9 +663,19 @@ public class GameManager {
         
         Player previousRunner = activeRunner;
         activeRunner = nextRunner;
-        
+
         if (previousRunner != null && previousRunner.isOnline()) {
-            activeRunner.teleport(previousRunner.getLocation());
+            Location swapLocation = previousRunner.getLocation();
+            if (plugin.getConfigManager().isSafeSwapEnabled()) {
+                Location safeLocation = SafeLocationFinder.findSafeLocation(swapLocation,
+                        plugin.getConfigManager().getSafeSwapHorizontalRadius(),
+                        plugin.getConfigManager().getSafeSwapVerticalDistance(),
+                        plugin.getConfigManager().getDangerousBlocks());
+                if (safeLocation != null) {
+                    swapLocation = safeLocation;
+                }
+            }
+            activeRunner.teleport(swapLocation);
             ItemStack[] invContents = previousRunner.getInventory().getContents();
             ItemStack[] armorContents = previousRunner.getInventory().getArmorContents();
             ItemStack offHand = previousRunner.getInventory().getItemInOffHand();
