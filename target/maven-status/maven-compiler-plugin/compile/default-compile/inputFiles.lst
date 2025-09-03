@@ -6,6 +6,7 @@
 /Users/mujeb/minecraft-speedrunner-swap-plugin/src/main/java/com/example/speedrunnerswap/models/PlayerState.java
 /Users/mujeb/minecraft-speedrunner-swap-plugin/src/main/java/com/example/speedrunnerswap/game/SuddenDeathManager.java
 /Users/mujeb/minecraft-speedrunner-swap-plugin/src/main/java/com/example/speedrunnerswap/gui/GuiListener.java
+/Users/mujeb/minecraft-speedrunner-swap-plugin/src/main/java/com/example/speedrunnerswap/tasks/SwapTask.java
 /Users/mujeb/minecraft-speedrunner-swap-plugin/src/main/java/com/example/speedrunnerswap/utils/PlayerStateUtil.java
 /Users/mujeb/minecraft-speedrunner-swap-plugin/src/main/java/com/example/speedrunnerswap/tracking/TrackerManager.java
 /Users/mujeb/minecraft-speedrunner-swap-plugin/src/main/java/com/example/speedrunnerswap/gui/SettingsGuiListener.java

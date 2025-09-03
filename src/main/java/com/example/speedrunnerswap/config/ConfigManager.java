@@ -14,16 +14,6 @@ import java.util.Set;
 
 public class ConfigManager {
 
-        public boolean isLocationSafe(Location location) {
-        // Placeholder logic for checking if a location is safe
-        return location.getBlock().getType().isAir();
-    }
-
-    public void initializeDangerousBlocks() {
-        // Placeholder logic for initializing dangerous blocks
-        plugin.getLogger().info("Dangerous blocks initialized.");
-    }
-    
     private final SpeedrunnerSwap plugin;
     private FileConfiguration config;
     private List<String> runnerNames;
@@ -58,7 +48,7 @@ public class ConfigManager {
      * @return The interval in seconds
      */
     public int getSwapInterval() {
-        return config.getInt("swap.interval", 300);
+        return config.getInt("swap.interval", 60);
     }
 
     /**
@@ -118,9 +108,9 @@ public class ConfigManager {
             }
         }
 
-        // Load powerups settings
-        this.powerUpsEnabled = config.getBoolean("powerups.enabled", true);
-        config.set("powerups.enabled", this.powerUpsEnabled); // Ensure config is in sync
+        // Load power-ups settings (canonical path: power_ups.enabled)
+        this.powerUpsEnabled = config.getBoolean("power_ups.enabled", true);
+        config.set("power_ups.enabled", this.powerUpsEnabled); // Ensure config is in sync
     }
     
     /**
@@ -157,12 +147,13 @@ public class ConfigManager {
 
     // PowerUps management methods
     public boolean isPowerUpsEnabled() {
+        // Return cached value; stays in sync via loadConfig()/setPowerUpsEnabled()
         return this.powerUpsEnabled;
     }
 
     public void setPowerUpsEnabled(boolean enabled) {
         this.powerUpsEnabled = enabled;
-        config.set("powerups.enabled", enabled);
+        config.set("power_ups.enabled", enabled);
         saveConfig();
     }
     
@@ -309,7 +300,7 @@ public class ConfigManager {
     }
 
     public String getFreezeMode() {
-        return config.getString("freeze.mode", "LIMBO");
+        return config.getString("freeze_mode", "LIMBO");
     }
 
     public Location getLimboLocation() {
@@ -326,7 +317,7 @@ public class ConfigManager {
     }
 
     public void setFreezeMode(String mode) {
-        config.set("freeze.mode", mode);
+        config.set("freeze_mode", mode);
         plugin.saveConfig();
     }
 

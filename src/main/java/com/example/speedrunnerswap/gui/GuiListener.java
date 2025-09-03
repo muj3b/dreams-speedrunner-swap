@@ -2,6 +2,7 @@ package com.example.speedrunnerswap.gui;
 
 import com.example.speedrunnerswap.SpeedrunnerSwap;
 import net.kyori.adventure.text.Component;
+import org.bukkit.Bukkit;
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
@@ -92,6 +93,8 @@ public class GuiListener implements Listener {
             handleTeamSelectorClick(event);
         } else if (title.contains("Settings")) {
             handleSettingsClick(event);
+        } else if (title.contains("Edit ") && title.contains(" Kit")) {
+            handleKitEditorClick(event, title);
         } else if (title.contains("Kits")) {
             handleKitsMenuClick(event);
         } else if (title.contains("Power-ups")) {
@@ -160,6 +163,33 @@ public class GuiListener implements Listener {
             guiManager.openSuddenDeathMenu(player);
         } else if (name.toLowerCase().contains("statistics") || name.toLowerCase().contains("status")) {
             guiManager.openStatisticsMenu(player);
+        } else if (name.equals("§a§lStart Game")) {
+            if (!plugin.getGameManager().isGameRunning()) {
+                if (plugin.getGameManager().startGame()) {
+                    player.sendMessage(Component.text("§aGame started."));
+                } else {
+                    player.sendMessage(Component.text("§cCannot start game. Check teams."));
+                }
+            }
+            guiManager.openMainMenu(player);
+        } else if (name.equals("§e§lPause Game")) {
+            if (plugin.getGameManager().isGameRunning() && !plugin.getGameManager().isGamePaused()) {
+                plugin.getGameManager().pauseGame();
+                player.sendMessage(Component.text("§eGame paused."));
+            }
+            guiManager.openMainMenu(player);
+        } else if (name.equals("§a§lResume Game")) {
+            if (plugin.getGameManager().isGameRunning() && plugin.getGameManager().isGamePaused()) {
+                plugin.getGameManager().resumeGame();
+                player.sendMessage(Component.text("§aGame resumed."));
+            }
+            guiManager.openMainMenu(player);
+        } else if (name.equals("§c§lStop Game")) {
+            if (plugin.getGameManager().isGameRunning()) {
+                plugin.getGameManager().stopGame();
+                player.sendMessage(Component.text("§cGame stopped."));
+            }
+            guiManager.openMainMenu(player);
         }
     }
 
@@ -170,21 +200,50 @@ public class GuiListener implements Listener {
         if (clicked == null || !clicked.hasItemMeta()) return;
 
         String buttonId = getButtonId(clicked);
-        if (buttonId == null) return;
-
-        switch (buttonId) {
-            case "swap_interval":
-                cycleSwapInterval(player);
-                break;
-            case "random_swaps":
-                toggleRandomSwaps(player);
-                break;
-            case "safe_swaps":
-                toggleSafeSwaps(player);
-                break;
-            case "timer_visibility":
-                cycleTimerVisibility(player);
-                break;
+        if (buttonId != null) {
+            switch (buttonId) {
+                case "swap_interval":
+                    cycleSwapInterval(player);
+                    break;
+                case "random_swaps":
+                    toggleRandomSwaps(player);
+                    break;
+                case "safe_swaps":
+                    toggleSafeSwaps(player);
+                    break;
+                case "tracker_toggle": {
+                    boolean enabled = plugin.getConfigManager().isTrackerEnabled();
+                    plugin.getConfigManager().setTrackerEnabled(!enabled);
+                    if (!enabled) {
+                        plugin.getTrackerManager().startTracking();
+                        for (org.bukkit.entity.Player hunter : plugin.getGameManager().getHunters()) {
+                            if (hunter.isOnline()) plugin.getTrackerManager().giveTrackingCompass(hunter);
+                        }
+                    } else {
+                        plugin.getTrackerManager().stopTracking();
+                    }
+                    break;
+                }
+                case "force_swap":
+                    plugin.getGameManager().triggerImmediateSwap();
+                    break;
+                case "force_hunter_shuffle":
+                    plugin.getGameManager().triggerImmediateHunterSwap();
+                    break;
+                case "update_compasses":
+                    plugin.getTrackerManager().updateAllHunterCompasses();
+                    break;
+            }
+        } else {
+            // Handle timer visibility clocks (created without explicit IDs)
+            String name = PlainTextComponentSerializer.plainText().serialize(clicked.getItemMeta().displayName());
+            if (name.equals("§e§lActive Runner Timer")) {
+                cycleRunnerTimer(player);
+            } else if (name.equals("§e§lWaiting Runner Timer")) {
+                cycleWaitingTimer(player);
+            } else if (name.equals("§e§lHunter Timer")) {
+                cycleHunterTimer(player);
+            }
         }
 
         // Refresh the settings menu
@@ -193,6 +252,24 @@ public class GuiListener implements Listener {
         // Update game state
         plugin.getGameManager().refreshSwapSchedule();
         plugin.getGameManager().refreshActionBar();
+    }
+
+    private void cycleRunnerTimer(Player player) {
+        String current = plugin.getConfigManager().getRunnerTimerVisibility();
+        String next = guiManager.getNextVisibility(current);
+        plugin.getConfigManager().setRunnerTimerVisibility(next);
+    }
+
+    private void cycleWaitingTimer(Player player) {
+        String current = plugin.getConfigManager().getWaitingTimerVisibility();
+        String next = guiManager.getNextVisibility(current);
+        plugin.getConfigManager().setWaitingTimerVisibility(next);
+    }
+
+    private void cycleHunterTimer(Player player) {
+        String current = plugin.getConfigManager().getHunterTimerVisibility();
+        String next = guiManager.getNextVisibility(current);
+        plugin.getConfigManager().setHunterTimerVisibility(next);
     }
 
     private String getButtonId(ItemStack item) {
@@ -245,19 +322,71 @@ public class GuiListener implements Listener {
         plugin.getConfigManager().setSafeSwapEnabled(!current);
     }
 
-    private void cycleTimerVisibility(Player player) {
-        String current = plugin.getConfigManager().getRunnerTimerVisibility();
-        String next = switch (current) {
-            case "always" -> "last_10";
-            case "last_10" -> "never";
-            default -> "always";
-        };
-        plugin.getConfigManager().setRunnerTimerVisibility(next);
-    }
-
     // Other menu handlers
     private void handleTeamSelectorClick(InventoryClickEvent event) {
-        // Implement team selector click handling
+        Player player = (Player) event.getWhoClicked();
+        ItemStack clicked = event.getCurrentItem();
+        if (clicked == null || !clicked.hasItemMeta()) return;
+
+        // Handle clear teams button by ID
+        String id = getButtonId(clicked);
+        if ("clear_teams".equals(id)) {
+            plugin.getGameManager().setRunners(new java.util.ArrayList<>());
+            plugin.getGameManager().setHunters(new java.util.ArrayList<>());
+            player.sendMessage(Component.text("§aCleared all teams."));
+            guiManager.openTeamSelector(player);
+            return;
+        }
+
+        String name = PlainTextComponentSerializer.plainText().serialize(clicked.getItemMeta().displayName());
+
+        // Select assignment team
+        if (name != null) {
+            if (name.contains("§b§lRunners")) {
+                guiManager.setPlayerTeam(player, com.example.speedrunnerswap.models.Team.RUNNER);
+                return;
+            }
+            if (name.contains("§c§lHunters")) {
+                guiManager.setPlayerTeam(player, com.example.speedrunnerswap.models.Team.HUNTER);
+                return;
+            }
+        }
+
+        // Assign a player by clicking their head, using current selected team
+        if (clicked.getType() == Material.PLAYER_HEAD && clicked.getItemMeta().displayName() != null) {
+            String targetName = PlainTextComponentSerializer.plainText().serialize(clicked.getItemMeta().displayName());
+            // displayName might be colored; strip any color prefixes/suffixes
+            targetName = targetName.replace("§b", "").replace("§c", "").replace("§f", "").replace("§r", "");
+            Player target = Bukkit.getPlayerExact(targetName);
+            if (target == null) {
+                player.sendMessage(Component.text("§cPlayer not found or offline: " + targetName));
+                return;
+            }
+
+            com.example.speedrunnerswap.models.Team selected = guiManager.getSelectedTeam(player);
+            if (selected == com.example.speedrunnerswap.models.Team.NONE) {
+                player.sendMessage(Component.text("§eSelect a team (Runners/Hunters) first."));
+                return;
+            }
+
+            // Build updated team lists
+            java.util.List<Player> newRunners = new java.util.ArrayList<>(plugin.getGameManager().getRunners());
+            java.util.List<Player> newHunters = new java.util.ArrayList<>(plugin.getGameManager().getHunters());
+            newRunners.remove(target);
+            newHunters.remove(target);
+            if (selected == com.example.speedrunnerswap.models.Team.RUNNER) {
+                newRunners.add(target);
+            } else if (selected == com.example.speedrunnerswap.models.Team.HUNTER) {
+                newHunters.add(target);
+            }
+
+            // Apply to runtime and config
+            plugin.getGameManager().setRunners(newRunners);
+            plugin.getGameManager().setHunters(newHunters);
+
+            // Refresh GUI to reflect changes
+            guiManager.openTeamSelector(player);
+        }
     }
 
     // removed duplicate; implemented below
@@ -269,6 +398,13 @@ public class GuiListener implements Listener {
         if (clicked == null || !clicked.hasItemMeta()) return;
 
         String name = PlainTextComponentSerializer.plainText().serialize(clicked.getItemMeta().displayName());
+
+        if ("§e§lToggle Power-ups".equals(name)) {
+            boolean current = plugin.getConfigManager().isPowerUpsEnabled();
+            plugin.getConfigManager().setPowerUpsEnabled(!current);
+            guiManager.openPowerUpsMenu(player);
+            return;
+        }
 
         if (name.contains("Positive Effects")) {
             guiManager.openPositiveEffectsMenu(player);
@@ -330,6 +466,23 @@ public class GuiListener implements Listener {
                 plugin.saveConfig();
                 changed = true;
             }
+            case "§e§lWarning Settings" -> {
+                int dist = plugin.getConfig().getInt("world_border.warning_distance", 50);
+                int interval = plugin.getConfig().getInt("world_border.warning_interval", 300);
+                if (event.isLeftClick()) dist += event.isShiftClick() ? 50 : 10;
+                if (event.isRightClick()) dist -= event.isShiftClick() ? 50 : 10;
+                if (event.isShiftClick()) {
+                    // While shift-clicking, also tweak interval for convenience
+                    if (event.isLeftClick()) interval += 30;
+                    if (event.isRightClick()) interval -= 30;
+                }
+                dist = Math.max(5, Math.min(1000, dist));
+                interval = Math.max(30, Math.min(3600, interval));
+                plugin.getConfig().set("world_border.warning_distance", dist);
+                plugin.getConfig().set("world_border.warning_interval", interval);
+                plugin.saveConfig();
+                changed = true;
+            }
             default -> {}
         }
 
@@ -365,10 +518,20 @@ public class GuiListener implements Listener {
         if (clicked == null || !clicked.hasItemMeta()) return;
         String name = PlainTextComponentSerializer.plainText().serialize(clicked.getItemMeta().displayName());
 
-        if (name.contains("Bounty") && name.contains(":")) {
+        if (name.contains("Bounty Status")) {
             boolean enabled = plugin.getConfig().getBoolean("bounty.enabled", true);
             plugin.getConfig().set("bounty.enabled", !enabled);
             plugin.saveConfig();
+            guiManager.openBountyMenu(player);
+            return;
+        }
+        if (name.equals("§e§lAssign New Bounty")) {
+            plugin.getBountyManager().assignNewBounty();
+            guiManager.openBountyMenu(player);
+            return;
+        }
+        if (name.equals("§c§lClear Bounty")) {
+            plugin.getBountyManager().clearBounty();
             guiManager.openBountyMenu(player);
         }
     }
@@ -458,6 +621,47 @@ public class GuiListener implements Listener {
         }
         // Refresh
         guiManager.openSuddenDeathMenu(player);
+    }
+
+    private void handleKitEditorClick(InventoryClickEvent event, String title) {
+        Player player = (Player) event.getWhoClicked();
+        ItemStack clicked = event.getCurrentItem();
+        if (clicked == null || !clicked.hasItemMeta()) return;
+
+        String name = PlainTextComponentSerializer.plainText().serialize(clicked.getItemMeta().displayName());
+        if (!name.equals("§a§lSave Kit")) return;
+
+        // Extract kit type from title: "§e§lEdit <kit> Kit"
+        String plainTitle = PlainTextComponentSerializer.plainText().serialize(event.getView().title());
+        String kitType = "runner";
+        int idxEdit = plainTitle.indexOf("Edit ");
+        int idxKit = plainTitle.indexOf(" Kit");
+        if (idxEdit >= 0 && idxKit > idxEdit + 5) {
+            kitType = plainTitle.substring(idxEdit + 5, idxKit).trim().toLowerCase();
+        }
+
+        // Gather contents (first 45 slots), armor in 45..48 -> [helmet, chest, legs, boots]
+        org.bukkit.inventory.Inventory top = event.getView().getTopInventory();
+        ItemStack[] contents = new ItemStack[45];
+        for (int i = 0; i < 45; i++) contents[i] = top.getItem(i);
+
+        ItemStack[] armor = new ItemStack[4];
+        ItemStack helmet = top.getItem(45);
+        ItemStack chest = top.getItem(46);
+        ItemStack legs = top.getItem(47);
+        ItemStack boots = top.getItem(48);
+        // Order expected by KitConfigManager.saveKit: [boots, leggings, chestplate, helmet]
+        armor[0] = boots;
+        armor[1] = legs;
+        armor[2] = chest;
+        armor[3] = helmet;
+
+        // Persist to kits.yml via KitConfigManager
+        plugin.getKitConfigManager().saveKit(kitType, contents, armor);
+        player.sendMessage(Component.text("§aSaved " + kitType + " kit."));
+
+        // Return to kits menu
+        guiManager.openKitsMenu(player);
     }
 
     private void handleStatisticsClick(InventoryClickEvent event) {

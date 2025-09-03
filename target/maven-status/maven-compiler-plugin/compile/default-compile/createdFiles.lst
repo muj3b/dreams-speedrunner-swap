@@ -10,6 +10,7 @@ com/example/speedrunnerswap/game/GameManager.class
 com/example/speedrunnerswap/config/ConfigManager.class
 com/example/speedrunnerswap/gui/GuiManager.class
 com/example/speedrunnerswap/models/PlayerState.class
+com/example/speedrunnerswap/tasks/SwapTask.class
 com/example/speedrunnerswap/game/CompassManager.class
 com/example/speedrunnerswap/models/Team.class
 com/example/speedrunnerswap/game/WorldBorderManager.class

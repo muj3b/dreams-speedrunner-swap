@@ -18,7 +18,7 @@ website: https://github.com/yourusername/speedrunnerswap
 commands:
   swap:
     description: Main command for SpeedrunnerSwap plugin
-    usage: /<command> [start|stop|pause|resume|status|setrunners|sethunters|reload|gui]
+    usage: /<command> [start|stop|pause|resume|status|setrunners|sethunters|reload|gui|clearteams]
     permission: speedrunnerswap.command
     
 permissions:

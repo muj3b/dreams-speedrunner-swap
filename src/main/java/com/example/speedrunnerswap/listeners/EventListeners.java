@@ -28,11 +28,9 @@ public class EventListeners implements Listener {
         Player player = event.getPlayer();
         
         // If the player is a hunter, give them a tracking compass
-        if (plugin.getGameManager().isGameRunning()) {
-            if (plugin.getGameManager() != null) {
-                plugin.getGameManager().updateTeams();
-            }
-            if (plugin.getGameManager().isHunter(player)) {
+        if (plugin.getGameManager() != null && plugin.getGameManager().isGameRunning()) {
+            plugin.getGameManager().updateTeams();
+            if (plugin.getGameManager().isHunter(player) && plugin.getTrackerManager() != null) {
                 plugin.getTrackerManager().giveTrackingCompass(player);
             }
         }

@@ -50,6 +50,8 @@ public class SwapCommand implements CommandExecutor, TabCompleter {
                     return handleReload(sender);
                 case "gui":
                     return handleMainCommand(sender);
+                case "clearteams":
+                    return handleClearTeams(sender);
                 default:
                     sender.sendMessage("§cUnknown subcommand. Use /swap for help.");
                     return false;
@@ -294,6 +296,23 @@ public class SwapCommand implements CommandExecutor, TabCompleter {
         
         return true;
     }
+
+    private boolean handleClearTeams(CommandSender sender) {
+        if (!sender.hasPermission("speedrunnerswap.admin")) {
+            sender.sendMessage("§cYou don't have permission to use this command.");
+            return false;
+        }
+
+        // Stop the game if it's running
+        if (plugin.getGameManager().isGameRunning()) {
+            plugin.getGameManager().stopGame();
+        }
+
+        plugin.getGameManager().setRunners(new ArrayList<>());
+        plugin.getGameManager().setHunters(new ArrayList<>());
+        sender.sendMessage("§aCleared all teams (runners and hunters).");
+        return true;
+    }
     
     @Override
     public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
@@ -301,7 +320,7 @@ public class SwapCommand implements CommandExecutor, TabCompleter {
         
         if (args.length == 1) {
             // Subcommands
-            List<String> subCommands = Arrays.asList("start", "stop", "pause", "resume", "status", "setrunners", "sethunters", "reload", "gui");
+            List<String> subCommands = Arrays.asList("start", "stop", "pause", "resume", "status", "setrunners", "sethunters", "reload", "gui", "clearteams");
             for (String subCommand : subCommands) {
                 if (subCommand.startsWith(args[0].toLowerCase())) {
                     completions.add(subCommand);

@@ -55,7 +55,9 @@ public final class SpeedrunnerSwap extends JavaPlugin {
         validatePowerUpConfig();
 
         // Register commands
-        getCommand("swap").setExecutor(new SwapCommand(this));
+        SwapCommand swapCommand = new SwapCommand(this);
+        getCommand("swap").setExecutor(swapCommand);
+        getCommand("swap").setTabCompleter(swapCommand);
         
         // Register event listeners
         getServer().getPluginManager().registerEvents(new EventListeners(this), this);

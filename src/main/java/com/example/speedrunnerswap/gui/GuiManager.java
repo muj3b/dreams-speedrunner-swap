@@ -120,24 +120,7 @@ public class GuiManager {
             inventory.setItem(i, filler);
         }
 
-        // Good effects button
-        List<String> goodEffectsLore = new ArrayList<>();
-        List<String> enabledGoodEffects = plugin.getConfig().getStringList("power_ups.good_effects");
-        goodEffectsLore.add("§7Click to manage positive effects");
-        goodEffectsLore.add("§7Current enabled effects: §f" + enabledGoodEffects.size());
-        inventory.setItem(11, createItem(Material.SPLASH_POTION, "§a§lPositive Effects", goodEffectsLore));
-
-        // Bad effects button
-        List<String> badEffectsLore = new ArrayList<>();
-        List<String> enabledBadEffects = plugin.getConfig().getStringList("power_ups.bad_effects");
-        badEffectsLore.add("§7Click to manage negative effects");
-        badEffectsLore.add("§7Current enabled effects: §f" + enabledBadEffects.size());
-        inventory.setItem(15, createItem(Material.LINGERING_POTION, "§c§lNegative Effects", badEffectsLore));
-
-        // Back button
-        inventory.setItem(31, createItem(Material.BARRIER, BACK_BUTTON_TITLE));
-
-        // Add toggle button
+        // Toggle button
         List<String> powerUpToggleLore = new ArrayList<>();
         boolean powerUpsEnabled = plugin.getConfig().getBoolean("power_ups.enabled", true);
         powerUpToggleLore.add("§7Current status: " + (powerUpsEnabled ? "§aEnabled" : "§cDisabled"));
@@ -149,7 +132,7 @@ public class GuiManager {
         );
         inventory.setItem(4, toggleItem);
 
-        player.openInventory(inventory);
+        // Positive effects section (detailed list)
         List<String> positiveEffectsLore = new ArrayList<>();
         positiveEffectsLore.add("§7Current effects:");
         for (String effect : plugin.getConfig().getStringList("power_ups.good_effects")) {
@@ -160,7 +143,7 @@ public class GuiManager {
         ItemStack goodEffectsItem = createItem(Material.SPLASH_POTION, "§a§lPositive Effects", positiveEffectsLore);
         inventory.setItem(11, goodEffectsItem);
 
-        // Bad effects section
+        // Negative effects section (detailed list)
         List<String> negativeEffectsLore = new ArrayList<>();
         negativeEffectsLore.add("§7Current effects:");
         for (String effect : plugin.getConfig().getStringList("power_ups.bad_effects")) {
@@ -181,7 +164,7 @@ public class GuiManager {
         inventory.setItem(22, durationItem);
 
         // Back button
-        inventory.setItem(35, createItem(Material.BARRIER, BACK_BUTTON_TITLE));
+        inventory.setItem(31, createItem(Material.BARRIER, BACK_BUTTON_TITLE));
 
         player.openInventory(inventory);
     }
@@ -451,6 +434,12 @@ public class GuiManager {
         ItemStack back = createItem(Material.ARROW, "§7§lBack", backLore);
         inventory.setItem(0, back);
         
+        // Clear teams quick action
+        ItemStack clearTeams = createGuiButton(Material.BARRIER, "§c§lClear All Teams", List.of(
+            "§7Remove all existing team assignments"
+        ), "clear_teams");
+        inventory.setItem(8, clearTeams);
+        
         // Runner team button with enhanced information
         List<String> runnerLore = new ArrayList<>();
         runnerLore.add("§7Click to select players as runners");
@@ -631,6 +620,39 @@ swapHeaderLore.add("§7• Hover over options for details");
                 safeSwapLore,
                 "safe_swaps");
         inventory.setItem(12, safeButton);
+        
+        // Tracker toggle
+        boolean trackerEnabled = plugin.getConfigManager().isTrackerEnabled();
+        List<String> trackerToggleLore = new ArrayList<>();
+        trackerToggleLore.add("§7Current: " + (trackerEnabled ? "§aEnabled" : "§cDisabled"));
+        trackerToggleLore.add("§7Hunters receive tracking compasses");
+        ItemStack trackerToggle = createGuiButton(
+                trackerEnabled ? Material.COMPASS : Material.GRAY_DYE,
+                "§e§lTracker: " + (trackerEnabled ? "§aEnabled" : "§cDisabled"),
+                trackerToggleLore,
+                "tracker_toggle");
+        inventory.setItem(13, trackerToggle);
+
+        // Admin tools
+        ItemStack adminHeader = createItem(Material.BOOK, "§6§lAdmin Tools", List.of(
+            "§7Operator utilities: force actions"
+        ));
+        inventory.setItem(27, adminHeader);
+
+        ItemStack forceSwap = createGuiButton(Material.ENDER_PEARL, "§d§lForce Runner Swap", List.of(
+            "§7Trigger immediate runner swap"
+        ), "force_swap");
+        inventory.setItem(28, forceSwap);
+
+        ItemStack forceHunterShuffle = createGuiButton(Material.CROSSBOW, "§c§lShuffle Hunters", List.of(
+            "§7Shuffle hunter order now"
+        ), "force_hunter_shuffle");
+        inventory.setItem(29, forceHunterShuffle);
+
+        ItemStack updateCompasses = createGuiButton(Material.LODESTONE, "§b§lUpdate Compasses", List.of(
+            "§7Refresh all hunter compasses"
+        ), "update_compasses");
+        inventory.setItem(30, updateCompasses);
         
         // Removed duplicate swap interval and safe swap UI blocks
 

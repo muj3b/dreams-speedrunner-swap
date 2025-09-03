@@ -525,20 +525,26 @@ public class GameManager {
             return;
         }
         
-        savePlayerState(activeRunner);
+        if (activeRunner != null && activeRunner.isOnline()) {
+            savePlayerState(activeRunner);
+        }
         
-        activeRunnerIndex = (activeRunnerIndex + 1) % runners.size();
-        Player nextRunner = runners.get(activeRunnerIndex);
-        
-        if (!nextRunner.isOnline()) {
+        // Find next online runner
+        int attempts = 0;
+        // removed unused variable originalIndex
+        do {
             activeRunnerIndex = (activeRunnerIndex + 1) % runners.size();
-            nextRunner = runners.get(activeRunnerIndex);
+            attempts++;
             
-            if (!nextRunner.isOnline()) {
+            // Prevent infinite loop if no runners are online
+            if (attempts >= runners.size()) {
+                plugin.getLogger().warning("No online runners found during swap - pausing game");
                 pauseGame();
                 return;
             }
-        }
+        } while (!runners.get(activeRunnerIndex).isOnline());
+        
+        Player nextRunner = runners.get(activeRunnerIndex);
         
         if (plugin.getConfigManager().isSafeSwapEnabled()) {
             Location safeLocation = SafeLocationFinder.findSafeLocation(nextRunner.getLocation(), 
@@ -601,6 +607,18 @@ public class GameManager {
         if (plugin.getConfigManager().isPowerUpsEnabled()) {
             applyRandomPowerUp(activeRunner);
         }
+    }
+
+    /** Trigger an immediate runner swap (admin action) */
+    public void triggerImmediateSwap() {
+        if (!gameRunning || gamePaused) return;
+        Bukkit.getScheduler().runTask(plugin, this::performSwap);
+    }
+
+    /** Trigger an immediate hunter shuffle (admin action) */
+    public void triggerImmediateHunterSwap() {
+        if (!gameRunning || gamePaused) return;
+        Bukkit.getScheduler().runTask(plugin, this::performHunterSwap);
     }
     
     private void performHunterSwap() {
