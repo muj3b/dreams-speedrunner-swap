@@ -291,9 +291,11 @@ public class GuiListener implements Listener {
 
     private boolean isBackButton(ItemStack item) {
         if (item == null || !item.hasItemMeta()) return false;
-        return item.getType() == Material.BARRIER && 
-               item.getItemMeta().displayName() != null &&
-               PlainTextComponentSerializer.plainText().serialize(item.getItemMeta().displayName()).contains("Back");
+        if (item.getItemMeta().displayName() == null) return false;
+        String text = PlainTextComponentSerializer.plainText().serialize(item.getItemMeta().displayName());
+        boolean looksLikeBack = text != null && text.toLowerCase().contains("back");
+        // Support both older barrier-style and newer arrow-style back buttons
+        return looksLikeBack && (item.getType() == Material.BARRIER || item.getType() == Material.ARROW);
     }
 
     // Helper methods for settings actions

@@ -72,41 +72,51 @@ public class EventListeners implements Listener {
         Player player = (Player) event.getWhoClicked();
         Inventory inventory = event.getClickedInventory();
         ItemStack clickedItem = event.getCurrentItem();
-
+    
         if (inventory == null || clickedItem == null || clickedItem.getType() == Material.AIR) return;
-
-        Component viewTitle = event.getView().title();
-        Component mainMenuTitle = Component.text(plugin.getConfigManager().getGuiMainMenuTitle());
-        Component teamSelectorTitle = Component.text(plugin.getConfigManager().getGuiTeamSelectorTitle());
-        Component settingsTitle = Component.text(plugin.getConfigManager().getGuiSettingsTitle());
-
-        // Handle GUI clicks
-        if (viewTitle.equals(mainMenuTitle) ||
-            viewTitle.equals(teamSelectorTitle) ||
-            viewTitle.equals(settingsTitle)) {
-            event.setCancelled(true);
-            handleGuiClick(event);
-        } else {
-            // For non-GUI inventories
-            if (plugin.getGameManager().isGameRunning() && 
-                plugin.getGameManager().isRunner(player)) {
-                
-                if (plugin.getGameManager().getActiveRunner() != player) {
-                    // Inactive runners can't interact
-                    event.setCancelled(true);
-                    player.sendMessage(Component.text("§cYou cannot interact with items while inactive!"));
-                    return;
-                } else {
-                    // Active runner inventory updates
-                    if (event.getView().getType() != InventoryType.WORKBENCH) {
-                        // Schedule sync for next tick to let the current operation complete
-                        plugin.getServer().getScheduler().runTask(plugin, () -> syncRunnerInventories(player));
-                    }
+    
+        // If this is one of our plugin GUIs, let the dedicated GuiListener handle it
+        String title = PlainTextComponentSerializer.plainText().serialize(event.getView().title());
+        if (isPluginGuiTitle(title)) {
+            return; // Do not cancel or handle here
+        }
+    
+        // For non-GUI inventories, enforce runner interaction rules and sync
+        if (plugin.getGameManager().isGameRunning() && plugin.getGameManager().isRunner(player)) {
+            if (plugin.getGameManager().getActiveRunner() != player) {
+                // Inactive runners can't interact
+                event.setCancelled(true);
+                player.sendMessage(Component.text("§cYou cannot interact with items while inactive!"));
+                return;
+            } else {
+                // Active runner inventory updates
+                if (event.getView().getType() != InventoryType.WORKBENCH) {
+                    // Schedule sync for next tick to let the current operation complete
+                    plugin.getServer().getScheduler().runTask(plugin, () -> syncRunnerInventories(player));
                 }
             }
         }
     }
+    
+    private boolean isPluginGuiTitle(String title) {
+        if (title == null || title.isEmpty()) return false;
+        return title.contains("SpeedrunnerSwap") ||
+               title.contains("Main Menu") ||
+               title.contains("Team Selector") ||
+               title.contains("Settings") ||
+               title.contains("Kits") ||
+               title.contains("Effects") ||
+               title.contains("Power-ups") ||
+               title.contains("World Border") ||
+               title.contains("Bounty") ||
+               title.contains("Last Stand") ||
+               title.contains("Compass") ||
+               title.contains("Sudden Death") ||
+               title.contains("Statistics") ||
+               title.contains("Edit ") && title.contains(" Kit");
+    }
 
+    @EventHandler
     private void handleGuiClick(InventoryClickEvent event) {
         ItemStack clickedItem = event.getCurrentItem();
         String viewTitle = PlainTextComponentSerializer.plainText().serialize(event.getView().title());

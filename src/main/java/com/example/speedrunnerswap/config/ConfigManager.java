@@ -410,15 +410,21 @@ public class ConfigManager {
     }
     
     public int getGuiMainMenuRows() {
-        return config.getInt("gui.main_menu_rows", 3);
+        // Prefer nested path; fall back to legacy flat key
+        return config.getInt("gui.main_menu.rows",
+                config.getInt("gui.main_menu_rows", 3));
     }
     
     public int getGuiTeamSelectorRows() {
-        return config.getInt("gui.team_selector_rows", 4);
+        // Prefer nested path; fall back to legacy flat key
+        return config.getInt("gui.team_selector.rows",
+                config.getInt("gui.team_selector_rows", 4));
     }
 
     public int getGuiSettingsRows() {
-        return config.getInt("gui.settings_rows", 5);
+        // Prefer nested path; fall back to legacy flat key
+        return config.getInt("gui.settings.rows",
+                config.getInt("gui.settings_rows", 5));
     }
 
     public boolean isBroadcastGameEvents() {
