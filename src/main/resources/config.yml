@@ -25,6 +25,8 @@ swap:
   grace_period_ticks: 40
   # Auto-pause if a runner disconnects
   pause_on_disconnect: true
+  # If true, apply the final active runner's state to all runners when ending the game
+  preserve_runner_progress_on_end: false
   hunter_swap:
     enabled: false
     interval: 60
@@ -79,6 +81,8 @@ tracker:
     enabled: false
     # Duration of compass jamming in ticks (20 ticks = 1 second)
     duration_ticks: 100
+    # Max random offset (in blocks) for jammed compass target
+    max_jam_distance: 500
 
 # GUI Configuration
 gui:

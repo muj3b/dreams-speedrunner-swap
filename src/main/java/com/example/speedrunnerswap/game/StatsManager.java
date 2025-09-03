@@ -3,6 +3,7 @@ package com.example.speedrunnerswap.game;
 import com.example.speedrunnerswap.SpeedrunnerSwap;
 import org.bukkit.entity.Player;
 import org.bukkit.Bukkit;
+import org.bukkit.scheduler.BukkitTask;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -12,6 +13,7 @@ public class StatsManager {
     private final SpeedrunnerSwap plugin;
     private final Map<UUID, PlayerStats> playerStats;
     private long gameStartTime;
+    private BukkitTask periodicTask;
 
     public StatsManager(SpeedrunnerSwap plugin) {
         this.plugin = plugin;
@@ -24,11 +26,24 @@ public class StatsManager {
         for (Player player : Bukkit.getOnlinePlayers()) {
             playerStats.put(player.getUniqueId(), new PlayerStats());
         }
+        // Optional periodic display
+        if (plugin.getConfig().getBoolean("stats.periodic_display", false)) {
+            int seconds = Math.max(60, plugin.getConfig().getInt("stats.periodic_display_interval", 300));
+            long ticks = seconds * 20L;
+            if (periodicTask != null) {
+                periodicTask.cancel();
+            }
+            periodicTask = Bukkit.getScheduler().runTaskTimer(plugin, this::displayStats, ticks, ticks);
+        }
     }
 
     public void stopTracking() {
         displayStats();
         playerStats.clear();
+        if (periodicTask != null) {
+            periodicTask.cancel();
+            periodicTask = null;
+        }
     }
 
     public void recordKill(Player killer, Player victim) {

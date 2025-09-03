@@ -110,6 +110,11 @@ public class GameManager {
                     }
                 }
 
+                // Optionally start stats tracking
+                if (plugin.getConfig().getBoolean("stats.enabled", true)) {
+                    plugin.getStatsManager().startTracking();
+                }
+
                 if (plugin.getConfigManager().isFreezeMechanicEnabled()) {
                     startFreezeChecking();
                 }
@@ -162,20 +167,23 @@ public class GameManager {
         if (actionBarTask != null) actionBarTask.cancel();
         if (freezeCheckTask != null) freezeCheckTask.cancel();
         plugin.getTrackerManager().stopTracking();
+        try { plugin.getStatsManager().stopTracking(); } catch (Exception ignored) {}
 
         new BukkitRunnable() {
             @Override
             public void run() {
-                // Capture final progress of the active runner and apply to all runners
-                try {
-                    if (activeRunner != null && activeRunner.isOnline() && !runners.isEmpty()) {
-                        com.example.speedrunnerswap.models.PlayerState finalState = PlayerStateUtil.capturePlayerState(activeRunner);
-                        for (Player r : runners) {
-                            playerStates.put(r.getUniqueId(), finalState);
+                // Optionally preserve final runner progress for all runners (configurable)
+                if (plugin.getConfig().getBoolean("swap.preserve_runner_progress_on_end", false)) {
+                    try {
+                        if (activeRunner != null && activeRunner.isOnline() && !runners.isEmpty()) {
+                            com.example.speedrunnerswap.models.PlayerState finalState = PlayerStateUtil.capturePlayerState(activeRunner);
+                            for (Player r : runners) {
+                                playerStates.put(r.getUniqueId(), finalState);
+                            }
                         }
+                    } catch (Exception ex) {
+                        plugin.getLogger().warning("Failed to capture/apply final runner state: " + ex.getMessage());
                     }
-                } catch (Exception ex) {
-                    plugin.getLogger().warning("Failed to capture/apply final runner state: " + ex.getMessage());
                 }
 
                 restoreAllPlayerStates();
@@ -597,7 +605,13 @@ public class GameManager {
                     runner.setGameMode(GameMode.SPECTATOR);
                 } else if (freezeMode.equalsIgnoreCase("LIMBO")) {
                     Location limboLocation = plugin.getConfigManager().getLimboLocation();
-                    runner.teleport(limboLocation);
+                    // Try to find a safe nearby spot instead of blindly teleporting
+                    Location safe = SafeLocationFinder.findSafeLocation(
+                            limboLocation,
+                            plugin.getConfigManager().getSafeSwapHorizontalRadius(),
+                            plugin.getConfigManager().getSafeSwapVerticalDistance(),
+                            plugin.getConfigManager().getDangerousBlocks());
+                    runner.teleport(safe != null ? safe : limboLocation);
                     runner.setGameMode(GameMode.ADVENTURE);
                     runner.addPotionEffect(new PotionEffect(PotionEffectType.BLINDNESS, Integer.MAX_VALUE, 1, false, false));
                 }

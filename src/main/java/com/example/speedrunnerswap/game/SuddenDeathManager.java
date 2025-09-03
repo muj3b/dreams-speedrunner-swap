@@ -8,6 +8,7 @@ import org.bukkit.entity.Player;
 import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
 import org.bukkit.Sound;
+import com.example.speedrunnerswap.utils.SafeLocationFinder;
 
 import java.util.Collection;
 import org.bukkit.scheduler.BukkitTask;
@@ -72,14 +73,25 @@ public class SuddenDeathManager {
         // Announce activation
         announceSuddenDeath();
 
-        // Teleport all players to The End
-        Location spawnLocation = new Location(endWorld, 100, 50, 0); // Safe location away from the center
+        // Determine arena spawn from config, and try to find a safe nearby spot
+        double ax = plugin.getConfig().getDouble("sudden_death.arena.x", 100.0);
+        double ay = plugin.getConfig().getDouble("sudden_death.arena.y", 50.0);
+        double az = plugin.getConfig().getDouble("sudden_death.arena.z", 0.0);
+        Location arena = new Location(endWorld, ax, ay, az);
+        Location spawnLocation = SafeLocationFinder.findSafeLocation(
+                arena,
+                plugin.getConfigManager().getSafeSwapHorizontalRadius(),
+                plugin.getConfigManager().getSafeSwapVerticalDistance(),
+                plugin.getConfigManager().getDangerousBlocks());
+        if (spawnLocation == null) spawnLocation = arena;
         Collection<? extends Player> players = Bukkit.getOnlinePlayers();
         
         for (Player player : players) {
-            // Apply effects
-            player.addPotionEffect(new PotionEffect(PotionEffectType.RESISTANCE, 20 * 10, 4)); // 10 seconds of resistance
-            player.addPotionEffect(new PotionEffect(PotionEffectType.REGENERATION, 20 * 10, 2)); // 10 seconds of regeneration
+            // Apply effects (durations from config, ticks)
+            int resTicks = plugin.getConfig().getInt("sudden_death.effects.resistance_duration", 200);
+            int regenTicks = plugin.getConfig().getInt("sudden_death.effects.regeneration_duration", 200);
+            player.addPotionEffect(new PotionEffect(PotionEffectType.RESISTANCE, Math.max(20, resTicks), 4));
+            player.addPotionEffect(new PotionEffect(PotionEffectType.REGENERATION, Math.max(20, regenTicks), 2));
             
             // Teleport
             player.teleport(spawnLocation);

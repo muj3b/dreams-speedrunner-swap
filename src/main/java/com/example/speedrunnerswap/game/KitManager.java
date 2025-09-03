@@ -29,7 +29,10 @@ public class KitManager {
     }
 
     public void giveKit(Player player, String kitType) {
-        if (!plugin.getConfig().getBoolean("kits.enabled", true)) {
+        // Respect both config.yml and kits.yml toggles; both must allow kits
+        boolean mainEnabled = plugin.getConfigManager().isKitsEnabled();
+        boolean fileEnabled = plugin.getKitConfigManager().getConfig().getBoolean("kits.enabled", mainEnabled);
+        if (!(mainEnabled && fileEnabled)) {
             return;
         }
 
@@ -67,7 +70,8 @@ public class KitManager {
         List<String> itemStrings = section.getStringList("items");
         for (String itemString : itemStrings) {
             try {
-                String[] parts = itemString.split(" ");
+                if (itemString == null) continue;
+                String[] parts = itemString.trim().split("\\s+");
                 Material material = Material.valueOf(parts[0].toUpperCase());
                 int amount = parts.length > 1 ? Integer.parseInt(parts[1]) : 1;
                 items.add(new ItemStack(material, amount));

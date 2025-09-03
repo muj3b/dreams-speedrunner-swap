@@ -134,8 +134,16 @@ public class TrackerManager {
             World.Environment targetEnv = target.getWorld().getEnvironment();
 
             if (isJammed) {
+                // Use configurable jamming radius; prefer tracker.compass_jamming.max_jam_distance, fallback to legacy sudden_death path
+                int maxDist = plugin.getConfig().getInt("tracker.compass_jamming.max_jam_distance",
+                        plugin.getConfig().getInt("sudden_death.arena.max_jam_distance", 500));
+                maxDist = Math.max(10, Math.min(5000, maxDist));
+                double angle = Math.random() * Math.PI * 2;
+                double radius = Math.random() * maxDist;
+                Location jam = hunter.getLocation().clone().add(Math.cos(angle) * radius, 0, Math.sin(angle) * radius);
+                jam.setY(Math.max(5, Math.min(hunter.getWorld().getMaxHeight() - 5, jam.getY())));
                 CompassMeta meta = (CompassMeta) compass.getItemMeta();
-                meta.setLodestone(new Location(hunter.getWorld(), Math.random() * 1000 - 500, 64, Math.random() * 1000 - 500));
+                meta.setLodestone(jam);
                 meta.setLodestoneTracked(false);
                 compass.setItemMeta(meta);
             } else if (hunterEnv == targetEnv) {

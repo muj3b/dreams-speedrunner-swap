@@ -16,6 +16,7 @@ public class BountyManager {
     private final Random random;
     private UUID bountyTarget;
     private boolean isBountyActive;
+    private long lastAssignedAt = 0L;
 
     public BountyManager(SpeedrunnerSwap plugin) {
         this.plugin = plugin;
@@ -24,6 +25,11 @@ public class BountyManager {
     }
 
     public void assignNewBounty() {
+        if (!plugin.getConfig().getBoolean("bounty.enabled", false)) return;
+        int cooldownSec = Math.max(0, plugin.getConfig().getInt("bounty.cooldown", 300));
+        if ((System.currentTimeMillis() - lastAssignedAt) < cooldownSec * 1000L) {
+            return; // still on cooldown
+        }
         List<Player> runners = plugin.getGameManager().getRunners();
         if (runners.isEmpty()) return;
 
@@ -32,11 +38,13 @@ public class BountyManager {
         bountyTarget = target.getUniqueId();
         isBountyActive = true;
 
-        // Apply glowing effect to make the target more visible
-        target.addPotionEffect(new PotionEffect(PotionEffectType.GLOWING, 20 * 60 * 5, 0)); // 5 minutes
+        // Apply glowing effect to make the target more visible (duration from config in seconds)
+        int glowSec = Math.max(10, plugin.getConfig().getInt("bounty.glow_duration", 300));
+        target.addPotionEffect(new PotionEffect(PotionEffectType.GLOWING, glowSec * 20, 0));
 
         // Announce the new bounty
         announceBounty(target);
+        lastAssignedAt = System.currentTimeMillis();
     }
 
     private void announceBounty(Player target) {
@@ -66,9 +74,11 @@ public class BountyManager {
     }
 
     private void giveRewards(Player hunter) {
-        // Give permanent effects
-        hunter.addPotionEffect(new PotionEffect(PotionEffectType.SPEED, 20 * 60 * 5, 0)); // Speed I for 5 minutes
-        hunter.addPotionEffect(new PotionEffect(PotionEffectType.STRENGTH, 20 * 60 * 5, 0)); // Strength I for 5 minutes
+        // Reward durations in seconds, configurable
+        int speedSec = Math.max(10, plugin.getConfig().getInt("bounty.rewards.speed_duration", 300));
+        int strengthSec = Math.max(10, plugin.getConfig().getInt("bounty.rewards.strength_duration", 300));
+        hunter.addPotionEffect(new PotionEffect(PotionEffectType.SPEED, speedSec * 20, 0));
+        hunter.addPotionEffect(new PotionEffect(PotionEffectType.STRENGTH, strengthSec * 20, 0));
         
         // Heal the hunter
         hunter.setHealth(20.0);

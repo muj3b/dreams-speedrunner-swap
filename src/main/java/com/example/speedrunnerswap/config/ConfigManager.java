@@ -654,6 +654,14 @@ public class ConfigManager {
     public void setKitsEnabled(boolean enabled) {
         config.set("kits.enabled", enabled);
         plugin.saveConfig();
+        // Keep kits.yml flag in sync for clarity
+        try {
+            org.bukkit.configuration.file.FileConfiguration kits = plugin.getKitConfigManager().getConfig();
+            kits.set("kits.enabled", enabled);
+            plugin.getKitConfigManager().saveConfig();
+        } catch (Exception ignored) {
+            // If kits.yml isn't available yet, skip silently
+        }
     }
 
     public List<String> getRunnerKitItems() {
