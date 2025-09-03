@@ -10,6 +10,7 @@ import org.bukkit.event.Listener;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.inventory.InventoryType;
 import org.bukkit.event.player.*;
+import org.bukkit.event.entity.PlayerDeathEvent;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 import net.kyori.adventure.text.Component;
@@ -33,6 +34,16 @@ public class EventListeners implements Listener {
             if (plugin.getGameManager().isHunter(player) && plugin.getTrackerManager() != null) {
                 plugin.getTrackerManager().giveTrackingCompass(player);
             }
+        }
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST)
+    public void onPlayerDeath(PlayerDeathEvent event) {
+        Player player = event.getEntity();
+
+        // Ensure hunters don't drop tracking compasses on death
+        if (plugin.getGameManager().isGameRunning() && plugin.getGameManager().isHunter(player)) {
+            event.getDrops().removeIf(item -> item != null && item.getType() == Material.COMPASS);
         }
     }
 

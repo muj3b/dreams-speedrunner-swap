@@ -34,7 +34,7 @@ swap:
 # Safe Swap Configuration
 safe_swap:
   # Whether to enable safe swap feature
-  enabled: true
+  enabled: false
   # Horizontal scan radius (blocks)
   horizontal_radius: 5
   # Vertical scan distance (blocks)
@@ -98,7 +98,7 @@ broadcasts:
 
 # Freeze Mechanic Configuration
 freeze_mechanic:
-  enabled: true
+  enabled: false
   duration_ticks: 100  # 5 seconds
   check_interval_ticks: 20
   max_distance: 50

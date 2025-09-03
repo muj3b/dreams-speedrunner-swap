@@ -519,6 +519,23 @@ public class GameManager {
             }
         }, 0L, interval);
     }
+
+    /**
+     * Refresh freeze mechanic task and reapply inactive effects/modes at runtime.
+     * Safe to call while game is running.
+     */
+    public void refreshFreezeMechanic() {
+        if (freezeCheckTask != null) {
+            freezeCheckTask.cancel();
+            freezeCheckTask = null;
+        }
+        if (gameRunning && plugin.getConfigManager().isFreezeMechanicEnabled()) {
+            startFreezeChecking();
+        }
+        if (gameRunning) {
+            applyInactiveEffects();
+        }
+    }
     
     private void performSwap() {
         if (!gameRunning || gamePaused || runners.size() < 1) {

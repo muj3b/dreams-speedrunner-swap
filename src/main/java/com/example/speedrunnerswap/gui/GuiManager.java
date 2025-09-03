@@ -550,13 +550,12 @@ public class GuiManager {
         backLore.add("§7Settings will be saved automatically");
         ItemStack back = createItem(Material.ARROW, "§7§lBack", backLore);
 
-    // Tracker Settings Header (simplified - particle/distance features removed)
+    // Tracker Settings Header
     List<String> trackerHeaderLore = new ArrayList<>();
     trackerHeaderLore.add("§7Configure compass tracking:");
-    trackerHeaderLore.add("§7• Hunters receive a compass to track the active runner");
-    trackerHeaderLore.add("§7• Particle trails and distance display removed");
+    trackerHeaderLore.add("§7• Hunters receive a compass to track active runner");
     ItemStack trackerHeader = createItem(Material.BOOK, "§6§lTracker Settings", trackerHeaderLore);
-    inventory.setItem(27, trackerHeader);
+    inventory.setItem(26, trackerHeader);
     inventory.setItem(0, back);
         
         // Swap Settings Section
@@ -621,6 +620,15 @@ swapHeaderLore.add("§7• Hover over options for details");
                 "safe_swaps");
         inventory.setItem(12, safeButton);
         
+        // Pause on disconnect toggle
+        boolean pauseOnDisconnect = plugin.getConfigManager().isPauseOnDisconnect();
+        ItemStack pauseToggle = createGuiButton(
+                pauseOnDisconnect ? Material.REDSTONE_TORCH : Material.LEVER,
+                "§e§lPause On Disconnect: " + (pauseOnDisconnect ? "§aEnabled" : "§cDisabled"),
+                List.of("§7Pause game if active runner disconnects"),
+                "pause_on_disconnect");
+        inventory.setItem(16, pauseToggle);
+
         // Tracker toggle
         boolean trackerEnabled = plugin.getConfigManager().isTrackerEnabled();
         List<String> trackerToggleLore = new ArrayList<>();
@@ -633,11 +641,37 @@ swapHeaderLore.add("§7• Hover over options for details");
                 "tracker_toggle");
         inventory.setItem(13, trackerToggle);
 
+        // Hunter Swap toggle and interval
+        boolean hunterSwapEnabled = plugin.getConfigManager().isHunterSwapEnabled();
+        ItemStack hunterSwapToggle = createGuiButton(
+                hunterSwapEnabled ? Material.CROSSBOW : Material.GRAY_DYE,
+                "§e§lHunter Swap: " + (hunterSwapEnabled ? "§aEnabled" : "§cDisabled"),
+                List.of("§7Shuffle hunters on a timer"),
+                "hunter_swap_toggle");
+        inventory.setItem(14, hunterSwapToggle);
+
+        int hunterSwapInterval = plugin.getConfigManager().getHunterSwapInterval();
+        ItemStack hunterSwapIntervalItem = createGuiButton(
+                Material.CLOCK,
+                "§e§lHunter Swap Interval",
+                List.of("§7Current: §e" + hunterSwapInterval + " seconds", "§7Left/Right: ±30s", "§7Shift: ±60s"),
+                "hunter_swap_interval");
+        inventory.setItem(15, hunterSwapIntervalItem);
+
+        // Hot Potato mode toggle
+        boolean hotPotato = plugin.getConfigManager().isHotPotatoModeEnabled();
+        ItemStack hotPotatoToggle = createGuiButton(
+                hotPotato ? Material.BLAZE_POWDER : Material.GRAY_DYE,
+                "§e§lHot Potato Mode: " + (hotPotato ? "§aEnabled" : "§cDisabled"),
+                List.of("§7Experimental runner swap variant"),
+                "hot_potato_toggle");
+        inventory.setItem(17, hotPotatoToggle);
+
         // Admin tools
         ItemStack adminHeader = createItem(Material.BOOK, "§6§lAdmin Tools", List.of(
             "§7Operator utilities: force actions"
         ));
-        inventory.setItem(27, adminHeader);
+        inventory.setItem(33, adminHeader);
 
         ItemStack forceSwap = createGuiButton(Material.ENDER_PEARL, "§d§lForce Runner Swap", List.of(
             "§7Trigger immediate runner swap"
@@ -706,6 +740,52 @@ swapHeaderLore.add("§7• Hover over options for details");
         hunterTimerLore.add("§7Click to change");
         ItemStack hunterTimer = createItem(Material.CLOCK, "§e§lHunter Timer", hunterTimerLore);
         inventory.setItem(21, hunterTimer);
+
+        // Freeze Mechanic Section
+        List<String> freezeHeaderLore = new ArrayList<>();
+        freezeHeaderLore.add("§7Freeze/slow hunters near the runner");
+        ItemStack freezeHeader = createItem(Material.BOOK, "§6§lFreeze Mechanic", freezeHeaderLore);
+        inventory.setItem(36, freezeHeader);
+
+        boolean freezeEnabled = plugin.getConfigManager().isFreezeMechanicEnabled();
+        ItemStack freezeToggle = createGuiButton(
+                freezeEnabled ? Material.BLUE_ICE : Material.GRAY_DYE,
+                "§e§lFreeze Mechanic: " + (freezeEnabled ? "§aEnabled" : "§cDisabled"),
+                List.of("§7Toggle freeze mechanic"),
+                "freeze_toggle");
+        inventory.setItem(37, freezeToggle);
+
+        String mode = plugin.getConfigManager().getFreezeMode();
+        ItemStack freezeMode = createGuiButton(
+                Material.SNOWBALL,
+                "§e§lFreeze Mode: §b" + mode,
+                List.of("§7Cycle: EFFECTS → SPECTATOR → LIMBO"),
+                "freeze_mode");
+        inventory.setItem(38, freezeMode);
+
+        int freezeDuration = plugin.getConfigManager().getFreezeDurationTicks();
+        ItemStack freezeDurationItem = createGuiButton(
+                Material.CLOCK,
+                "§e§lFreeze Duration",
+                List.of("§7Current: §e" + freezeDuration + " ticks", "§7Left/Right: ±20", "§7Shift: ±100"),
+                "freeze_duration");
+        inventory.setItem(39, freezeDurationItem);
+
+        int freezeInterval = plugin.getConfigManager().getFreezeCheckIntervalTicks();
+        ItemStack freezeIntervalItem = createGuiButton(
+                Material.REPEATER,
+                "§e§lFreeze Check Interval",
+                List.of("§7Current: §e" + freezeInterval + " ticks", "§7Left/Right: ±5", "§7Shift: ±20"),
+                "freeze_check_interval");
+        inventory.setItem(40, freezeIntervalItem);
+
+        int freezeDistance = (int) plugin.getConfigManager().getFreezeMaxDistance();
+        ItemStack freezeDistanceItem = createGuiButton(
+                Material.SPYGLASS,
+                "§e§lFreeze Max Distance",
+                List.of("§7Current: §e" + freezeDistance + " blocks", "§7Left/Right: ±5", "§7Shift: ±20"),
+                "freeze_max_distance");
+        inventory.setItem(41, freezeDistanceItem);
         
         player.openInventory(inventory);
     }

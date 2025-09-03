@@ -31,7 +31,7 @@ public class ConfigManager {
      * @return True if safe swaps are enabled
      */
     public boolean isSafeSwapEnabled() {
-        return config.getBoolean("safe_swap.enabled", true);
+        return config.getBoolean("safe_swap.enabled", false);
     }
 
     /**
@@ -448,7 +448,7 @@ public class ConfigManager {
      * @return True if enabled
      */
     public boolean isFreezeMechanicEnabled() {
-        return config.getBoolean("freeze_mechanic.enabled", true);
+        return config.getBoolean("freeze_mechanic.enabled", false);
     }
 
     /**

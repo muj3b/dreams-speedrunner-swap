@@ -87,7 +87,8 @@ public class GuiListener implements Listener {
         }
 
         // Route to specific menu handlers
-        if (title.contains("Main Menu")) {
+        // Main menu: support both legacy "Main Menu" and configurable titles like "SpeedrunnerSwap Menu"
+        if (title.contains("Main Menu") || title.contains("SpeedrunnerSwap")) {
             handleMainMenuClick(event);
         } else if (title.contains("Team Selector")) {
             handleTeamSelectorClick(event);
@@ -202,15 +203,111 @@ public class GuiListener implements Listener {
         String buttonId = getButtonId(clicked);
         if (buttonId != null) {
             switch (buttonId) {
-                case "swap_interval":
-                    cycleSwapInterval(player);
+                case "swap_interval": {
+                    int current = plugin.getConfigManager().getSwapInterval();
+                    int delta = event.isShiftClick() ? 60 : 30;
+                    if (event.isLeftClick()) current += delta;
+                    if (event.isRightClick()) current -= delta;
+                    current = Math.max(30, Math.min(300, current));
+                    plugin.getConfigManager().setSwapInterval(current);
                     break;
+                }
                 case "random_swaps":
                     toggleRandomSwaps(player);
                     break;
                 case "safe_swaps":
                     toggleSafeSwaps(player);
                     break;
+                case "pause_on_disconnect": {
+                    boolean enabled = plugin.getConfigManager().isPauseOnDisconnect();
+                    plugin.getConfig().set("swap.pause_on_disconnect", !enabled);
+                    plugin.saveConfig();
+                    break;
+                }
+                case "hunter_swap_toggle": {
+                    boolean enabled = plugin.getConfigManager().isHunterSwapEnabled();
+                    plugin.getConfig().set("swap.hunter_swap.enabled", !enabled);
+                    plugin.saveConfig();
+                    break;
+                }
+                case "hunter_swap_interval": {
+                    int val = plugin.getConfigManager().getHunterSwapInterval();
+                    int delta = event.isShiftClick() ? 60 : 30;
+                    if (event.isLeftClick()) val += delta;
+                    if (event.isRightClick()) val -= delta;
+                    val = Math.max(30, Math.min(600, val));
+                    plugin.getConfig().set("swap.hunter_swap.interval", val);
+                    plugin.saveConfig();
+                    break;
+                }
+                case "hot_potato_toggle": {
+                    boolean enabled = plugin.getConfigManager().isHotPotatoModeEnabled();
+                    plugin.getConfig().set("swap.hot_potato_mode.enabled", !enabled);
+                    plugin.saveConfig();
+                    break;
+                }
+                case "freeze_toggle": {
+                    boolean enabled = plugin.getConfigManager().isFreezeMechanicEnabled();
+                    plugin.getConfig().set("freeze_mechanic.enabled", !enabled);
+                    plugin.saveConfig();
+                    if (plugin.getGameManager().isGameRunning()) {
+                        plugin.getGameManager().refreshFreezeMechanic();
+                    }
+                    break;
+                }
+                case "freeze_mode": {
+                    String current = plugin.getConfigManager().getFreezeMode();
+                    String next = switch (current.toUpperCase()) {
+                        case "EFFECTS" -> "SPECTATOR";
+                        case "SPECTATOR" -> "LIMBO";
+                        default -> "EFFECTS";
+                    };
+                    plugin.getConfig().set("freeze_mode", next);
+                    plugin.saveConfig();
+                    if (plugin.getGameManager().isGameRunning()) {
+                        plugin.getGameManager().refreshFreezeMechanic();
+                    }
+                    break;
+                }
+                case "freeze_duration": {
+                    int val = plugin.getConfigManager().getFreezeDurationTicks();
+                    int delta = event.isShiftClick() ? 100 : 20;
+                    if (event.isLeftClick()) val += delta;
+                    if (event.isRightClick()) val -= delta;
+                    val = Math.max(20, Math.min(20 * 60 * 5, val)); // 1s..5m
+                    plugin.getConfig().set("freeze_mechanic.duration_ticks", val);
+                    plugin.saveConfig();
+                    if (plugin.getGameManager().isGameRunning()) {
+                        plugin.getGameManager().refreshFreezeMechanic();
+                    }
+                    break;
+                }
+                case "freeze_check_interval": {
+                    int val = plugin.getConfigManager().getFreezeCheckIntervalTicks();
+                    int delta = event.isShiftClick() ? 20 : 5;
+                    if (event.isLeftClick()) val += delta;
+                    if (event.isRightClick()) val -= delta;
+                    val = Math.max(1, Math.min(200, val));
+                    plugin.getConfig().set("freeze_mechanic.check_interval_ticks", val);
+                    plugin.saveConfig();
+                    if (plugin.getGameManager().isGameRunning()) {
+                        plugin.getGameManager().refreshFreezeMechanic();
+                    }
+                    break;
+                }
+                case "freeze_max_distance": {
+                    int val = (int) Math.round(plugin.getConfigManager().getFreezeMaxDistance());
+                    int delta = event.isShiftClick() ? 20 : 5;
+                    if (event.isLeftClick()) val += delta;
+                    if (event.isRightClick()) val -= delta;
+                    val = Math.max(5, Math.min(256, val));
+                    plugin.getConfig().set("freeze_mechanic.max_distance", val);
+                    plugin.saveConfig();
+                    if (plugin.getGameManager().isGameRunning()) {
+                        plugin.getGameManager().refreshFreezeMechanic();
+                    }
+                    break;
+                }
                 case "tracker_toggle": {
                     boolean enabled = plugin.getConfigManager().isTrackerEnabled();
                     plugin.getConfigManager().setTrackerEnabled(!enabled);
@@ -299,20 +396,6 @@ public class GuiListener implements Listener {
     }
 
     // Helper methods for settings actions
-    private void cycleSwapInterval(Player player) {
-        int current = plugin.getConfigManager().getSwapInterval();
-        int[] intervals = {30, 60, 120, 180, 300}; // 30s, 1m, 2m, 3m, 5m
-        
-        int nextIndex = 0;
-        for (int i = 0; i < intervals.length; i++) {
-            if (current == intervals[i]) {
-                nextIndex = (i + 1) % intervals.length;
-                break;
-            }
-        }
-        
-        plugin.getConfigManager().setSwapInterval(intervals[nextIndex]);
-    }
 
     private void toggleRandomSwaps(Player player) {
         boolean current = plugin.getConfigManager().isSwapRandomized();
