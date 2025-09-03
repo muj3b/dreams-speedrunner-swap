@@ -455,7 +455,7 @@ public class GameManager {
         }
         
         long intervalSeconds;
-        if (plugin.getConfigManager().isRandomizeSwap()) {
+        if (plugin.getConfigManager().isSwapRandomized()) {
             double mean = plugin.getConfigManager().getSwapInterval();
             double stdDev = plugin.getConfigManager().getJitterStdDev();
             double jitteredInterval = ThreadLocalRandom.current().nextGaussian() * stdDev + mean;
