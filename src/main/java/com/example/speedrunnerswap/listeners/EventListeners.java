@@ -20,6 +20,8 @@ import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 public class EventListeners implements Listener {
     
     private final SpeedrunnerSwap plugin;
+    // Simple debounce for hot potato swap triggers
+    private volatile long lastHotPotatoTriggerMs = 0L;
     
     public EventListeners(SpeedrunnerSwap plugin) {
         this.plugin = plugin;
@@ -36,6 +38,24 @@ public class EventListeners implements Listener {
                 plugin.getTrackerManager().giveTrackingCompass(player);
             }
         }
+    }
+
+    @org.bukkit.event.EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    public void onRunnerDamaged(org.bukkit.event.entity.EntityDamageEvent event) {
+        if (!plugin.getGameManager().isGameRunning()) return;
+        if (!plugin.getConfigManager().isHotPotatoModeEnabled()) return;
+
+        if (!(event.getEntity() instanceof Player player)) return;
+        if (!plugin.getGameManager().isRunner(player)) return;
+        if (!player.equals(plugin.getGameManager().getActiveRunner())) return;
+
+        // Debounce to avoid cascading swaps from multi-hit damage events
+        long now = System.currentTimeMillis();
+        if (now - lastHotPotatoTriggerMs < 1000) return; // 1s cooldown
+        lastHotPotatoTriggerMs = now;
+
+        // Trigger an immediate swap on next tick
+        plugin.getGameManager().triggerImmediateSwap();
     }
 
     @EventHandler(priority = EventPriority.HIGHEST)

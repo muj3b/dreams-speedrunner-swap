@@ -74,6 +74,11 @@ tracker:
   enabled: true
   # How often to update the compass (in ticks, 20 ticks = 1 second)
   update_ticks: 20
+  # Temporary compass jamming after swaps to give the new runner an escape window
+  compass_jamming:
+    enabled: false
+    # Duration of compass jamming in ticks (20 ticks = 1 second)
+    duration_ticks: 100
 
 # GUI Configuration
 gui:
@@ -193,10 +198,5 @@ sudden_death:
     x: 100
     y: 50
     z: 0
-
-  compass_jamming:
-    enabled: false
-    # Duration of compass jamming in ticks (20 ticks = 1 second)
-    duration_ticks: 100
     # Maximum distance for random compass pointing when jammed
     max_jam_distance: 100

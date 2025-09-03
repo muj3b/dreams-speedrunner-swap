@@ -52,10 +52,9 @@ The plugin is highly configurable through `config.yml`:
 ## Requirements
 
 - Java 17 or higher
-- Paper/Spigot 1.21.8
+- Paper/Spigot 1.21+
 
 ## Links
 
-- [GitHub Repository](https://github.com/yourusername/speedrunnerswap)
-- [SpigotMC](https://www.spigotmc.org/resources/speedrunnerswap.12345/)
-- [Issue Tracker](https://github.com/yourusername/speedrunnerswap/issues)
+- [GitHub Repository](https://github.com/muj3b/minecraft-speedrunner-swap-plugin)
+- [Issue Tracker](https://github.com/muj3b/minecraft-speedrunner-swap-plugin/issues)

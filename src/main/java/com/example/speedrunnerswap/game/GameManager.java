@@ -713,6 +713,15 @@ public class GameManager {
         if (plugin.getConfigManager().isPowerUpsEnabled()) {
             applyRandomPowerUp(activeRunner);
         }
+
+        // Optionally jam hunter compasses right after a swap to give the new runner a window
+        if (plugin.getConfigManager().isCompassJammingEnabled()) {
+            long duration = plugin.getConfigManager().getCompassJamDuration();
+            // Guard against non-positive durations
+            if (duration > 0) {
+                plugin.getTrackerManager().jamCompasses(duration);
+            }
+        }
     }
 
     /** Trigger an immediate runner swap (admin action) */

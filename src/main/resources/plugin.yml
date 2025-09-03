@@ -13,7 +13,7 @@ description: |
   - Safe swap locations
   - Hunter swap system
   - Compass tracking system
-website: https://github.com/yourusername/speedrunnerswap
+website: https://github.com/muj3b/minecraft-speedrunner-swap-plugin
 
 commands:
   swap:
