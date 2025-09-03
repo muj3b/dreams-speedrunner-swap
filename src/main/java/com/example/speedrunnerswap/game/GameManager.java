@@ -5,17 +5,23 @@ import com.example.speedrunnerswap.models.PlayerState;
 import com.example.speedrunnerswap.models.Team;
 import com.example.speedrunnerswap.utils.PlayerStateUtil;
 import com.example.speedrunnerswap.utils.SafeLocationFinder;
+import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.format.NamedTextColor;
+import net.kyori.adventure.text.format.TextDecoration;
+import net.kyori.adventure.title.Title;
 import org.bukkit.Location;
 import org.bukkit.*;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.Player;
 import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
+import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.scheduler.BukkitTask;
 import org.bukkit.Server;
 import org.bukkit.attribute.Attribute;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.GameMode;
+import java.time.Duration;
 
 import java.util.*;
 import java.util.concurrent.ThreadLocalRandom;
@@ -53,87 +59,157 @@ public class GameManager {
         }
         
         if (!canStartGame()) {
-            Bukkit.broadcast(net.kyori.adventure.text.Component.text("§cGame cannot start: At least one runner and one hunter are required."), Server.BROADCAST_CHANNEL_USERS);
+            Bukkit.broadcast(Component.text("§cGame cannot start: At least one runner and one hunter are required."), Server.BROADCAST_CHANNEL_USERS);
             return false;
         }
         
-        gameRunning = true;
-        gamePaused = false;
-        activeRunnerIndex = 0;
-        activeRunner = runners.get(activeRunnerIndex);
-        
-        saveAllPlayerStates();
-        
-        if (plugin.getConfigManager().isKitsEnabled()) {
-            for (Player player : runners) {
-                plugin.getKitManager().giveKit(player, "runner");
-            }
-            for (Player hunter : hunters) {
-                plugin.getKitManager().giveKit(hunter, "hunter");
-            }
-        }
-        
-        applyInactiveEffects();
-        scheduleNextSwap();
-        scheduleNextHunterSwap();
-        startActionBarUpdates();
-        
-        if (plugin.getConfigManager().isTrackerEnabled()) {
-            plugin.getTrackerManager().startTracking();
-            for (Player hunter : hunters) {
-                if (hunter.isOnline()) {
-                    plugin.getTrackerManager().giveTrackingCompass(hunter);
+        // Countdown
+        new BukkitRunnable() {
+            int count = 3;
+
+            @Override
+            public void run() {
+                if (count > 0) {
+                    Title title = Title.title(
+                        Component.text("Starting in " + count).color(NamedTextColor.GREEN).decorate(TextDecoration.BOLD),
+                        Component.text("Made by muj3b").color(NamedTextColor.GRAY),
+                        Title.Times.times(Duration.ofMillis(500), Duration.ofMillis(3500), Duration.ofMillis(500))
+                    );
+                    
+                    for (Player player : Bukkit.getOnlinePlayers()) {
+                        player.showTitle(title);
+                    }
+                    count--;
+                } else {
+                    this.cancel();
+                    gameRunning = true;
+                    gamePaused = false;
+                    activeRunnerIndex = 0;
+                    activeRunner = runners.get(activeRunnerIndex);                saveAllPlayerStates();
+                
+                if (plugin.getConfigManager().isKitsEnabled()) {
+                    for (Player player : runners) {
+                        plugin.getKitManager().giveKit(player, "runner");
+                    }
+                    for (Player hunter : hunters) {
+                        plugin.getKitManager().giveKit(hunter, "hunter");
+                    }
+                }
+                
+                applyInactiveEffects();
+                scheduleNextSwap();
+                scheduleNextHunterSwap();
+                startActionBarUpdates();
+                
+                if (plugin.getConfigManager().isTrackerEnabled()) {
+                    plugin.getTrackerManager().startTracking();
+                    for (Player hunter : hunters) {
+                        if (hunter.isOnline()) {
+                            plugin.getTrackerManager().giveTrackingCompass(hunter);
+                        }
+                    }
+                }
+
+                if (plugin.getConfigManager().isFreezeMechanicEnabled()) {
+                    startFreezeChecking();
                 }
             }
         }
-
-        if (plugin.getConfigManager().isFreezeMechanicEnabled()) {
-            startFreezeChecking();
-        }
-        
-        return true;
-    }
+    }.runTaskTimer(plugin, 0L, 20L);
     
-    public void endGame(Team winner) {
+    return true;
+}    public void endGame(Team winner) {
         if (!gameRunning) {
             return;
         }
-        
-        if (swapTask != null) {
-            swapTask.cancel();
-            swapTask = null;
-        }
-        
-        if (hunterSwapTask != null) {
-            hunterSwapTask.cancel();
-            hunterSwapTask = null;
-        }
-        
-        if (actionBarTask != null) {
-            actionBarTask.cancel();
-            actionBarTask = null;
-        }
-        
-        plugin.getTrackerManager().stopTracking();
-        
-        if (freezeCheckTask != null) {
-            freezeCheckTask.cancel();
-            freezeCheckTask = null;
-        }
-        
-        restoreAllPlayerStates();
-        
-        gameRunning = false;
-        gamePaused = false;
-        activeRunner = null;
-        
-        if (plugin.getConfigManager().isBroadcastGameEvents()) {
-            String winnerMessage = (winner != null) ? winner.name() + " team won!" : "Game ended!";
-            Bukkit.broadcast(net.kyori.adventure.text.Component.text("§a[SpeedrunnerSwap] Game ended! " + winnerMessage), Server.BROADCAST_CHANNEL_USERS);
-        }
-    }
 
-    /** Stop the game without declaring a winner */
+        // Announce winner with a title
+        Component titleText;
+        Component subtitleText;
+        
+        if (winner == Team.RUNNER) {
+            titleText = Component.text("RUNNERS WIN!")
+                .color(NamedTextColor.GREEN)
+                .decorate(TextDecoration.BOLD);
+            subtitleText = Component.text("Congratulations!")
+                .color(NamedTextColor.YELLOW);
+        } else if (winner == Team.HUNTER) {
+            titleText = Component.text("HUNTERS WIN!")
+                .color(NamedTextColor.RED)
+                .decorate(TextDecoration.BOLD);
+            subtitleText = Component.text("Better luck next time, runners!")
+                .color(NamedTextColor.YELLOW);
+        } else {
+            titleText = Component.text("GAME OVER")
+                .color(NamedTextColor.RED)
+                .decorate(TextDecoration.BOLD);
+            subtitleText = Component.text("No winner declared.")
+                .color(NamedTextColor.YELLOW);
+        }
+
+        Title endTitle = Title.title(
+            titleText,
+            subtitleText,
+            Title.Times.times(Duration.ofMillis(500), Duration.ofMillis(5000), Duration.ofMillis(500))
+        );
+
+        for (Player player : Bukkit.getOnlinePlayers()) {
+            player.showTitle(endTitle);
+        }    // Cancel all game tasks
+    if (swapTask != null) swapTask.cancel();
+    if (hunterSwapTask != null) hunterSwapTask.cancel();
+    if (actionBarTask != null) actionBarTask.cancel();
+    if (freezeCheckTask != null) freezeCheckTask.cancel();
+    plugin.getTrackerManager().stopTracking();
+
+    // Delay before resetting players and broadcasting final messages
+    new BukkitRunnable() {
+        @Override
+        public void run() {
+            restoreAllPlayerStates();
+            
+            gameRunning = false;
+            gamePaused = false;
+            activeRunner = null;
+            
+            if (plugin.getConfigManager().isBroadcastGameEvents()) {
+                String winnerMessage = (winner != null) ? winner.name() + " team won!" : "Game ended!";
+                Bukkit.broadcast(net.kyori.adventure.text.Component.text("§a[SpeedrunnerSwap] Game ended! " + winnerMessage), Server.BROADCAST_CHANNEL_USERS);
+            }
+
+            broadcastDonationMessage();
+        }
+    }.runTaskLater(plugin, 200L); // 10-second delay (20 ticks/sec * 10 sec)
+}
+
+    private void broadcastDonationMessage() {
+        // Add some spacing
+        Bukkit.broadcast(Component.text("\n"), Server.BROADCAST_CHANNEL_USERS);
+        
+        // Header
+        Bukkit.broadcast(Component.text("=== Support the Creator ===")
+            .color(NamedTextColor.GOLD)
+            .decorate(TextDecoration.BOLD), Server.BROADCAST_CHANNEL_USERS);
+            
+        // Message
+        Bukkit.broadcast(Component.text("Enjoy the plugin? Consider supporting the creator (muj3b)!")
+            .color(NamedTextColor.YELLOW), Server.BROADCAST_CHANNEL_USERS);
+        
+        // Clickable donation link
+        Component donateMessage = Component.text("[Click here to donate]")
+            .color(NamedTextColor.GREEN)
+            .decorate(TextDecoration.BOLD)
+            .clickEvent(net.kyori.adventure.text.event.ClickEvent.openUrl("https://donate.stripe.com/cNicN5gG3f8ocU4cjN0Ba00"))
+            .hoverEvent(net.kyori.adventure.text.event.HoverEvent.showText(
+                Component.text("Click to support the creator!")
+                    .color(NamedTextColor.YELLOW)
+            ));
+            
+        Bukkit.broadcast(donateMessage, Server.BROADCAST_CHANNEL_USERS);
+        
+        // Add spacing after
+        Bukkit.broadcast(Component.text("\n"), Server.BROADCAST_CHANNEL_USERS);
+    }/** Stop the game without declaring a winner */
     public void stopGame() {
         endGame(null);
     }

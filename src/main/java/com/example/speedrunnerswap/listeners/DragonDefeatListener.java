@@ -42,12 +42,12 @@ public class DragonDefeatListener implements Listener {
             // Different messages based on team
             if (plugin.getGameManager().isRunner(player)) {
                 player.sendMessage("§6§l=== VICTORY! ===");
-                player.sendMessage("§aYou've successfully defeated the Ender Dragon!");
-                player.sendMessage("§eThe hunters couldn't stop you this time!");
+                player.sendMessage("§aYou've successfully defeated that stupid Ender Dragon!");
+                player.sendMessage("§eGood stuff my guy");
             } else {
                 player.sendMessage("§c§l=== GAME OVER ===");
-                player.sendMessage("§cThe runners have succeeded in their mission.");
-                player.sendMessage("§eBetter luck next time, hunters!");
+                player.sendMessage("§cThe runners have succeeded in their mission like how");
+                player.sendMessage("§eY'all hunters trash asf");
             }
         }
 
@@ -56,7 +56,7 @@ public class DragonDefeatListener implements Listener {
             Bukkit.broadcast(net.kyori.adventure.text.Component.text("\n=== Support the Creator ===")
                 .color(net.kyori.adventure.text.format.NamedTextColor.GOLD)
                 .decorate(net.kyori.adventure.text.format.TextDecoration.BOLD), Server.BROADCAST_CHANNEL_USERS);
-            Bukkit.broadcast(net.kyori.adventure.text.Component.text("Enjoy the plugin? Consider supporting the creator (muj3b)!")
+            Bukkit.broadcast(net.kyori.adventure.text.Component.text("Enjoy the plugin? Consider supporting me (muj3b)!")
                 .color(net.kyori.adventure.text.format.NamedTextColor.YELLOW), Server.BROADCAST_CHANNEL_USERS);
             
             // Create clickable donation link using Adventure API
