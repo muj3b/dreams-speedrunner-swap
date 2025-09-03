@@ -109,7 +109,7 @@ public class ConfigManager {
         }
 
         // Load power-ups settings (canonical path: power_ups.enabled)
-        this.powerUpsEnabled = config.getBoolean("power_ups.enabled", true);
+        this.powerUpsEnabled = config.getBoolean("power_ups.enabled", false);
         config.set("power_ups.enabled", this.powerUpsEnabled); // Ensure config is in sync
     }
     
@@ -335,7 +335,7 @@ public class ConfigManager {
     }
 
     public boolean isParticleTrailEnabled() {
-        return config.getBoolean("particle_trail.enabled", true);
+        return config.getBoolean("particle_trail.enabled", false);
     }
 
     public int getParticleSpawnInterval() {
@@ -494,7 +494,7 @@ public class ConfigManager {
     }
 
     public boolean isCompassJammingEnabled() {
-        return config.getBoolean("tracker.compass_jamming.enabled", true);
+        return config.getBoolean("tracker.compass_jamming.enabled", false);
     }
 
     public int getCompassJamDuration() {
@@ -502,7 +502,7 @@ public class ConfigManager {
     }
 
     public boolean isHunterSwapEnabled() {
-        return config.getBoolean("swap.hunter_swap.enabled", true);
+        return config.getBoolean("swap.hunter_swap.enabled", false);
     }
 
     public int getHunterSwapInterval() {
@@ -518,7 +518,7 @@ public class ConfigManager {
     }
 
     public boolean isLastStandEnabled() {
-        return config.getBoolean("last_stand.enabled", true);
+        return config.getBoolean("last_stand.enabled", false);
     }
 
     public int getLastStandDuration() {
@@ -534,7 +534,7 @@ public class ConfigManager {
     }
 
     public boolean isKitsEnabled() {
-        return config.getBoolean("kits.enabled", true);
+        return config.getBoolean("kits.enabled", false);
     }
 
     /**

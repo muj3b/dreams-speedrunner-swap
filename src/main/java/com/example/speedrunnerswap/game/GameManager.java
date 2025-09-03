@@ -64,7 +64,7 @@ public class GameManager {
         
         saveAllPlayerStates();
         
-        if (plugin.getConfig().getBoolean("kits.enabled", true)) {
+        if (plugin.getConfigManager().isKitsEnabled()) {
             for (Player player : runners) {
                 plugin.getKitManager().giveKit(player, "runner");
             }
@@ -593,8 +593,11 @@ public class GameManager {
             previousRunner.getInventory().setArmorContents(new ItemStack[]{});
             previousRunner.getInventory().setItemInOffHand(null);
         } else {
-            activeRunner.getInventory().clear();
-            plugin.getKitManager().giveKit(activeRunner, "runner");
+            // Only clear/give kit if kits are enabled; otherwise leave inventory unchanged
+            if (plugin.getConfigManager().isKitsEnabled()) {
+                activeRunner.getInventory().clear();
+                plugin.getKitManager().giveKit(activeRunner, "runner");
+            }
         }
         
         applyInactiveEffects();

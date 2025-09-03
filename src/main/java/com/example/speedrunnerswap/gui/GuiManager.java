@@ -122,7 +122,7 @@ public class GuiManager {
 
         // Toggle button
         List<String> powerUpToggleLore = new ArrayList<>();
-        boolean powerUpsEnabled = plugin.getConfig().getBoolean("power_ups.enabled", true);
+        boolean powerUpsEnabled = plugin.getConfigManager().isPowerUpsEnabled();
         powerUpToggleLore.add("§7Current status: " + (powerUpsEnabled ? "§aEnabled" : "§cDisabled"));
         powerUpToggleLore.add("§7Click to toggle");
         ItemStack toggleItem = createItem(

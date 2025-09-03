@@ -26,7 +26,7 @@ swap:
   # Auto-pause if a runner disconnects
   pause_on_disconnect: true
   hunter_swap:
-    enabled: true
+    enabled: false
     interval: 60
   hot_potato_mode:
     enabled: false
@@ -115,13 +115,13 @@ timer_visibility:
 # Simple Voice Chat Integration (if available)
 voice_chat:
   # Whether to integrate with Simple Voice Chat
-  enabled: true
+  enabled: false
   # Whether to mute inactive runners
   mute_inactive_runners: true
 
 # Power-ups Configuration
 power_ups:
-  enabled: true
+  enabled: false
   good_effects:
     - SPEED
     - DOLPHINS_GRACE
@@ -137,7 +137,7 @@ power_ups:
 
 # Last Stand Configuration
 last_stand:
-  enabled: true
+  enabled: false
   duration_ticks: 600 # 30 seconds
   strength_amplifier: 1
   speed_amplifier: 1
@@ -145,7 +145,7 @@ last_stand:
 # Kits Configuration
 # Note: Kits are configured in kits.yml
 kits:
-  enabled: true  # Controls whether the kit system is enabled
+  enabled: false  # Controls whether the kit system is enabled
 
 # Advanced Stats Configuration
 stats:
@@ -158,7 +158,7 @@ stats:
 
 # World Border Configuration
 world_border:
-  enabled: true
+  enabled: false
   initial_size: 2000
   final_size: 100
   # Time in seconds for the border to shrink
@@ -169,7 +169,7 @@ world_border:
 
 # Bounty System Configuration
 bounty:
-  enabled: true
+  enabled: false
   # Minimum time between bounties (in seconds)
   cooldown: 300
   # Duration of the glowing effect on the target (in seconds)
@@ -181,7 +181,7 @@ bounty:
 
 # Sudden Death Configuration
 sudden_death:
-  enabled: true
+  enabled: false
   # Time before sudden death activates (in seconds)
   activation_delay: 1200 # 20 minutes
   # Effects given to players in sudden death
@@ -195,7 +195,7 @@ sudden_death:
     z: 0
 
   compass_jamming:
-    enabled: true
+    enabled: false
     # Duration of compass jamming in ticks (20 ticks = 1 second)
     duration_ticks: 100
     # Maximum distance for random compass pointing when jammed
