@@ -4,8 +4,7 @@ import com.example.speedrunnerswap.SpeedrunnerSwap;
 import org.bukkit.entity.Player;
 import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
-import org.bukkit.NamespacedKey;
-import org.bukkit.Registry;
+import com.example.speedrunnerswap.utils.BukkitCompat;
 
 import java.util.Random;
 
@@ -92,6 +91,6 @@ public class PowerUpManager {
             case "confusion", "nausea" -> "nausea";
             default -> key;
         };
-        return Registry.POTION_EFFECT_TYPE.get(NamespacedKey.minecraft(key));
+        return BukkitCompat.resolvePotionEffect(key);
     }
 }

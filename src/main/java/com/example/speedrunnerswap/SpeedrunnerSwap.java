@@ -168,7 +168,7 @@ public final class SpeedrunnerSwap extends JavaPlugin {
                 case "confusion" -> "nausea";
                 default -> key;
             };
-            org.bukkit.potion.PotionEffectType t = org.bukkit.Registry.POTION_EFFECT_TYPE.get(org.bukkit.NamespacedKey.minecraft(key));
+            org.bukkit.potion.PotionEffectType t = com.example.speedrunnerswap.utils.BukkitCompat.resolvePotionEffect(key);
             if (t == null) {
                 invalid.add(id);
             }

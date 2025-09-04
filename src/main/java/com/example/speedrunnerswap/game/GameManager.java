@@ -18,15 +18,15 @@ import org.bukkit.potion.PotionEffectType;
 import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.scheduler.BukkitTask;
 import org.bukkit.Server;
-import org.bukkit.attribute.Attribute;
+import com.example.speedrunnerswap.utils.BukkitCompat;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.GameMode;
 import java.time.Duration;
 
 import java.util.*;
 import java.util.concurrent.ThreadLocalRandom;
-import org.bukkit.NamespacedKey;
-import org.bukkit.Registry;
+// Use compat resolver for cross-version effect lookups
+import com.example.speedrunnerswap.utils.BukkitCompat;
 
 public class GameManager {
     private final SpeedrunnerSwap plugin;
@@ -410,12 +410,14 @@ public class GameManager {
                 restorePlayerState(player);
             }
             
-            player.removePotionEffect(PotionEffectType.BLINDNESS);
-            player.removePotionEffect(PotionEffectType.DARKNESS);
-            player.removePotionEffect(PotionEffectType.WEAKNESS);
-            player.removePotionEffect(PotionEffectType.SLOW_FALLING);
-            player.removePotionEffect(PotionEffectType.SLOWNESS);
-            player.removePotionEffect(PotionEffectType.JUMP_BOOST);
+            // Remove effects using compat lookups for cross-version support
+            PotionEffectType eff;
+            if ((eff = BukkitCompat.resolvePotionEffect("blindness")) != null) player.removePotionEffect(eff);
+            if ((eff = BukkitCompat.resolvePotionEffect("darkness")) != null) player.removePotionEffect(eff);
+            if ((eff = BukkitCompat.resolvePotionEffect("weakness")) != null) player.removePotionEffect(eff);
+            if ((eff = BukkitCompat.resolvePotionEffect("slow_falling")) != null) player.removePotionEffect(eff);
+            if ((eff = BukkitCompat.resolvePotionEffect("slowness")) != null) player.removePotionEffect(eff);
+            if ((eff = BukkitCompat.resolvePotionEffect("jump_boost")) != null) player.removePotionEffect(eff);
             
             if (player.getGameMode() == GameMode.SPECTATOR && runners.contains(player)) {
                 player.setGameMode(GameMode.SURVIVAL);
@@ -435,8 +437,8 @@ public class GameManager {
                 for (PotionEffect effect : player.getActivePotionEffects()) {
                     player.removePotionEffect(effect.getType());
                 }
-                
-                player.setHealth(player.getAttribute(Attribute.MAX_HEALTH).getValue());
+                // Reset to server-defined max health using version-safe attribute access
+                player.setHealth(BukkitCompat.getMaxHealthValue(player));
                 player.setFoodLevel(20);
                 player.setFireTicks(0);
                 player.setFallDistance(0);
@@ -586,10 +588,11 @@ public class GameManager {
         
         for (Player runner : runners) {
             if (runner.equals(activeRunner)) {
-                runner.removePotionEffect(PotionEffectType.BLINDNESS);
-                runner.removePotionEffect(PotionEffectType.DARKNESS);
-                runner.removePotionEffect(PotionEffectType.SLOWNESS);
-                runner.removePotionEffect(PotionEffectType.SLOW_FALLING);
+                PotionEffectType eff;
+                if ((eff = BukkitCompat.resolvePotionEffect("blindness")) != null) runner.removePotionEffect(eff);
+                if ((eff = BukkitCompat.resolvePotionEffect("darkness")) != null) runner.removePotionEffect(eff);
+                if ((eff = BukkitCompat.resolvePotionEffect("slowness")) != null) runner.removePotionEffect(eff);
+                if ((eff = BukkitCompat.resolvePotionEffect("slow_falling")) != null) runner.removePotionEffect(eff);
                 runner.setGameMode(GameMode.SURVIVAL);
                 
                 for (Player viewer : Bukkit.getOnlinePlayers()) {
@@ -597,10 +600,14 @@ public class GameManager {
                 }
             } else {
                 if (freezeMode.equalsIgnoreCase("EFFECTS")) {
-                    runner.addPotionEffect(new PotionEffect(PotionEffectType.BLINDNESS, Integer.MAX_VALUE, 1, false, false));
-                    runner.addPotionEffect(new PotionEffect(PotionEffectType.DARKNESS, Integer.MAX_VALUE, 1, false, false));
-                    runner.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS, Integer.MAX_VALUE, 255, false, false));
-                    runner.addPotionEffect(new PotionEffect(PotionEffectType.SLOW_FALLING, Integer.MAX_VALUE, 128, false, false));
+                    PotionEffectType blindness = BukkitCompat.resolvePotionEffect("blindness");
+                    if (blindness != null) runner.addPotionEffect(new PotionEffect(blindness, Integer.MAX_VALUE, 1, false, false));
+                    PotionEffectType darkness = BukkitCompat.resolvePotionEffect("darkness");
+                    if (darkness != null) runner.addPotionEffect(new PotionEffect(darkness, Integer.MAX_VALUE, 1, false, false));
+                    PotionEffectType slowness = BukkitCompat.resolvePotionEffect("slowness");
+                    if (slowness != null) runner.addPotionEffect(new PotionEffect(slowness, Integer.MAX_VALUE, 255, false, false));
+                    PotionEffectType slowFalling = BukkitCompat.resolvePotionEffect("slow_falling");
+                    if (slowFalling != null) runner.addPotionEffect(new PotionEffect(slowFalling, Integer.MAX_VALUE, 128, false, false));
                 } else if (freezeMode.equalsIgnoreCase("SPECTATOR")) {
                     runner.setGameMode(GameMode.SPECTATOR);
                 } else if (freezeMode.equalsIgnoreCase("LIMBO")) {
@@ -613,7 +620,8 @@ public class GameManager {
                             plugin.getConfigManager().getDangerousBlocks());
                     runner.teleport(safe != null ? safe : limboLocation);
                     runner.setGameMode(GameMode.ADVENTURE);
-                    runner.addPotionEffect(new PotionEffect(PotionEffectType.BLINDNESS, Integer.MAX_VALUE, 1, false, false));
+                    PotionEffectType blindness2 = BukkitCompat.resolvePotionEffect("blindness");
+                    if (blindness2 != null) runner.addPotionEffect(new PotionEffect(blindness2, Integer.MAX_VALUE, 1, false, false));
                 }
                 
                 for (Player viewer : Bukkit.getOnlinePlayers()) {
@@ -637,8 +645,12 @@ public class GameManager {
 
             if (target instanceof Player hunter && isHunter(hunter)) {
                 int duration = plugin.getConfigManager().getFreezeDurationTicks();
-                hunter.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS, duration, 255, false, false));
-                hunter.addPotionEffect(new PotionEffect(PotionEffectType.JUMP_BOOST, duration, 128, false, false));
+                PotionEffectType slowness2 = BukkitCompat.resolvePotionEffect("slowness");
+                if (slowness2 != null)
+                    hunter.addPotionEffect(new PotionEffect(slowness2, duration, 255, false, false));
+                PotionEffectType jumpBoost = BukkitCompat.resolvePotionEffect("jump_boost");
+                if (jumpBoost != null)
+                    hunter.addPotionEffect(new PotionEffect(jumpBoost, duration, 128, false, false));
                 
                 if (plugin.getConfigManager().isBroadcastGameEvents()) {
                     hunter.sendMessage(net.kyori.adventure.text.Component.text("§cYou have been frozen by the runner!"));
@@ -815,22 +827,27 @@ public class GameManager {
 
         // Fallbacks if config lists are empty or invalid
         if (goodTypes.isEmpty()) {
-            goodTypes = java.util.Arrays.asList(
-                PotionEffectType.SPEED,
-                PotionEffectType.REGENERATION,
-                PotionEffectType.RESISTANCE,
-                PotionEffectType.NIGHT_VISION,
-                PotionEffectType.DOLPHINS_GRACE
-            );
+            String[] defaults = {"speed", "regeneration", "resistance", "night_vision", "dolphins_grace"};
+            for (String k : defaults) {
+                PotionEffectType t = BukkitCompat.resolvePotionEffect(k);
+                if (t != null) goodTypes.add(t);
+            }
+            if (goodTypes.isEmpty()) {
+                // Ultra-safe baseline
+                PotionEffectType t = BukkitCompat.resolvePotionEffect("speed");
+                if (t != null) goodTypes.add(t);
+            }
         }
         if (badTypes.isEmpty()) {
-            badTypes = java.util.Arrays.asList(
-                PotionEffectType.SLOWNESS,
-                PotionEffectType.WEAKNESS,
-                PotionEffectType.HUNGER,
-                PotionEffectType.DARKNESS,
-                PotionEffectType.GLOWING
-            );
+            String[] defaults = {"slowness", "weakness", "hunger", "darkness", "glowing"};
+            for (String k : defaults) {
+                PotionEffectType t = BukkitCompat.resolvePotionEffect(k);
+                if (t != null) badTypes.add(t);
+            }
+            if (badTypes.isEmpty()) {
+                PotionEffectType t = BukkitCompat.resolvePotionEffect("slowness");
+                if (t != null) badTypes.add(t);
+            }
         }
 
         boolean isGoodEffect = ThreadLocalRandom.current().nextBoolean();
@@ -854,22 +871,7 @@ public class GameManager {
     }
 
     private PotionEffectType resolveEffect(String id) {
-        if (id == null) return null;
-        String key = id.toLowerCase(java.util.Locale.ROOT);
-
-        // Handle common legacy aliases -> modern keys
-        key = switch (key) {
-            case "increase_damage" -> "strength";
-            case "damage_resistance" -> "resistance";
-            case "slow" -> "slowness";
-            case "jump" -> "jump_boost";
-            case "slow_digging" -> "mining_fatigue";
-            case "confusion" -> "nausea";
-            default -> key;
-        };
-
-        PotionEffectType type = Registry.POTION_EFFECT_TYPE.get(NamespacedKey.minecraft(key));
-        return type;
+        return BukkitCompat.resolvePotionEffect(id);
     }
 
     /**

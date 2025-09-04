@@ -6,6 +6,7 @@ import org.bukkit.Sound;
 import org.bukkit.entity.Player;
 import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
+import com.example.speedrunnerswap.utils.BukkitCompat;
 
 import java.util.List;
 import java.util.Random;
@@ -40,7 +41,10 @@ public class BountyManager {
 
         // Apply glowing effect to make the target more visible (duration from config in seconds)
         int glowSec = Math.max(10, plugin.getConfig().getInt("bounty.glow_duration", 300));
-        target.addPotionEffect(new PotionEffect(PotionEffectType.GLOWING, glowSec * 20, 0));
+        PotionEffectType glowing = BukkitCompat.resolvePotionEffect("glowing");
+        if (glowing != null) {
+            target.addPotionEffect(new PotionEffect(glowing, glowSec * 20, 0));
+        }
 
         // Announce the new bounty
         announceBounty(target);
