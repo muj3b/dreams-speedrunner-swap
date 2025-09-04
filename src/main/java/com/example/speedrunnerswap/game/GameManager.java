@@ -581,7 +581,7 @@ public class GameManager {
             };
 
             if (!showTimer) {
-                player.sendActionBar(net.kyori.adventure.text.Component.text(""));
+                com.example.speedrunnerswap.utils.ActionBarUtil.sendActionBar(player, "");
                 continue;
             }
 
@@ -598,7 +598,7 @@ public class GameManager {
                 message = String.format("§eTime until next swap: §c%ds", timeLeft);
             }
 
-            player.sendActionBar(net.kyori.adventure.text.Component.text(message));
+            com.example.speedrunnerswap.utils.ActionBarUtil.sendActionBar(player, message);
         }
     }
     
@@ -668,7 +668,7 @@ public class GameManager {
             }
 
             int maxDistance = (int) plugin.getConfigManager().getFreezeMaxDistance();
-            Entity target = activeRunner.getTargetEntity(maxDistance, false);
+            Entity target = com.example.speedrunnerswap.utils.BukkitCompat.getTargetEntity(activeRunner, maxDistance);
 
             if (target instanceof Player hunter && isHunter(hunter)) {
                 int duration = plugin.getConfigManager().getFreezeDurationTicks();

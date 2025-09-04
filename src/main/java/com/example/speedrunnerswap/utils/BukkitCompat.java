@@ -3,6 +3,9 @@ package com.example.speedrunnerswap.utils;
 import org.bukkit.attribute.Attribute;
 import org.bukkit.attribute.AttributeInstance;
 import org.bukkit.entity.LivingEntity;
+import org.bukkit.entity.Player;
+import org.bukkit.entity.Entity;
+import org.bukkit.Location;
 import org.bukkit.potion.PotionEffectType;
 
 /**
@@ -79,6 +82,44 @@ public final class BukkitCompat {
         } catch (Throwable ignored) {
         }
 
+        return null;
+    }
+
+    /**
+     * Resolve targeted entity for a player across Paper/Bukkit versions.
+     * Tries Player#getTargetEntity(int, boolean), then Player#getTargetEntity(int),
+     * finally falls back to a ray trace against entities.
+     */
+    public static Entity getTargetEntity(Player player, int maxDistance) {
+        if (player == null) return null;
+        try {
+            // Paper 1.19+: getTargetEntity(int maxDistance, boolean ignoreBlocks)
+            java.lang.reflect.Method m = Player.class.getMethod("getTargetEntity", int.class, boolean.class);
+            Object ent = m.invoke(player, maxDistance, false);
+            return (Entity) ent;
+        } catch (NoSuchMethodException ignored) {
+        } catch (Throwable t) {
+            // continue
+        }
+        try {
+            // Older Paper: getTargetEntity(int maxDistance)
+            java.lang.reflect.Method m = Player.class.getMethod("getTargetEntity", int.class);
+            Object ent = m.invoke(player, maxDistance);
+            return (Entity) ent;
+        } catch (NoSuchMethodException ignored) {
+        } catch (Throwable t) {
+        }
+
+        // Vanilla Bukkit fallback using ray trace
+        try {
+            Location eye = player.getEyeLocation();
+            org.bukkit.util.Vector dir = eye.getDirection();
+            org.bukkit.util.RayTraceResult res = player.getWorld().rayTraceEntities(eye, dir, maxDistance, e -> e != player);
+            if (res != null) {
+                return res.getHitEntity();
+            }
+        } catch (Throwable ignored) {
+        }
         return null;
     }
 }

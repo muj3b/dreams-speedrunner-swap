@@ -2,6 +2,7 @@ package com.example.speedrunnerswap.listeners;
 
 import com.example.speedrunnerswap.SpeedrunnerSwap;
 import io.papermc.paper.event.player.AsyncChatEvent;
+import org.bukkit.event.player.AsyncPlayerChatEvent;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
@@ -210,6 +211,17 @@ public class EventListeners implements Listener {
             player.sendMessage(Component.text("§c[SpeedrunnerSwap] You cannot chat while inactive."));
             event.setCancelled(true);
         }
+    }
+
+    // Fallback for servers where Paper's AsyncChatEvent may not fire
+    @EventHandler(priority = EventPriority.HIGHEST)
+    public void onPlayerChatLegacy(AsyncPlayerChatEvent event) {
+        Player player = event.getPlayer();
+        if (!plugin.getGameManager().isGameRunning()) return;
+        if (!plugin.getGameManager().isRunner(player)) return;
+        if (plugin.getGameManager().getActiveRunner() == player) return;
+        player.sendMessage(Component.text("§c[SpeedrunnerSwap] You cannot chat while inactive."));
+        event.setCancelled(true);
     }
 
     @EventHandler
