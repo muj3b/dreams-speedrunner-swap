@@ -39,9 +39,14 @@ public class GameManager {
     private BukkitTask swapTask;
     private BukkitTask hunterSwapTask;
     private BukkitTask actionBarTask;
+    private BukkitTask titleTask;
     private BukkitTask freezeCheckTask;
+    private BukkitTask cageTask;
     private long nextSwapTime;
     private final Map<UUID, PlayerState> playerStates;
+    // Cage management for CAGE freeze mode
+    private final Map<java.util.UUID, java.util.List<org.bukkit.block.BlockState>> builtCages = new java.util.HashMap<>();
+    private final Map<java.util.UUID, org.bukkit.Location> cageCenters = new java.util.HashMap<>();
     
     public GameManager(SpeedrunnerSwap plugin) {
         this.plugin = plugin;
@@ -100,6 +105,8 @@ public class GameManager {
                 scheduleNextSwap();
                 scheduleNextHunterSwap();
                 startActionBarUpdates();
+                startTitleUpdates();
+                startCageEnforcement();
                 
                 if (plugin.getConfigManager().isTrackerEnabled()) {
                     plugin.getTrackerManager().startTracking();
@@ -165,7 +172,9 @@ public class GameManager {
         if (swapTask != null) swapTask.cancel();
         if (hunterSwapTask != null) hunterSwapTask.cancel();
         if (actionBarTask != null) actionBarTask.cancel();
+        if (titleTask != null) titleTask.cancel();
         if (freezeCheckTask != null) freezeCheckTask.cancel();
+        if (cageTask != null) { cageTask.cancel(); cageTask = null; }
         plugin.getTrackerManager().stopTracking();
         try { plugin.getStatsManager().stopTracking(); } catch (Exception ignored) {}
 
@@ -186,6 +195,7 @@ public class GameManager {
                     }
                 }
 
+                cleanupAllCages();
                 restoreAllPlayerStates();
                 
                 gameRunning = false;
@@ -534,6 +544,15 @@ public class GameManager {
             updateActionBar();
         }, 0L, 20L);
     }
+
+    private void startTitleUpdates() {
+        if (titleTask != null) titleTask.cancel();
+        // Update titles a bit faster for near-immediate status feedback
+        titleTask = Bukkit.getScheduler().runTaskTimer(plugin, () -> {
+            if (!gameRunning || gamePaused) return;
+            updateTitles();
+        }, 0L, 5L); // 0.25s for snappier updates
+    }
     
     private void updateActionBar() {
         if (!gameRunning || gamePaused) {
@@ -588,6 +607,8 @@ public class GameManager {
         
         for (Player runner : runners) {
             if (runner.equals(activeRunner)) {
+                // Remove cage if previously created
+                removeCageFor(runner);
                 PotionEffectType eff;
                 if ((eff = BukkitCompat.resolvePotionEffect("blindness")) != null) runner.removePotionEffect(eff);
                 if ((eff = BukkitCompat.resolvePotionEffect("darkness")) != null) runner.removePotionEffect(eff);
@@ -622,6 +643,12 @@ public class GameManager {
                     runner.setGameMode(GameMode.ADVENTURE);
                     PotionEffectType blindness2 = BukkitCompat.resolvePotionEffect("blindness");
                     if (blindness2 != null) runner.addPotionEffect(new PotionEffect(blindness2, Integer.MAX_VALUE, 1, false, false));
+                } else if (freezeMode.equalsIgnoreCase("CAGE")) {
+                    // Teleport to a high-altitude bedrock cage and blind
+                    createCageFor(runner);
+                    PotionEffectType blindness = BukkitCompat.resolvePotionEffect("blindness");
+                    if (blindness != null) runner.addPotionEffect(new PotionEffect(blindness, Integer.MAX_VALUE, 1, false, false));
+                    runner.setGameMode(GameMode.ADVENTURE);
                 }
                 
                 for (Player viewer : Bukkit.getOnlinePlayers()) {
@@ -673,6 +700,10 @@ public class GameManager {
         }
         if (gameRunning) {
             applyInactiveEffects();
+            // If CAGE mode is not selected anymore, ensure cages are removed
+            if (!"CAGE".equalsIgnoreCase(plugin.getConfigManager().getFreezeMode())) {
+                cleanupAllCages();
+            }
         }
     }
     
@@ -891,6 +922,9 @@ public class GameManager {
         if (actionBarTask != null) {
             actionBarTask.cancel();
         }
+        if (titleTask != null) {
+            titleTask.cancel();
+        }
         return true;
     }
 
@@ -905,6 +939,8 @@ public class GameManager {
         scheduleNextSwap();
         scheduleNextHunterSwap();
         startActionBarUpdates();
+        startTitleUpdates();
+        startCageEnforcement();
         return true;
     }
 
@@ -937,5 +973,135 @@ public class GameManager {
         currentRunners.removeAll(names);
         plugin.getConfigManager().setRunnerNames(currentRunners);
         this.hunters = new java.util.ArrayList<>(players);
+    }
+
+    private void updateTitles() {
+        int timeLeft = getTimeUntilNextSwap();
+        Player current = activeRunner;
+        boolean isSneak = current != null && current.isSneaking();
+        boolean isSprint = current != null && current.isSprinting();
+
+        net.kyori.adventure.text.Component sub = net.kyori.adventure.text.Component.text(
+                String.format("Sneaking: %s  |  Running: %s", isSneak ? "Yes" : "No", isSprint ? "Yes" : "No"))
+                .color(NamedTextColor.YELLOW);
+
+        for (Player p : Bukkit.getOnlinePlayers()) {
+            if (!runners.contains(p)) continue; // Only runners get titles
+
+            boolean isActive = p.equals(current);
+            boolean shouldShow = !isActive || timeLeft <= 10; // waiting: always; active: last 10s only
+            if (!shouldShow) continue;
+
+            net.kyori.adventure.text.Component titleText = net.kyori.adventure.text.Component.text(
+                    String.format("Swap in: %ds", Math.max(0, timeLeft)))
+                    .color(isActive ? NamedTextColor.RED : NamedTextColor.GOLD)
+                    .decorate(TextDecoration.BOLD);
+
+            Title title = Title.title(
+                    titleText,
+                    sub,
+                    Title.Times.times(Duration.ZERO, Duration.ofMillis(600), Duration.ZERO)
+            );
+            p.showTitle(title);
+        }
+    }
+
+    private void createCageFor(Player runner) {
+        if (runner == null || !runner.isOnline()) return;
+        if (builtCages.containsKey(runner.getUniqueId())) return;
+
+        // Base world/location from limbo config world; center spaced by runner index
+        Location base = plugin.getConfigManager().getLimboLocation();
+        World world = base.getWorld() != null ? base.getWorld() : runner.getWorld();
+        int y = world.getMaxHeight() - 10;
+        int index = Math.max(0, runners.indexOf(runner));
+        int spacing = 10;
+        int cx = (int) Math.round(base.getX()) + index * spacing;
+        int cz = (int) Math.round(base.getZ());
+        Location center = new Location(world, cx + 0.5, y + 1, cz + 0.5);
+        // Ensure chunk is loaded
+        center.getChunk().load(true);
+
+        java.util.List<org.bukkit.block.BlockState> changed = new java.util.ArrayList<>();
+        // Build 5x5x5 cube of bedrock with 3x3x3 air cavity, plus extended floor to catch glitches
+        for (int dx = -2; dx <= 2; dx++) {
+            for (int dy = -1; dy <= 3; dy++) {
+                for (int dz = -2; dz <= 2; dz++) {
+                    org.bukkit.block.Block block = world.getBlockAt(cx + dx, y + dy, cz + dz);
+                    boolean isShell = (dx == -2 || dx == 2 || dz == -2 || dz == 2 || dy == -1 || dy == 3);
+                    if (isShell) {
+                        changed.add(block.getState());
+                        block.setType(Material.BEDROCK, false);
+                    } else {
+                        changed.add(block.getState());
+                        block.setType(Material.AIR, false);
+                    }
+                }
+            }
+        }
+
+        // Extended floor: 7x7 bedrock platform at y-1 to prevent falling off due to lag/glitch
+        for (int dx = -3; dx <= 3; dx++) {
+            for (int dz = -3; dz <= 3; dz++) {
+                org.bukkit.block.Block floor = world.getBlockAt(cx + dx, y - 1, cz + dz);
+                changed.add(floor.getState());
+                floor.setType(Material.BEDROCK, false);
+            }
+        }
+
+        builtCages.put(runner.getUniqueId(), changed);
+        cageCenters.put(runner.getUniqueId(), center.clone());
+        // Teleport inside cage
+        runner.teleport(center);
+    }
+
+    private void removeCageFor(Player runner) {
+        if (runner == null) return;
+        java.util.List<org.bukkit.block.BlockState> states = builtCages.remove(runner.getUniqueId());
+        cageCenters.remove(runner.getUniqueId());
+        if (states != null) {
+            for (org.bukkit.block.BlockState s : states) {
+                try { s.update(true, false); } catch (Exception ignored) {}
+            }
+        }
+    }
+
+    private void cleanupAllCages() {
+        java.util.Set<java.util.UUID> ids = new java.util.HashSet<>(builtCages.keySet());
+        for (java.util.UUID id : ids) {
+            Player p = Bukkit.getPlayer(id);
+            if (p != null) removeCageFor(p);
+        }
+        builtCages.clear();
+        cageCenters.clear();
+    }
+
+    private void startCageEnforcement() {
+        if (cageTask != null) { cageTask.cancel(); cageTask = null; }
+        cageTask = Bukkit.getScheduler().runTaskTimer(plugin, () -> {
+            if (!gameRunning || gamePaused) return;
+            if (!"CAGE".equalsIgnoreCase(plugin.getConfigManager().getFreezeMode())) return;
+
+            for (Player r : runners) {
+                if (r.equals(activeRunner)) continue;
+                if (!r.isOnline()) continue;
+                // Ensure cage exists
+                createCageFor(r);
+                org.bukkit.Location center = cageCenters.get(r.getUniqueId());
+                if (center == null) continue;
+
+                org.bukkit.Location loc = r.getLocation();
+                double dx = Math.abs(loc.getX() - center.getX());
+                double dy = loc.getY() - center.getY();
+                double dz = Math.abs(loc.getZ() - center.getZ());
+                boolean outside = dx > 1.2 || dz > 1.2 || dy < -0.6 || dy > 2.6;
+                if (outside) {
+                    r.teleport(center);
+                    r.setVelocity(new org.bukkit.util.Vector(0, 0, 0));
+                    r.setFallDistance(0f);
+                    r.setNoDamageTicks(Math.max(10, r.getNoDamageTicks()));
+                }
+            }
+        }, 0L, 5L); // enforce every 0.25s
     }
 }

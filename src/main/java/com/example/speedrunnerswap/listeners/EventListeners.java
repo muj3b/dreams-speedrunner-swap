@@ -81,6 +81,26 @@ public class EventListeners implements Listener {
         }
     }
 
+    @EventHandler(priority = EventPriority.HIGHEST)
+    public void onInventoryDrag(org.bukkit.event.inventory.InventoryDragEvent event) {
+        if (!(event.getWhoClicked() instanceof Player player)) return;
+        if (!plugin.getGameManager().isGameRunning() || !plugin.getGameManager().isHunter(player)) return;
+
+        ItemStack dragged = event.getOldCursor();
+        if (dragged == null || dragged.getType() != Material.COMPASS) return;
+
+        // If any of the slots are outside the player's inventory, block it
+        for (int rawSlot : event.getRawSlots()) {
+            // Player inventory raw slots are >= 36 for bottom inventory in most cases
+            // Safer: if it affects the top inventory (container), cancel
+            if (rawSlot < player.getOpenInventory().getBottomInventory().getSize()) {
+                event.setCancelled(true);
+                player.sendMessage(Component.text("§cYou cannot move your tracking compass!"));
+                return;
+            }
+        }
+    }
+
     @EventHandler
     public void onPlayerRespawn(PlayerRespawnEvent event) {
         Player player = event.getPlayer();
@@ -130,6 +150,15 @@ public class EventListeners implements Listener {
             return; // Do not cancel or handle here
         }
     
+        // Prevent hunters from moving the tracking compass at all (avoids losing/duplicating)
+        if (plugin.getGameManager().isGameRunning() && plugin.getGameManager().isHunter(player)) {
+            if (clickedItem.getType() == Material.COMPASS) {
+                event.setCancelled(true);
+                player.sendMessage(Component.text("§cYou cannot move your tracking compass!"));
+                return;
+            }
+        }
+
         // For non-GUI inventories, enforce runner interaction rules and sync
         if (plugin.getGameManager().isGameRunning() && plugin.getGameManager().isRunner(player)) {
             if (plugin.getGameManager().getActiveRunner() != player) {

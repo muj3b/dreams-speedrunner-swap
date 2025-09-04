@@ -23,6 +23,8 @@ public class TrackerManager {
     private final Object taskLock = new Object();
     // Cache last known compass slot to avoid full scans each update
     private final java.util.Map<java.util.UUID, Integer> compassSlotCache = new java.util.HashMap<>();
+    // Track hunters we've already notified about End portal hint this game
+    private final java.util.Set<java.util.UUID> endHintNotifiedOnce = new java.util.HashSet<>();
     
     public TrackerManager(SpeedrunnerSwap plugin) {
         this.plugin = plugin;
@@ -121,9 +123,9 @@ public class TrackerManager {
             // Find an existing compass (use cache first)
             int slot = findCompassSlot(hunter);
             if (slot == -1) {
-                giveTrackingCompass(hunter);
-                slot = findCompassSlot(hunter);
-                if (slot == -1) return; // couldn't find/give
+                // Do not auto-give here to avoid duplication races with drop prevention.
+                // Compass is given on join/start/respawn or via GUI update.
+                return;
             }
             ItemStack compass = hunter.getInventory().getItem(slot);
             if (compass == null || compass.getType() != Material.COMPASS) return;
@@ -163,7 +165,11 @@ public class TrackerManager {
                 Location hint = plugin.getConfigManager().getEndPortalHint(hunter.getWorld());
                 adjustedLoc = hint != null ? hint : hunter.getWorld().getSpawnLocation();
                 hunter.setCompassTarget(adjustedLoc);
-                hunter.sendMessage("§eTarget is in The End! Compass points to the End Portal hint.");
+                // Notify exactly once per hunter per game
+                if (!endHintNotifiedOnce.contains(hunter.getUniqueId())) {
+                    hunter.sendMessage("§eTarget is in The End! Compass points to the End Portal hint.");
+                    endHintNotifiedOnce.add(hunter.getUniqueId());
+                }
             } else {
                 adjustedLoc = hunter.getWorld().getSpawnLocation();
                 hunter.setCompassTarget(adjustedLoc);

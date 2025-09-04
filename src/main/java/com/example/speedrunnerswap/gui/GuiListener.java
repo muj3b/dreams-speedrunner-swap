@@ -273,6 +273,7 @@ public class GuiListener implements Listener {
                     String next = switch (current.toUpperCase()) {
                         case "EFFECTS" -> "SPECTATOR";
                         case "SPECTATOR" -> "LIMBO";
+                        case "LIMBO" -> "CAGE";
                         default -> "EFFECTS";
                     };
                     plugin.getConfig().set("freeze_mode", next);

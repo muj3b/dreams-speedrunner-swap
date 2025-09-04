@@ -53,8 +53,8 @@ safe_swap:
     - POINTED_DRIPSTONE
 
 # Freeze Mode for Inactive Runners
-# Options: EFFECTS, SPECTATOR, LIMBO
-freeze_mode: LIMBO
+# Options: EFFECTS, SPECTATOR, LIMBO, CAGE
+freeze_mode: CAGE
 
 # Limbo configuration
 limbo:

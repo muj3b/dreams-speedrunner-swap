@@ -771,10 +771,18 @@ public class GuiManager {
         inventory.setItem(37, freezeToggle);
 
         String mode = plugin.getConfigManager().getFreezeMode();
+        List<String> freezeLore = new ArrayList<>();
+        freezeLore.add("§7Cycle modes for inactive runners:");
+        freezeLore.add("§f• §bEFFECTS§7: Blindness/Darkness/Slowness; hidden; can't move");
+        freezeLore.add("§f• §bSPECTATOR§7: Puts runner in spectator mode");
+        freezeLore.add("§f• §bLIMBO§7: Teleports to configured limbo location with blindness");
+        freezeLore.add("§f• §bCAGE§7: High bedrock cage + blindness; enforced to prevent glitches");
+        freezeLore.add("");
+        freezeLore.add("§7Click to cycle EFFECTS → SPECTATOR → LIMBO → CAGE");
         ItemStack freezeMode = createGuiButton(
                 Material.SNOWBALL,
                 "§e§lFreeze Mode: §b" + mode,
-                List.of("§7Cycle: EFFECTS → SPECTATOR → LIMBO"),
+                freezeLore,
                 "freeze_mode");
         inventory.setItem(38, freezeMode);
 
