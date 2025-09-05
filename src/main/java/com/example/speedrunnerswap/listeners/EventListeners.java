@@ -72,21 +72,27 @@ public class EventListeners implements Listener {
             event.getDrops().removeIf(item -> item != null && item.getType() == Material.COMPASS);
         }
 
-        // Show pop-up title when a runner dies
+        // Show pop-up title when a runner dies, then end the game
         if (plugin.getGameManager().isGameRunning() && plugin.getGameManager().isRunner(player)) {
-            Component titleText = Component.text("RUNNER DOWN!")
+            Component titleText = Component.text("bro speedrunners died bro no shot")
                     .color(NamedTextColor.RED)
                     .decorate(TextDecoration.BOLD);
-            Component subText = Component.text(player.getName() + " died")
-                    .color(NamedTextColor.YELLOW);
+            Component subText = Component.text("");
             Title deathTitle = Title.title(
                     titleText,
                     subText,
-                    Title.Times.times(Duration.ofMillis(300), Duration.ofMillis(2200), Duration.ofMillis(400))
+                    Title.Times.times(Duration.ofMillis(200), Duration.ofMillis(1600), Duration.ofMillis(200))
             );
             for (Player p : plugin.getServer().getOnlinePlayers()) {
                 p.showTitle(deathTitle);
             }
+
+            // End the game shortly after the title displays
+            plugin.getServer().getScheduler().runTaskLater(plugin, () -> {
+                if (plugin.getGameManager().isGameRunning()) {
+                    plugin.getGameManager().stopGame(); // no winner, ends cleanly
+                }
+            }, 20L);
         }
     }
 
