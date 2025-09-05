@@ -10,6 +10,7 @@ import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.inventory.InventoryType;
+import org.bukkit.event.inventory.InventoryAction;
 import org.bukkit.event.player.*;
 import org.bukkit.event.player.PlayerChangedWorldEvent;
 import org.bukkit.event.entity.PlayerDeathEvent;
@@ -182,7 +183,6 @@ public class EventListeners implements Listener {
         // Hunters: allow moving compass within their own inventory, but block
         // placing it into any container/top inventory or quick-moving into it.
         if (plugin.getGameManager().isGameRunning() && plugin.getGameManager().isHunter(player)) {
-            org.bukkit.inventory.InventoryView view = event.getView();
             boolean clickedInPlayerInv = inventory.equals(player.getInventory());
 
             // If the item on cursor is a compass and the click targets a container, block
@@ -212,26 +212,26 @@ public class EventListeners implements Listener {
             }
 
             // Block hotbar-swap that would push a compass into the container
-            switch (event.getAction()) {
-                case MOVE_TO_OTHER_INVENTORY -> {
-                    if (clickedItem.getType() == Material.COMPASS) {
+            InventoryAction action = event.getAction();
+            if (action == InventoryAction.MOVE_TO_OTHER_INVENTORY) {
+                if (clickedItem.getType() == Material.COMPASS) {
+                    event.setCancelled(true);
+                    player.sendMessage("§cYou cannot quick-move your tracking compass!");
+                    return;
+                }
+            }
+            // Avoid referencing deprecated HOTBAR_MOVE_AND_READD constant directly
+            String actName = action.name();
+            if (action == InventoryAction.HOTBAR_SWAP || "HOTBAR_MOVE_AND_READD".equals(actName)) {
+                int hb = event.getHotbarButton();
+                if (hb >= 0) {
+                    ItemStack hotbarItem = player.getInventory().getItem(hb);
+                    if (hotbarItem != null && hotbarItem.getType() == Material.COMPASS && !clickedInPlayerInv) {
                         event.setCancelled(true);
-                        player.sendMessage("§cYou cannot quick-move your tracking compass!");
+                        player.sendMessage("§cYou cannot store your tracking compass in containers!");
                         return;
                     }
                 }
-                case HOTBAR_SWAP, HOTBAR_MOVE_AND_READD -> {
-                    int hb = event.getHotbarButton();
-                    if (hb >= 0) {
-                        ItemStack hotbarItem = player.getInventory().getItem(hb);
-                        if (hotbarItem != null && hotbarItem.getType() == Material.COMPASS && !clickedInPlayerInv) {
-                            event.setCancelled(true);
-                            player.sendMessage("§cYou cannot store your tracking compass in containers!");
-                            return;
-                        }
-                    }
-                }
-                default -> { /* allow */ }
             }
         }
 
@@ -289,6 +289,7 @@ public class EventListeners implements Listener {
     }
 
     // Fallback for servers where Paper's AsyncChatEvent may not fire
+    @SuppressWarnings("deprecation")
     @EventHandler(priority = EventPriority.HIGHEST)
     public void onPlayerChatLegacy(AsyncPlayerChatEvent event) {
         Player player = event.getPlayer();

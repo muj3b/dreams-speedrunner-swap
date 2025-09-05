@@ -36,7 +36,7 @@ public class WorldBorderManager {
             border.setSize(finalSize, shrinkDuration);
 
             // Broadcast border start message
-            Bukkit.broadcastMessage("§c§lWorld Border will shrink from " +
+            com.example.speedrunnerswap.utils.Msg.broadcast("§c§lWorld Border will shrink from " +
                 initialSize + " blocks to " + finalSize + " blocks over " +
                 (shrinkDuration / 60) + " minutes!");
         }
@@ -78,7 +78,7 @@ public class WorldBorderManager {
             int finalSize = plugin.getConfig().getInt("world_border.final_size", 100);
             
             if (currentSize > finalSize) {
-                Bukkit.broadcastMessage(String.format("§e§lWorld Border: §r§e%.0f blocks and shrinking!", currentSize));
+                com.example.speedrunnerswap.utils.Msg.broadcast(String.format("§e§lWorld Border: §r§e%.0f blocks and shrinking!", currentSize));
             }
         }, 20 * 60 * 5, 20 * 60 * 5); // Every 5 minutes
     }

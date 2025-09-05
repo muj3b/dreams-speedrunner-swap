@@ -3,7 +3,7 @@ package com.example.speedrunnerswap.utils;
 import com.example.speedrunnerswap.models.PlayerState;
 import org.bukkit.entity.Player;
 import org.bukkit.potion.PotionEffect;
-import com.example.speedrunnerswap.utils.BukkitCompat;
+// Use fully-qualified reference for BukkitCompat to avoid IDE false positives
 
 import java.util.ArrayList;
 
@@ -67,7 +67,7 @@ public class PlayerStateUtil {
         player.teleport(state.getLocation());
         
         // Apply health and food (handle API changes across versions)
-        player.setHealth(Math.min(state.getHealth(), BukkitCompat.getMaxHealthValue(player)));
+        player.setHealth(Math.min(state.getHealth(), com.example.speedrunnerswap.utils.BukkitCompat.getMaxHealthValue(player)));
         player.setFoodLevel(state.getFoodLevel());
         player.setSaturation(state.getSaturation());
         player.setExhaustion(state.getExhaustion());
@@ -97,12 +97,13 @@ public class PlayerStateUtil {
         }
         
         // Handle vehicle state
-        if (player.isInsideVehicle() && player.getVehicle() != null) {
-            player.getVehicle().eject();
-        }
-        if (state.isInVehicle() && state.getVehicle() != null) {
-            state.getVehicle().addPassenger(player);
-        }
+        try {
+            if (player.isInsideVehicle() && player.getVehicle() != null) {
+                player.getVehicle().eject();
+            }
+        } catch (Exception ignored) {}
+        // Do not attempt to re-mount the player onto the previous runner's vehicle.
+        // This can cross dimensions (Nether/End) and cause swap failures.
 
         // Apply speed settings
         player.setWalkSpeed(state.getWalkSpeed());

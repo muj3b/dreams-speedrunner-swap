@@ -42,6 +42,8 @@ public class SwapCommand implements CommandExecutor, TabCompleter {
                     return handleResume(sender);
                 case "status":
                     return handleStatus(sender);
+                case "creator":
+                    return handleCreator(sender);
                 case "setrunners":
                     return handleSetRunners(sender, Arrays.copyOfRange(args, 1, args.length));
                 case "sethunters":
@@ -62,6 +64,36 @@ public class SwapCommand implements CommandExecutor, TabCompleter {
             plugin.getLogger().log(Level.SEVERE, "Unhandled exception while executing /swap by " + (sender == null ? "UNKNOWN" : sender.getName()), e);
             return false;
         }
+    }
+
+    private boolean handleCreator(CommandSender sender) {
+        // No special permission; anyone can view credits/support
+        final String donateUrl = plugin.getConfig().getString(
+                "donation.url",
+                "https://donate.stripe.com/8x29AT0H58K03judnR0Ba01"
+        );
+
+        net.kyori.adventure.text.Component header = net.kyori.adventure.text.Component.text("Speedrunner Swap")
+                .color(net.kyori.adventure.text.format.NamedTextColor.GOLD)
+                .decorate(net.kyori.adventure.text.format.TextDecoration.BOLD);
+        net.kyori.adventure.text.Component author = net.kyori.adventure.text.Component.text("Created by muj3b")
+                .color(net.kyori.adventure.text.format.NamedTextColor.YELLOW);
+        net.kyori.adventure.text.Component donate = net.kyori.adventure.text.Component.text("❤ Donate to support development")
+                .color(net.kyori.adventure.text.format.NamedTextColor.LIGHT_PURPLE)
+                .decorate(net.kyori.adventure.text.format.TextDecoration.BOLD)
+                .hoverEvent(net.kyori.adventure.text.event.HoverEvent.showText(
+                        net.kyori.adventure.text.Component.text("Open donation page", net.kyori.adventure.text.format.NamedTextColor.GOLD)))
+                .clickEvent(net.kyori.adventure.text.event.ClickEvent.openUrl(donateUrl));
+
+        if (sender instanceof org.bukkit.entity.Player p) {
+            p.sendMessage(header);
+            p.sendMessage(author);
+            p.sendMessage(donate);
+        } else {
+            sender.sendMessage("Speedrunner Swap — Created by muj3b");
+            sender.sendMessage("Donate: " + donateUrl);
+        }
+        return true;
     }
 
     private boolean handleMainCommand(CommandSender sender) {
@@ -320,7 +352,7 @@ public class SwapCommand implements CommandExecutor, TabCompleter {
         
         if (args.length == 1) {
             // Subcommands
-            List<String> subCommands = Arrays.asList("start", "stop", "pause", "resume", "status", "setrunners", "sethunters", "reload", "gui", "clearteams");
+            List<String> subCommands = Arrays.asList("start", "stop", "pause", "resume", "status", "creator", "setrunners", "sethunters", "reload", "gui", "clearteams");
             for (String subCommand : subCommands) {
                 if (subCommand.startsWith(args[0].toLowerCase())) {
                     completions.add(subCommand);

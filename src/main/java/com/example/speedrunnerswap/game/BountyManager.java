@@ -52,9 +52,9 @@ public class BountyManager {
     }
 
     private void announceBounty(Player target) {
-        Bukkit.broadcastMessage("\n§4§l=== BOUNTY ANNOUNCED ===");
-        Bukkit.broadcastMessage("§c" + target.getName() + " §ehas been marked for elimination!");
-        Bukkit.broadcastMessage("§eThe hunter who eliminates them will receive special rewards!");
+        com.example.speedrunnerswap.utils.Msg.broadcast("\n§4§l=== BOUNTY ANNOUNCED ===");
+        com.example.speedrunnerswap.utils.Msg.broadcast("§c" + target.getName() + " §ehas been marked for elimination!");
+        com.example.speedrunnerswap.utils.Msg.broadcast("§eThe hunter who eliminates them will receive special rewards!");
 
         // Play sound to all players
         for (Player player : Bukkit.getOnlinePlayers()) {
@@ -70,8 +70,8 @@ public class BountyManager {
         giveRewards(hunter);
 
         // Announce bounty claimed
-        Bukkit.broadcastMessage("\n§4§l=== BOUNTY CLAIMED ===");
-        Bukkit.broadcastMessage("§e" + hunter.getName() + " §ahas eliminated the bounty target!");
+        com.example.speedrunnerswap.utils.Msg.broadcast("\n§4§l=== BOUNTY CLAIMED ===");
+        com.example.speedrunnerswap.utils.Msg.broadcast("§e" + hunter.getName() + " §ahas eliminated the bounty target!");
 
         // Play victory sound
         hunter.playSound(hunter.getLocation(), Sound.UI_TOAST_CHALLENGE_COMPLETE, 1.0f, 1.0f);

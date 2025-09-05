@@ -39,11 +39,14 @@ public final class BukkitCompat {
      * potentially-removed fields directly. Tries names in order.
      */
     public static Attribute resolveAttribute(String... names) {
+        // Use reflection to access enum fields directly, avoiding deprecated
+        // helper methods like values() or name() present in newer APIs.
         for (String name : names) {
             try {
-                return Attribute.valueOf(name);
-            } catch (IllegalArgumentException ignored) {
-                // try next
+                java.lang.reflect.Field f = Attribute.class.getField(name);
+                Object v = f.get(null);
+                if (v instanceof Attribute) return (Attribute) v;
+            } catch (Throwable ignored) {
             }
         }
         return null;
@@ -67,9 +70,9 @@ public final class BukkitCompat {
             default -> key;
         };
 
-        // Use the classic resolver which exists across many versions
-        PotionEffectType byName = PotionEffectType.getByName(key.toUpperCase(java.util.Locale.ROOT));
-        if (byName != null) return byName;
+        // Prefer modern getByKey via NamespacedKey (handled below).
+        // Then, as a legacy fallback, try getByName via reflection to avoid
+        // compile-time deprecation warnings on 1.21+.
 
         // Try namespaced-key resolver if available at runtime
         try {
@@ -78,6 +81,14 @@ public final class BukkitCompat {
             Object namespacedKey = minecraft.invoke(null, key);
             java.lang.reflect.Method getByKey = PotionEffectType.class.getMethod("getByKey", nsk);
             Object type = getByKey.invoke(null, namespacedKey);
+            if (type instanceof PotionEffectType) return (PotionEffectType) type;
+        } catch (Throwable ignored) {
+        }
+
+        // Legacy fallback via reflection call to getByName
+        try {
+            java.lang.reflect.Method getByName = PotionEffectType.class.getMethod("getByName", String.class);
+            Object type = getByName.invoke(null, key.toUpperCase(java.util.Locale.ROOT));
             if (type instanceof PotionEffectType) return (PotionEffectType) type;
         } catch (Throwable ignored) {
         }

@@ -75,7 +75,7 @@ public class SafeLocationFinder {
         int z = location.getBlockZ();
         
         // Check if the location is in the void
-        if (y < 0 || y >= world.getMaxHeight()) {
+        if (y < world.getMinHeight() || y >= world.getMaxHeight()) {
             return false;
         }
         

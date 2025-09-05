@@ -19,16 +19,14 @@ import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
 import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.scheduler.BukkitTask;
-import org.bukkit.Server;
 import com.example.speedrunnerswap.utils.BukkitCompat;
+import com.example.speedrunnerswap.utils.Msg;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.GameMode;
 import java.time.Duration;
 
 import java.util.*;
 import java.util.concurrent.ThreadLocalRandom;
-// Use compat resolver for cross-version effect lookups
-import com.example.speedrunnerswap.utils.BukkitCompat;
 
 public class GameManager {
     private final SpeedrunnerSwap plugin;
@@ -66,7 +64,7 @@ public class GameManager {
         }
         
         if (!canStartGame()) {
-            Bukkit.broadcast("§cGame cannot start: At least one runner and one hunter are required.", Server.BROADCAST_CHANNEL_USERS);
+            Msg.broadcast("§cGame cannot start: At least one runner and one hunter are required.");
             return false;
         }
         
@@ -206,7 +204,7 @@ public class GameManager {
                 
                 if (plugin.getConfigManager().isBroadcastGameEvents()) {
                     String winnerMessage = (winner != null) ? winner.name() + " team won!" : "Game ended!";
-                    Bukkit.broadcast("§a[SpeedrunnerSwap] Game ended! " + winnerMessage, Server.BROADCAST_CHANNEL_USERS);
+                    Msg.broadcast("§a[SpeedrunnerSwap] Game ended! " + winnerMessage);
                 }
 
                 broadcastDonationMessage();
@@ -362,8 +360,7 @@ public class GameManager {
             if (plugin.getConfigManager().isPauseOnDisconnect()) {
                 pauseGame();
                 if (plugin.getConfigManager().isBroadcastGameEvents()) {
-                    Bukkit.broadcast("§e[SpeedrunnerSwap] Game paused: waiting for players to return.",
-                            Server.BROADCAST_CHANNEL_USERS);
+                    Msg.broadcast("§e[SpeedrunnerSwap] Game paused: waiting for players to return.");
                 }
             } else {
                 // Keep running but log a warning for admins
@@ -808,7 +805,7 @@ public class GameManager {
         plugin.getTrackerManager().updateAllHunterCompasses();
 
         if (plugin.getConfigManager().isBroadcastsEnabled()) {
-            Bukkit.broadcast("§c[SpeedrunnerSwap] Hunters have been swapped!", Server.BROADCAST_CHANNEL_USERS);
+            Msg.broadcast("§c[SpeedrunnerSwap] Hunters have been swapped!");
         }
     }
     
@@ -979,11 +976,20 @@ public class GameManager {
 
     private void createCageFor(Player runner) {
         if (runner == null || !runner.isOnline()) return;
-        if (builtCages.containsKey(runner.getUniqueId())) return;
+        org.bukkit.Location existing = cageCenters.get(runner.getUniqueId());
+        if (existing != null) {
+            // If cage exists in another world, rebuild it here
+            if (existing.getWorld() != runner.getWorld()) {
+                removeCageFor(runner);
+            } else {
+                return; // already has a cage in this world
+            }
+        }
 
-        // Base world/location from limbo config world; center spaced by runner index
+        // Build cage in the runner's current world so freezing works in
+        // Overworld, Nether, and The End consistently.
         Location base = plugin.getConfigManager().getLimboLocation();
-        World world = base.getWorld() != null ? base.getWorld() : runner.getWorld();
+        World world = runner.getWorld();
         int y = world.getMaxHeight() - 10;
         int index = Math.max(0, runners.indexOf(runner));
         int spacing = 10;
