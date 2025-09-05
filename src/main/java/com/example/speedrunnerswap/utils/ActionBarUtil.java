@@ -24,17 +24,7 @@ public class ActionBarUtil {
         } catch (Throwable ignored) {
         }
 
-        // Fallback to Spigot API
-        try {
-            Object spigot = player.getClass().getMethod("spigot").invoke(player);
-            Class<?> chatMessageType = Class.forName("net.md_5.bungee.api.ChatMessageType");
-            Class<?> textComponent = Class.forName("net.md_5.bungee.api.chat.TextComponent");
-            Object type = chatMessageType.getField("ACTION_BAR").get(null);
-            Object tc = textComponent.getConstructor(String.class).newInstance(message);
-            spigot.getClass().getMethod("sendMessage", chatMessageType, Class.forName("net.md_5.bungee.api.chat.BaseComponent")).invoke(spigot, type, tc);
-        } catch (Throwable ignored) {
-            // As a last resort, send as chat (not ideal but visible)
-            player.sendMessage(message);
-        }
+        // Fallback: send as plain chat (keeps compatibility, avoids legacy bungee API)
+        player.sendMessage(message);
     }
 }

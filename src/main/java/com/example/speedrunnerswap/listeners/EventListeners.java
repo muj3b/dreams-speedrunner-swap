@@ -78,7 +78,7 @@ public class EventListeners implements Listener {
             plugin.getGameManager().isHunter(player) &&
             droppedItem.getType() == Material.COMPASS) {
             event.setCancelled(true);
-            player.sendMessage(Component.text("§cYou cannot drop your tracking compass!"));
+            player.sendMessage("§cYou cannot drop your tracking compass!");
         }
     }
 
@@ -96,7 +96,7 @@ public class EventListeners implements Listener {
             // Safer: if it affects the top inventory (container), cancel
             if (rawSlot < player.getOpenInventory().getBottomInventory().getSize()) {
                 event.setCancelled(true);
-                player.sendMessage(Component.text("§cYou cannot move your tracking compass!"));
+                player.sendMessage("§cYou cannot move your tracking compass!");
                 return;
             }
         }
@@ -155,7 +155,7 @@ public class EventListeners implements Listener {
         if (plugin.getGameManager().isGameRunning() && plugin.getGameManager().isHunter(player)) {
             if (clickedItem.getType() == Material.COMPASS) {
                 event.setCancelled(true);
-                player.sendMessage(Component.text("§cYou cannot move your tracking compass!"));
+                player.sendMessage("§cYou cannot move your tracking compass!");
                 return;
             }
         }
@@ -165,7 +165,7 @@ public class EventListeners implements Listener {
             if (plugin.getGameManager().getActiveRunner() != player) {
                 // Inactive runners can't interact
                 event.setCancelled(true);
-                player.sendMessage(Component.text("§cYou cannot interact with items while inactive!"));
+                player.sendMessage("§cYou cannot interact with items while inactive!");
                 return;
             } else {
                 // Active runner inventory updates
@@ -208,7 +208,7 @@ public class EventListeners implements Listener {
             plugin.getGameManager().getActiveRunner() != player) {
             
             // Only send message to the player
-            player.sendMessage(Component.text("§c[SpeedrunnerSwap] You cannot chat while inactive."));
+            player.sendMessage("§c[SpeedrunnerSwap] You cannot chat while inactive.");
             event.setCancelled(true);
         }
     }
@@ -220,7 +220,7 @@ public class EventListeners implements Listener {
         if (!plugin.getGameManager().isGameRunning()) return;
         if (!plugin.getGameManager().isRunner(player)) return;
         if (plugin.getGameManager().getActiveRunner() == player) return;
-        player.sendMessage(Component.text("§c[SpeedrunnerSwap] You cannot chat while inactive."));
+        player.sendMessage("§c[SpeedrunnerSwap] You cannot chat while inactive.");
         event.setCancelled(true);
     }
 

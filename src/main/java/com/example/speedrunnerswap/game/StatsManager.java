@@ -68,18 +68,18 @@ public class StatsManager {
     public void displayStats() {
         long gameDuration = System.currentTimeMillis() - gameStartTime;
         
-        Bukkit.broadcast(net.kyori.adventure.text.Component.text("\n§6=== Game Statistics ==="));
-        Bukkit.broadcast(net.kyori.adventure.text.Component.text("§7Total Game Time: §f" + formatTime(gameDuration)));
+        Bukkit.broadcastMessage("\n§6=== Game Statistics ===");
+        Bukkit.broadcastMessage("§7Total Game Time: §f" + formatTime(gameDuration));
 
         for (Player player : Bukkit.getOnlinePlayers()) {
             PlayerStats stats = getStats(player);
             String role = plugin.getGameManager().isRunner(player) ? "Runner" : "Hunter";
             
-            Bukkit.broadcast(net.kyori.adventure.text.Component.text("\n§e" + player.getName() + " §7(" + role + ")"));
-            Bukkit.broadcast(net.kyori.adventure.text.Component.text("§7Time as Active: §f" + formatTime(stats.getActiveTime())));
-            Bukkit.broadcast(net.kyori.adventure.text.Component.text("§7Distance Traveled: §f" + String.format("%.1f", stats.getDistanceTraveled()) + " blocks"));
-            Bukkit.broadcast(net.kyori.adventure.text.Component.text("§7Kills: §f" + stats.getKills()));
-            Bukkit.broadcast(net.kyori.adventure.text.Component.text("§7Deaths: §f" + stats.getDeaths()));
+            Bukkit.broadcastMessage("\n§e" + player.getName() + " §7(" + role + ")");
+            Bukkit.broadcastMessage("§7Time as Active: §f" + formatTime(stats.getActiveTime()));
+            Bukkit.broadcastMessage("§7Distance Traveled: §f" + String.format("%.1f", stats.getDistanceTraveled()) + " blocks");
+            Bukkit.broadcastMessage("§7Kills: §f" + stats.getKills());
+            Bukkit.broadcastMessage("§7Deaths: §f" + stats.getDeaths());
         }
     }
 

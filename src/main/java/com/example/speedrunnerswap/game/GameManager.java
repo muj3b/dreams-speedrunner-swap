@@ -64,7 +64,7 @@ public class GameManager {
         }
         
         if (!canStartGame()) {
-            Bukkit.broadcast(Component.text("§cGame cannot start: At least one runner and one hunter are required."), Server.BROADCAST_CHANNEL_USERS);
+            Bukkit.broadcast("§cGame cannot start: At least one runner and one hunter are required.", Server.BROADCAST_CHANNEL_USERS);
             return false;
         }
         
@@ -204,7 +204,7 @@ public class GameManager {
                 
                 if (plugin.getConfigManager().isBroadcastGameEvents()) {
                     String winnerMessage = (winner != null) ? winner.name() + " team won!" : "Game ended!";
-                    Bukkit.broadcast(net.kyori.adventure.text.Component.text("§a[SpeedrunnerSwap] Game ended! " + winnerMessage), Server.BROADCAST_CHANNEL_USERS);
+                    Bukkit.broadcast("§a[SpeedrunnerSwap] Game ended! " + winnerMessage, Server.BROADCAST_CHANNEL_USERS);
                 }
 
                 broadcastDonationMessage();
@@ -213,32 +213,12 @@ public class GameManager {
     }
 
     private void broadcastDonationMessage() {
-        // Add some spacing
-        Bukkit.broadcast(Component.text("\n"), Server.BROADCAST_CHANNEL_USERS);
-        
-        // Header
-        Bukkit.broadcast(Component.text("=== Support the Creator ===")
-            .color(NamedTextColor.GOLD)
-            .decorate(TextDecoration.BOLD), Server.BROADCAST_CHANNEL_USERS);
-            
-        // Message
-        Bukkit.broadcast(Component.text("Enjoy the plugin? Consider supporting the creator (muj3b)!")
-            .color(NamedTextColor.YELLOW), Server.BROADCAST_CHANNEL_USERS);
-        
-        // Clickable donation link
-        Component donateMessage = Component.text("[Click here to donate]")
-            .color(NamedTextColor.GREEN)
-            .decorate(TextDecoration.BOLD)
-            .clickEvent(net.kyori.adventure.text.event.ClickEvent.openUrl("https://donate.stripe.com/cNicN5gG3f8ocU4cjN0Ba00"))
-            .hoverEvent(net.kyori.adventure.text.event.HoverEvent.showText(
-                Component.text("Click to support the creator!")
-                    .color(NamedTextColor.YELLOW)
-            ));
-            
-        Bukkit.broadcast(donateMessage, Server.BROADCAST_CHANNEL_USERS);
-        
-        // Add spacing after
-        Bukkit.broadcast(Component.text("\n"), Server.BROADCAST_CHANNEL_USERS);
+        // Simple, log-safe broadcast lines
+        Bukkit.broadcast("", Server.BROADCAST_CHANNEL_USERS);
+        Bukkit.broadcast("§6§l=== Support the Creator ===", Server.BROADCAST_CHANNEL_USERS);
+        Bukkit.broadcast("§eEnjoy the plugin? Consider supporting the creator (muj3b)!", Server.BROADCAST_CHANNEL_USERS);
+        Bukkit.broadcast("§a[Donate] https://donate.stripe.com/cNicN5gG3f8ocU4cjN0Ba00", Server.BROADCAST_CHANNEL_USERS);
+        Bukkit.broadcast("", Server.BROADCAST_CHANNEL_USERS);
     }/** Stop the game without declaring a winner */
     public void stopGame() {
         endGame(null);
@@ -361,8 +341,7 @@ public class GameManager {
             if (plugin.getConfigManager().isPauseOnDisconnect()) {
                 pauseGame();
                 if (plugin.getConfigManager().isBroadcastGameEvents()) {
-                    Bukkit.broadcast(net.kyori.adventure.text.Component.text(
-                            "§e[SpeedrunnerSwap] Game paused: waiting for players to return."),
+                    Bukkit.broadcast("§e[SpeedrunnerSwap] Game paused: waiting for players to return.",
                             Server.BROADCAST_CHANNEL_USERS);
                 }
             } else {
@@ -680,7 +659,7 @@ public class GameManager {
                     hunter.addPotionEffect(new PotionEffect(jumpBoost, duration, 128, false, false));
                 
                 if (plugin.getConfigManager().isBroadcastGameEvents()) {
-                    hunter.sendMessage(net.kyori.adventure.text.Component.text("§cYou have been frozen by the runner!"));
+                    hunter.sendMessage("§cYou have been frozen by the runner!");
                 }
             }
         }, 0L, interval);
@@ -798,8 +777,7 @@ public class GameManager {
         scheduleNextSwap();
 
         if (plugin.getConfigManager().isBroadcastsEnabled() && previousRunner != null) {
-            Bukkit.broadcast(net.kyori.adventure.text.Component.text(
-                    "§6[SpeedrunnerSwap] Swapped from " + previousRunner.getName() + " to " + nextRunner.getName() + "!"),
+            Bukkit.broadcast("§6[SpeedrunnerSwap] Swapped from " + previousRunner.getName() + " to " + nextRunner.getName() + "!",
                     Server.BROADCAST_CHANNEL_USERS);
         }
 
@@ -836,7 +814,7 @@ public class GameManager {
         plugin.getTrackerManager().updateAllHunterCompasses();
 
         if (plugin.getConfigManager().isBroadcastsEnabled()) {
-            Bukkit.broadcast(net.kyori.adventure.text.Component.text("§c[SpeedrunnerSwap] Hunters have been swapped!"), Server.BROADCAST_CHANNEL_USERS);
+            Bukkit.broadcast("§c[SpeedrunnerSwap] Hunters have been swapped!", Server.BROADCAST_CHANNEL_USERS);
         }
     }
     
@@ -893,12 +871,11 @@ public class GameManager {
         String effectName = effectType.getKey().getKey().replace("_", " ").toLowerCase();
         String effectLevel = amplifier == 0 ? "I" : "II";
         
-        player.sendMessage(net.kyori.adventure.text.Component.text(
-            String.format("§%sYou received a %s power-up: %s %s!", 
+        player.sendMessage(String.format("§%sYou received a %s power-up: %s %s!",
                 isGoodEffect ? "a" : "c",
                 isGoodEffect ? "good" : "bad",
                 effectName,
-                effectLevel)));
+                effectLevel));
     }
 
     private PotionEffectType resolveEffect(String id) {

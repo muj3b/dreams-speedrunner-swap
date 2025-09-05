@@ -9,7 +9,7 @@ teams:
 # Swap System Configuration
 swap:
   # Fixed interval or random swap with Gaussian jitter
-  randomize: true
+  randomize: false
   # Base interval in seconds (or mean if randomized)
   interval: 60
   # Min and max interval in seconds (only used if randomize is true)

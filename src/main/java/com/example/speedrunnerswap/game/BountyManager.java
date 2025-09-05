@@ -52,9 +52,9 @@ public class BountyManager {
     }
 
     private void announceBounty(Player target) {
-        Bukkit.broadcast(net.kyori.adventure.text.Component.text("\n§4§l=== BOUNTY ANNOUNCED ==="));
-        Bukkit.broadcast(net.kyori.adventure.text.Component.text("§c" + target.getName() + " §ehas been marked for elimination!"));
-        Bukkit.broadcast(net.kyori.adventure.text.Component.text("§eThe hunter who eliminates them will receive special rewards!"));
+        Bukkit.broadcastMessage("\n§4§l=== BOUNTY ANNOUNCED ===");
+        Bukkit.broadcastMessage("§c" + target.getName() + " §ehas been marked for elimination!");
+        Bukkit.broadcastMessage("§eThe hunter who eliminates them will receive special rewards!");
 
         // Play sound to all players
         for (Player player : Bukkit.getOnlinePlayers()) {
@@ -70,8 +70,8 @@ public class BountyManager {
         giveRewards(hunter);
 
         // Announce bounty claimed
-        Bukkit.broadcast(net.kyori.adventure.text.Component.text("\n§4§l=== BOUNTY CLAIMED ==="));
-        Bukkit.broadcast(net.kyori.adventure.text.Component.text("§e" + hunter.getName() + " §ahas eliminated the bounty target!"));
+        Bukkit.broadcastMessage("\n§4§l=== BOUNTY CLAIMED ===");
+        Bukkit.broadcastMessage("§e" + hunter.getName() + " §ahas eliminated the bounty target!");
 
         // Play victory sound
         hunter.playSound(hunter.getLocation(), Sound.UI_TOAST_CHALLENGE_COMPLETE, 1.0f, 1.0f);
@@ -88,7 +88,7 @@ public class BountyManager {
         hunter.setHealth(20.0);
         hunter.setFoodLevel(20);
 
-        hunter.sendMessage(net.kyori.adventure.text.Component.text("§aYou have received bounty hunter rewards!"));
+        hunter.sendMessage("§aYou have received bounty hunter rewards!");
     }
 
     public boolean isBountyTarget(Player player) {

@@ -756,32 +756,32 @@ public class GuiManager {
         ItemStack hunterTimer = createItem(Material.CLOCK, "§e§lHunter Timer", hunterTimerLore);
         inventory.setItem(21, hunterTimer);
 
-        // Freeze Mechanic Section
+        // Freeze Mechanic Section (affects hunters near active runner)
         List<String> freezeHeaderLore = new ArrayList<>();
         freezeHeaderLore.add("§7Freeze/slow hunters near the runner");
-        ItemStack freezeHeader = createItem(Material.BOOK, "§6§lFreeze Mechanic", freezeHeaderLore);
+        ItemStack freezeHeader = createItem(Material.BOOK, "§6§lHunter Freeze", freezeHeaderLore);
         inventory.setItem(36, freezeHeader);
 
         boolean freezeEnabled = plugin.getConfigManager().isFreezeMechanicEnabled();
         ItemStack freezeToggle = createGuiButton(
                 freezeEnabled ? Material.BLUE_ICE : Material.GRAY_DYE,
-                "§e§lFreeze Mechanic: " + (freezeEnabled ? "§aEnabled" : "§cDisabled"),
-                List.of("§7Toggle freeze mechanic"),
+                "§e§lHunter Freeze: " + (freezeEnabled ? "§aEnabled" : "§cDisabled"),
+                List.of("§7Toggle hunter freeze mechanic"),
                 "freeze_toggle");
         inventory.setItem(37, freezeToggle);
 
         String mode = plugin.getConfigManager().getFreezeMode();
         List<String> freezeLore = new ArrayList<>();
-        freezeLore.add("§7Cycle modes for inactive runners:");
-        freezeLore.add("§f• §bEFFECTS§7: Blindness/Darkness/Slowness; hidden; can't move");
-        freezeLore.add("§f• §bSPECTATOR§7: Puts runner in spectator mode");
-        freezeLore.add("§f• §bLIMBO§7: Teleports to configured limbo location with blindness");
-        freezeLore.add("§f• §bCAGE§7: High bedrock cage + blindness; enforced to prevent glitches");
+        freezeLore.add("§7Choose how the inactive runner is handled:");
+        freezeLore.add("§f• §bEFFECTS§7: Blindness/Darkness/Slowness; cannot move");
+        freezeLore.add("§f• §bSPECTATOR§7: Switch to spectator while inactive");
+        freezeLore.add("§f• §bLIMBO§7: Teleport to limbo location with blindness");
+        freezeLore.add("§f• §bCAGE§7: Bedrock cage with blindness; anti-glitch enforcement");
         freezeLore.add("");
         freezeLore.add("§7Click to cycle EFFECTS → SPECTATOR → LIMBO → CAGE");
         ItemStack freezeMode = createGuiButton(
-                Material.SNOWBALL,
-                "§e§lFreeze Mode: §b" + mode,
+                Material.ARMOR_STAND,
+                "§e§lInactive Runner State: §b" + mode,
                 freezeLore,
                 "freeze_mode");
         inventory.setItem(38, freezeMode);
