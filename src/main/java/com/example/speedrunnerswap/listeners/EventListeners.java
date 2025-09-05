@@ -90,16 +90,17 @@ public class EventListeners implements Listener {
         ItemStack dragged = event.getOldCursor();
         if (dragged == null || dragged.getType() != Material.COMPASS) return;
 
-        // If any of the slots are outside the player's inventory, block it
+        // Allow dragging the compass within the player's own inventory only.
+        // If any affected slot is in the top (container) inventory, cancel.
+        int topSize = event.getView().getTopInventory() != null ? event.getView().getTopInventory().getSize() : 0;
         for (int rawSlot : event.getRawSlots()) {
-            // Player inventory raw slots are >= 36 for bottom inventory in most cases
-            // Safer: if it affects the top inventory (container), cancel
-            if (rawSlot < player.getOpenInventory().getBottomInventory().getSize()) {
+            if (rawSlot < topSize) {
                 event.setCancelled(true);
-                player.sendMessage("§cYou cannot move your tracking compass!");
+                player.sendMessage("§cYou cannot store your tracking compass in containers!");
                 return;
             }
         }
+        // Otherwise, drag stays within bottom inventory and is allowed.
     }
 
     @EventHandler
@@ -151,12 +152,59 @@ public class EventListeners implements Listener {
             return; // Do not cancel or handle here
         }
     
-        // Prevent hunters from moving the tracking compass at all (avoids losing/duplicating)
+        // Hunters: allow moving compass within their own inventory, but block
+        // placing it into any container/top inventory or quick-moving into it.
         if (plugin.getGameManager().isGameRunning() && plugin.getGameManager().isHunter(player)) {
-            if (clickedItem.getType() == Material.COMPASS) {
+            org.bukkit.inventory.InventoryView view = event.getView();
+            boolean clickedInPlayerInv = inventory.equals(player.getInventory());
+
+            // If the item on cursor is a compass and the click targets a container, block
+            ItemStack cursor = event.getCursor();
+            if (cursor != null && cursor.getType() == Material.COMPASS && !clickedInPlayerInv) {
                 event.setCancelled(true);
-                player.sendMessage("§cYou cannot move your tracking compass!");
+                player.sendMessage("§cYou cannot store your tracking compass in containers!");
                 return;
+            }
+
+            // If the clicked item is a compass, only allow moves inside the player inventory.
+            if (clickedItem.getType() == Material.COMPASS) {
+                // Disallow shift-click (would move to top/container)
+                if (event.isShiftClick()) {
+                    event.setCancelled(true);
+                    player.sendMessage("§cYou cannot quick-move your tracking compass!");
+                    return;
+                }
+
+                // Disallow placing into any container/top inventory
+                if (!clickedInPlayerInv) {
+                    event.setCancelled(true);
+                    player.sendMessage("§cYou cannot store your tracking compass in containers!");
+                    return;
+                }
+                // Otherwise allow normal rearranging inside player inventory
+            }
+
+            // Block hotbar-swap that would push a compass into the container
+            switch (event.getAction()) {
+                case MOVE_TO_OTHER_INVENTORY -> {
+                    if (clickedItem.getType() == Material.COMPASS) {
+                        event.setCancelled(true);
+                        player.sendMessage("§cYou cannot quick-move your tracking compass!");
+                        return;
+                    }
+                }
+                case HOTBAR_SWAP, HOTBAR_MOVE_AND_READD -> {
+                    int hb = event.getHotbarButton();
+                    if (hb >= 0) {
+                        ItemStack hotbarItem = player.getInventory().getItem(hb);
+                        if (hotbarItem != null && hotbarItem.getType() == Material.COMPASS && !clickedInPlayerInv) {
+                            event.setCancelled(true);
+                            player.sendMessage("§cYou cannot store your tracking compass in containers!");
+                            return;
+                        }
+                    }
+                }
+                default -> { /* allow */ }
             }
         }
 

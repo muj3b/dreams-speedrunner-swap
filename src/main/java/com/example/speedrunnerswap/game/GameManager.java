@@ -540,44 +540,14 @@ public class GameManager {
 
         int timeLeft = getTimeUntilNextSwap();
         for (Player player : Bukkit.getOnlinePlayers()) {
-            String visibility;
-            boolean isWaitingRunner = false;
-
-            if (player.equals(activeRunner)) {
-                visibility = plugin.getConfigManager().getRunnerTimerVisibility();
-            } else if (runners.contains(player)) {
-                visibility = plugin.getConfigManager().getWaitingTimerVisibility();
-                isWaitingRunner = true;
+            // Only the active runner sees the timer in the actionbar, and only for the last 10s.
+            if (player.equals(activeRunner) && timeLeft <= 10) {
+                String msg = String.format("§eSwap in: §c%ds", Math.max(0, timeLeft));
+                com.example.speedrunnerswap.utils.ActionBarUtil.sendActionBar(player, msg);
             } else {
-                visibility = plugin.getConfigManager().getHunterTimerVisibility();
-            }
-
-            boolean showTimer = switch (visibility) {
-                case "always" -> true;
-                case "last_10" -> timeLeft <= 10;
-                case "never" -> false;
-                default -> false;
-            };
-
-            if (!showTimer) {
+                // Clear any prior actionbar for others
                 com.example.speedrunnerswap.utils.ActionBarUtil.sendActionBar(player, "");
-                continue;
             }
-
-            String message;
-            if (isWaitingRunner && activeRunner != null) {
-                String dim = switch (activeRunner.getWorld().getEnvironment()) {
-                    case NETHER -> "Nether";
-                    case THE_END -> "End";
-                    default -> "Overworld";
-                };
-                message = String.format("§eActive: §b%s §7in §d%s §7| §eSwap in: §c%ds",
-                        activeRunner.getName(), dim, timeLeft);
-            } else {
-                message = String.format("§eTime until next swap: §c%ds", timeLeft);
-            }
-
-            com.example.speedrunnerswap.utils.ActionBarUtil.sendActionBar(player, message);
         }
     }
     
@@ -594,6 +564,9 @@ public class GameManager {
                 if ((eff = BukkitCompat.resolvePotionEffect("slowness")) != null) runner.removePotionEffect(eff);
                 if ((eff = BukkitCompat.resolvePotionEffect("slow_falling")) != null) runner.removePotionEffect(eff);
                 runner.setGameMode(GameMode.SURVIVAL);
+                // Ensure flight is disabled for the active runner to avoid anti-cheat confusion
+                try { runner.setAllowFlight(false); } catch (Exception ignored) {}
+                try { runner.setFlying(false); } catch (Exception ignored) {}
                 
                 for (Player viewer : Bukkit.getOnlinePlayers()) {
                     viewer.showPlayer(plugin, runner);
@@ -628,6 +601,9 @@ public class GameManager {
                     PotionEffectType blindness = BukkitCompat.resolvePotionEffect("blindness");
                     if (blindness != null) runner.addPotionEffect(new PotionEffect(blindness, Integer.MAX_VALUE, 1, false, false));
                     runner.setGameMode(GameMode.ADVENTURE);
+                    // Allow flight while caged to prevent server kicking for "flying"
+                    try { runner.setAllowFlight(true); } catch (Exception ignored) {}
+                    try { runner.setFlying(false); } catch (Exception ignored) {}
                 }
                 
                 for (Player viewer : Bukkit.getOnlinePlayers()) {
@@ -966,7 +942,7 @@ public class GameManager {
             if (!runners.contains(p)) continue; // Only runners get titles
 
             boolean isActive = p.equals(current);
-            boolean shouldShow = !isActive || timeLeft <= 10; // waiting: always; active: last 10s only
+            boolean shouldShow = !isActive; // waiting: always; active: never (use actionbar for last 10s)
             if (!shouldShow) continue;
 
             net.kyori.adventure.text.Component titleText = net.kyori.adventure.text.Component.text(
@@ -995,7 +971,9 @@ public class GameManager {
         int spacing = 10;
         int cx = (int) Math.round(base.getX()) + index * spacing;
         int cz = (int) Math.round(base.getZ());
-        Location center = new Location(world, cx + 0.5, y + 1, cz + 0.5);
+        // Place center at the cage floor level (top of the bedrock floor),
+        // so standing on the floor does not get treated as "outside" and yo-yo teleport.
+        Location center = new Location(world, cx + 0.5, y, cz + 0.5);
         // Ensure chunk is loaded
         center.getChunk().load(true);
 
@@ -1030,6 +1008,9 @@ public class GameManager {
         cageCenters.put(runner.getUniqueId(), center.clone());
         // Teleport inside cage
         runner.teleport(center);
+        // Guard against anti-fly kicks while caged
+        try { runner.setAllowFlight(true); } catch (Exception ignored) {}
+        try { runner.setFlying(false); } catch (Exception ignored) {}
     }
 
     private void removeCageFor(Player runner) {
@@ -1071,12 +1052,17 @@ public class GameManager {
                 double dx = Math.abs(loc.getX() - center.getX());
                 double dy = loc.getY() - center.getY();
                 double dz = Math.abs(loc.getZ() - center.getZ());
-                boolean outside = dx > 1.2 || dz > 1.2 || dy < -0.6 || dy > 2.6;
+                // With center.y at floor top, allow a small tolerance above/below
+                boolean outside = dx > 1.2 || dz > 1.2 || dy < -0.2 || dy > 2.8;
                 if (outside) {
                     r.teleport(center);
                     r.setVelocity(new org.bukkit.util.Vector(0, 0, 0));
                     r.setFallDistance(0f);
                     r.setNoDamageTicks(Math.max(10, r.getNoDamageTicks()));
+                } else {
+                    // Keep anti-fly protection while in cage
+                    try { r.setAllowFlight(true); } catch (Exception ignored) {}
+                    try { r.setFlying(false); } catch (Exception ignored) {}
                 }
             }
         }, 0L, 5L); // enforce every 0.25s
