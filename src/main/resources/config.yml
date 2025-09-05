@@ -204,3 +204,8 @@ sudden_death:
     z: 0
     # Maximum distance for random compass pointing when jammed
     max_jam_distance: 100
+
+# Donation / Support
+donation:
+  # URL used for the clickable donate message shown when the game ends
+  url: "https://donate.stripe.com/8x29AT0H58K03judnR0Ba01"

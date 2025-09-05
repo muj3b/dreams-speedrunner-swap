@@ -8,6 +8,8 @@ import com.example.speedrunnerswap.utils.SafeLocationFinder;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.format.TextDecoration;
+import net.kyori.adventure.text.event.ClickEvent;
+import net.kyori.adventure.text.event.HoverEvent;
 import net.kyori.adventure.title.Title;
 import org.bukkit.Location;
 import org.bukkit.*;
@@ -213,13 +215,32 @@ public class GameManager {
     }
 
     private void broadcastDonationMessage() {
-        // Simple, log-safe broadcast lines
-        Bukkit.broadcast("", Server.BROADCAST_CHANNEL_USERS);
-        Bukkit.broadcast("§6§l=== Support the Creator ===", Server.BROADCAST_CHANNEL_USERS);
-        Bukkit.broadcast("§eEnjoy the plugin? Consider supporting the creator (muj3b)!", Server.BROADCAST_CHANNEL_USERS);
-        Bukkit.broadcast("§a[Donate] https://donate.stripe.com/cNicN5gG3f8ocU4cjN0Ba00", Server.BROADCAST_CHANNEL_USERS);
-        Bukkit.broadcast("", Server.BROADCAST_CHANNEL_USERS);
-    }/** Stop the game without declaring a winner */
+        final String donateUrl = plugin.getConfig().getString(
+            "donation.url",
+            "https://donate.stripe.com/8x29AT0H58K03judnR0Ba01"
+        );
+
+        Component spacer = Component.text("");
+        Component header = Component.text("=== Support the Creator ===")
+            .color(NamedTextColor.GOLD)
+            .decorate(TextDecoration.BOLD);
+        Component desc = Component.text("Enjoyed the game? Help keep updates coming!")
+            .color(NamedTextColor.YELLOW);
+        Component donate = Component.text("❤ Click to Donate")
+            .color(NamedTextColor.LIGHT_PURPLE)
+            .decorate(TextDecoration.BOLD)
+            .hoverEvent(HoverEvent.showText(Component.text("Open donation page", NamedTextColor.GOLD)))
+            .clickEvent(ClickEvent.openUrl(donateUrl));
+
+        for (Player player : Bukkit.getOnlinePlayers()) {
+            player.sendMessage(spacer);
+            player.sendMessage(header);
+            player.sendMessage(desc);
+            player.sendMessage(donate);
+            player.sendMessage(spacer);
+        }
+    }
+    /** Stop the game without declaring a winner */
     public void stopGame() {
         endGame(null);
     }
