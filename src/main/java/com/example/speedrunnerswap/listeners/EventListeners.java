@@ -17,6 +17,10 @@ import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
+import net.kyori.adventure.title.Title;
+import net.kyori.adventure.text.format.NamedTextColor;
+import net.kyori.adventure.text.format.TextDecoration;
+import java.time.Duration;
 
 public class EventListeners implements Listener {
     
@@ -66,6 +70,23 @@ public class EventListeners implements Listener {
         // Ensure hunters don't drop tracking compasses on death
         if (plugin.getGameManager().isGameRunning() && plugin.getGameManager().isHunter(player)) {
             event.getDrops().removeIf(item -> item != null && item.getType() == Material.COMPASS);
+        }
+
+        // Show pop-up title when a runner dies
+        if (plugin.getGameManager().isGameRunning() && plugin.getGameManager().isRunner(player)) {
+            Component titleText = Component.text("RUNNER DOWN!")
+                    .color(NamedTextColor.RED)
+                    .decorate(TextDecoration.BOLD);
+            Component subText = Component.text(player.getName() + " died")
+                    .color(NamedTextColor.YELLOW);
+            Title deathTitle = Title.title(
+                    titleText,
+                    subText,
+                    Title.Times.times(Duration.ofMillis(300), Duration.ofMillis(2200), Duration.ofMillis(400))
+            );
+            for (Player p : plugin.getServer().getOnlinePlayers()) {
+                p.showTitle(deathTitle);
+            }
         }
     }
 

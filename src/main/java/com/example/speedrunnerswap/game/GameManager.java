@@ -752,10 +752,7 @@ public class GameManager {
         applyInactiveEffects();
         scheduleNextSwap();
 
-        if (plugin.getConfigManager().isBroadcastsEnabled() && previousRunner != null) {
-            Bukkit.broadcast("§6[SpeedrunnerSwap] Swapped from " + previousRunner.getName() + " to " + nextRunner.getName() + "!",
-                    Server.BROADCAST_CHANNEL_USERS);
-        }
+        // Suppress public chat broadcast on swap per request
 
         if (plugin.getConfigManager().isPowerUpsEnabled()) {
             applyRandomPowerUp(nextRunner);
