@@ -1,5 +1,5 @@
 name: SpeedrunnerSwap
-version: '1.3'
+version: '2.3'
 main: com.example.speedrunnerswap.SpeedrunnerSwap
 api-version: '1.21'
 authors: [muj3b]
