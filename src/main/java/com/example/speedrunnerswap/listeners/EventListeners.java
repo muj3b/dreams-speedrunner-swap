@@ -243,11 +243,9 @@ public class EventListeners implements Listener {
                 player.sendMessage("§cYou cannot interact with items while inactive!");
                 return;
             } else {
-                // Active runner inventory updates
-                if (event.getView().getType() != InventoryType.WORKBENCH) {
-                    // Schedule sync for next tick to let the current operation complete
-                    plugin.getServer().getScheduler().runTask(plugin, () -> syncRunnerInventories(player));
-                }
+                // Do not sync inventories between runners. Inactive runners should
+                // never see or receive the active runner's inventory until swapped in.
+                // Intentionally no-op here.
             }
         }
     }
@@ -322,31 +320,6 @@ public class EventListeners implements Listener {
         }
     }
 
-    /**
-     * Synchronize inventories between all runners, with crafting protection
-     * @param sourcePlayer The player whose inventory should be copied to others
-     */
-    private void syncRunnerInventories(Player sourcePlayer) {
-        if (!plugin.getGameManager().isGameRunning() || !plugin.getGameManager().isRunner(sourcePlayer)) return;
-        
-        // Don't sync while crafting to avoid state corruption
-        if (sourcePlayer.getOpenInventory().getType() == InventoryType.WORKBENCH) {
-            return;
-        }
-        
-        ItemStack[] contents = sourcePlayer.getInventory().getContents();
-        ItemStack[] armor = sourcePlayer.getInventory().getArmorContents();
-        ItemStack offhand = sourcePlayer.getInventory().getItemInOffHand();
-        
-        for (Player runner : plugin.getGameManager().getRunners()) {
-            if (runner != sourcePlayer && runner.isOnline() && 
-                runner.getOpenInventory().getType() != InventoryType.WORKBENCH) {
-                    
-                runner.getInventory().setContents(contents.clone());
-                runner.getInventory().setArmorContents(armor.clone());
-                runner.getInventory().setItemInOffHand(offhand.clone());
-                runner.updateInventory();
-            }
-        }
-    }
+    // Removed inventory sync method: inactive runners will not receive
+    // the active runner's inventory outside of swap logic.
 }

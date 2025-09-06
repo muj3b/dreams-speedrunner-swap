@@ -623,6 +623,16 @@ public class GameManager {
                     try { runner.setAllowFlight(true); } catch (Exception ignored) {}
                     try { runner.setFlying(false); } catch (Exception ignored) {}
                 }
+
+                // Ensure inactive runners have no visible/usable inventory
+                // until they are swapped in. Their original inventories are
+                // preserved via saveAllPlayerStates() and restored on endGame.
+                try {
+                    runner.getInventory().clear();
+                    runner.getInventory().setArmorContents(new ItemStack[]{});
+                    runner.getInventory().setItemInOffHand(null);
+                    runner.updateInventory();
+                } catch (Exception ignored) {}
                 
                 for (Player viewer : Bukkit.getOnlinePlayers()) {
                     if (!viewer.equals(runner)) {
