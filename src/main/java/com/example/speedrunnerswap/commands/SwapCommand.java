@@ -52,6 +52,8 @@ public class SwapCommand implements CommandExecutor, TabCompleter {
                     return handleReload(sender);
                 case "gui":
                     return handleMainCommand(sender);
+                case "mode":
+                    return handleMode(sender, Arrays.copyOfRange(args, 1, args.length));
                 case "clearteams":
                     return handleClearTeams(sender);
                 default:
@@ -63,6 +65,68 @@ public class SwapCommand implements CommandExecutor, TabCompleter {
             sender.sendMessage("§cAn internal error occurred while executing that command. Check server logs for details.");
             plugin.getLogger().log(Level.SEVERE, "Unhandled exception while executing /swap by " + (sender == null ? "UNKNOWN" : sender.getName()), e);
             return false;
+        }
+    }
+
+    private boolean handleMode(CommandSender sender, String[] rest) {
+        if (!sender.hasPermission("speedrunnerswap.admin")) {
+            sender.sendMessage("§cYou don't have permission to change mode.");
+            return false;
+        }
+
+        if (rest.length == 0) {
+            sender.sendMessage("§eCurrent mode: §f" + plugin.getCurrentMode().name().toLowerCase());
+            sender.sendMessage("§7Usage: /swap mode <dream|sapnap> [--force]");
+            sender.sendMessage("§7       /swap mode default <dream|sapnap>");
+            return true;
+        }
+
+        String mode = rest[0].toLowerCase();
+
+        if ("default".equals(mode)) {
+            if (rest.length < 2) {
+                sender.sendMessage("§eDefault mode: §f" + plugin.getConfigManager().getDefaultMode().name().toLowerCase());
+                sender.sendMessage("§7Usage: /swap mode default <dream|sapnap>");
+                return true;
+            }
+            String val = rest[1].toLowerCase();
+            if (!val.equals("dream") && !val.equals("sapnap")) {
+                sender.sendMessage("§cUnknown mode: " + val);
+                return false;
+            }
+            com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode m = val.equals("sapnap") ? com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode.SAPNAP : com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode.DREAM;
+            plugin.getConfigManager().setDefaultMode(m);
+            sender.sendMessage("§aDefault mode set to §f" + val + "§a.");
+            return true;
+        }
+        boolean force = rest.length > 1 && ("--force".equalsIgnoreCase(rest[1]) || "-f".equalsIgnoreCase(rest[1]) || "force".equalsIgnoreCase(rest[1]));
+        if (plugin.getGameManager().isGameRunning() && !force) {
+            sender.sendMessage("§cStop the current game before switching modes. Add --force to end it and switch now.");
+            return false;
+        }
+        if (force && plugin.getGameManager().isGameRunning()) {
+            plugin.getGameManager().stopGame();
+        }
+        switch (mode) {
+            case "dream":
+                plugin.setCurrentMode(com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode.DREAM);
+                sender.sendMessage("§aMode set to §fDream§a (runners + hunters)");
+                // Open main GUI if a player
+                if (sender instanceof Player p) plugin.getGuiManager().openMainMenu(p);
+                return true;
+            case "sapnap":
+            case "sapnaps":
+            case "runner":
+            case "runners":
+                plugin.setCurrentMode(com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode.SAPNAP);
+                sender.sendMessage("§aMode set to §fSapnap§a (runners only)");
+                if (sender instanceof Player p) {
+                    try { new com.example.speedrunnerswap.gui.ControlGui(plugin).openMainMenu(p); } catch (Throwable ignored) {}
+                }
+                return true;
+            default:
+                sender.sendMessage("§cUnknown mode: " + mode + ". Use dream|sapnap");
+                return false;
         }
     }
 
@@ -114,7 +178,8 @@ public class SwapCommand implements CommandExecutor, TabCompleter {
         }
 
         try {
-            plugin.getGuiManager().openMainMenu((Player) sender);
+            // Open 2-button mode selector first
+            plugin.getGuiManager().openModeSelector((Player) sender);
             return true;
         } catch (Exception e) {
             sender.sendMessage("§cError opening GUI: " + e.getMessage());
@@ -352,7 +417,7 @@ public class SwapCommand implements CommandExecutor, TabCompleter {
         
         if (args.length == 1) {
             // Subcommands
-            List<String> subCommands = Arrays.asList("start", "stop", "pause", "resume", "status", "creator", "setrunners", "sethunters", "reload", "gui", "clearteams");
+            List<String> subCommands = Arrays.asList("start", "stop", "pause", "resume", "status", "creator", "setrunners", "sethunters", "reload", "gui", "mode", "clearteams");
             for (String subCommand : subCommands) {
                 if (subCommand.startsWith(args[0].toLowerCase())) {
                     completions.add(subCommand);
@@ -367,9 +432,17 @@ public class SwapCommand implements CommandExecutor, TabCompleter {
                         completions.add(name);
                     }
                 }
+            } else if (args[0].equalsIgnoreCase("mode") && args.length == 2) {
+                for (String opt : new String[]{"dream", "sapnap", "default"}) {
+                    if (opt.startsWith(args[1].toLowerCase())) completions.add(opt);
+                }
+            } else if (args[0].equalsIgnoreCase("mode") && args.length == 3 && "default".startsWith(args[1].toLowerCase())) {
+                for (String opt : new String[]{"dream", "sapnap"}) {
+                    if (opt.startsWith(args[2].toLowerCase())) completions.add(opt);
+                }
             }
         }
-        
+
         return completions;
     }
 }

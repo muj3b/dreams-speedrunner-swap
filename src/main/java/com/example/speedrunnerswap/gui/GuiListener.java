@@ -53,6 +53,8 @@ public class GuiListener implements Listener {
         if (title == null || title.isEmpty()) return false;
         // Include all plugin menus and the kit editor
         return title.contains("SpeedrunnerSwap") ||
+               title.contains("Mode Selector") ||
+               title.contains("Confirm Mode Switch") ||
                title.contains("Main Menu") ||
                title.contains("Team Selector") ||
                title.contains("Settings") ||
@@ -88,6 +90,13 @@ public class GuiListener implements Listener {
         Player player = (Player) event.getWhoClicked();
         ItemStack clickedItem = event.getCurrentItem();
         
+        // If this button carries a specific id, route it first (before generic back buttons)
+        String earlyId = getButtonId(clickedItem);
+        if ("back_mode".equals(earlyId)) {
+            guiManager.openModeSelector(player);
+            return;
+        }
+
         // Handle back buttons first
         if (isBackButton(clickedItem)) {
             guiManager.openMainMenu(player);
@@ -98,8 +107,18 @@ public class GuiListener implements Listener {
         if (maybeHandlePowerUpDurationsMenu(event, title)) return;
 
         // Route to specific menu handlers
+        if (title.contains("Mode Selector")) {
+            handleModeSelectorClick(event);
+            return;
+        }
         // Main menu: support both legacy "Main Menu" and configurable titles like "SpeedrunnerSwap Menu"
         if (title.contains("Main Menu") || title.contains("SpeedrunnerSwap")) {
+            // If someone opened this while in Sapnap mode, redirect
+            if (plugin.getCurrentMode() == com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode.SAPNAP && plugin.getGameManager().isGameRunning()) {
+                ((Player) event.getWhoClicked()).sendMessage(Component.text("§cYou're in Sapnap mode. Stop the game to switch."));
+                event.setCancelled(true);
+                return;
+            }
             handleMainMenuClick(event);
         } else if (title.contains("Team Selector")) {
             handleTeamSelectorClick(event);
@@ -127,6 +146,99 @@ public class GuiListener implements Listener {
             handleLastStandClick(event);
         } else if (title.contains("Statistics")) {
             handleStatisticsClick(event);
+        }
+    }
+
+    private void handleModeSelectorClick(InventoryClickEvent event) {
+        Player player = (Player) event.getWhoClicked();
+        ItemStack clicked = event.getCurrentItem();
+        if (clicked == null || !clicked.hasItemMeta()) return;
+        String id = getButtonId(clicked);
+        if ("mode_dream".equals(id)) {
+            if (plugin.getGameManager().isGameRunning()) {
+                // Show confirm UI instead of doing nothing
+                if (!player.hasPermission("speedrunnerswap.admin")) {
+                    player.sendMessage(Component.text("§cStop the current game before switching modes."));
+                    return;
+                }
+                guiManager.openForceConfirm(player, com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode.DREAM);
+                return;
+            }
+            plugin.setCurrentMode(com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode.DREAM);
+            guiManager.openMainMenu(player);
+            return;
+        }
+        if ("mode_sapnap".equals(id)) {
+            if (plugin.getGameManager().isGameRunning()) {
+                if (!player.hasPermission("speedrunnerswap.admin")) {
+                    player.sendMessage(Component.text("§cStop the current game before switching modes."));
+                    return;
+                }
+                guiManager.openForceConfirm(player, com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode.SAPNAP);
+                return;
+            }
+            plugin.setCurrentMode(com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode.SAPNAP);
+            try {
+                new com.example.speedrunnerswap.gui.ControlGui(plugin).openMainMenu(player);
+            } catch (Throwable t) {
+                player.sendMessage("§cRunner-only GUI failed to open. Using text commands.");
+            }
+            return;
+        }
+        if ("force_dream".equals(id)) {
+            if (plugin.getGameManager().isGameRunning()) {
+                if (!player.hasPermission("speedrunnerswap.admin")) return;
+                guiManager.openForceConfirm(player, com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode.DREAM);
+                return;
+            }
+            plugin.setCurrentMode(com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode.DREAM);
+            guiManager.openMainMenu(player);
+            return;
+        }
+        if ("force_sapnap".equals(id)) {
+            if (plugin.getGameManager().isGameRunning()) {
+                if (!player.hasPermission("speedrunnerswap.admin")) return;
+                guiManager.openForceConfirm(player, com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode.SAPNAP);
+                return;
+            }
+            plugin.setCurrentMode(com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode.SAPNAP);
+            try { new com.example.speedrunnerswap.gui.ControlGui(plugin).openMainMenu(player); } catch (Throwable ignored) {}
+            return;
+        }
+        if ("force_yes_dream".equals(id)) {
+            if (!player.hasPermission("speedrunnerswap.admin")) return;
+            if (plugin.getGameManager().isGameRunning()) plugin.getGameManager().stopGame();
+            plugin.setCurrentMode(com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode.DREAM);
+            guiManager.openMainMenu(player);
+            return;
+        }
+        if ("force_yes_sapnap".equals(id)) {
+            if (!player.hasPermission("speedrunnerswap.admin")) return;
+            if (plugin.getGameManager().isGameRunning()) plugin.getGameManager().stopGame();
+            plugin.setCurrentMode(com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode.SAPNAP);
+            try { new com.example.speedrunnerswap.gui.ControlGui(plugin).openMainMenu(player); } catch (Throwable ignored) {}
+            return;
+        }
+        if ("force_no".equals(id)) {
+            guiManager.openModeSelector(player);
+            return;
+        }
+        if ("set_default_dream".equals(id)) {
+            if (!player.hasPermission("speedrunnerswap.admin")) return;
+            plugin.getConfigManager().setDefaultMode(com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode.DREAM);
+            player.sendMessage(Component.text("§aDefault mode set to §fDream§a."));
+            guiManager.openModeSelector(player);
+            return;
+        }
+        if ("set_default_sapnap".equals(id)) {
+            if (!player.hasPermission("speedrunnerswap.admin")) return;
+            plugin.getConfigManager().setDefaultMode(com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode.SAPNAP);
+            player.sendMessage(Component.text("§aDefault mode set to §fSapnap§a."));
+            guiManager.openModeSelector(player);
+            return;
+        }
+        if ("back_mode".equals(id)) {
+            guiManager.openModeSelector(player);
         }
     }
 
@@ -175,8 +287,11 @@ public class GuiListener implements Listener {
             guiManager.openCompassSettingsMenu(player);
         } else if (name.toLowerCase().contains("sudden death")) {
             guiManager.openSuddenDeathMenu(player);
-        } else if (name.toLowerCase().contains("statistics") || name.toLowerCase().contains("status")) {
+        } else if (name.toLowerCase().contains("statistics")) {
             guiManager.openStatisticsMenu(player);
+        } else if (name.toLowerCase().contains("status")) {
+            // Show quick status info in chat
+            showStatus(player);
         } else if (name.equals("§a§lStart Game")) {
             if (!plugin.getGameManager().isGameRunning()) {
                 if (plugin.getGameManager().startGame()) {
@@ -204,6 +319,24 @@ public class GuiListener implements Listener {
                 player.sendMessage(Component.text("§cGame stopped."));
             }
             guiManager.openMainMenu(player);
+        }
+    }
+
+    private void showStatus(Player sender) {
+        sender.sendMessage("§6=== SpeedrunnerSwap Status ===");
+        sender.sendMessage("§eGame Running: §f" + plugin.getGameManager().isGameRunning());
+        sender.sendMessage("§eGame Paused: §f" + plugin.getGameManager().isGamePaused());
+
+        if (plugin.getGameManager().isGameRunning()) {
+            org.bukkit.entity.Player activeRunner = plugin.getGameManager().getActiveRunner();
+            sender.sendMessage("§eActive Runner: §f" + (activeRunner != null ? activeRunner.getName() : "None"));
+            sender.sendMessage("§eTime Until Next Swap: §f" + plugin.getGameManager().getTimeUntilNextSwap() + "s");
+
+            java.util.List<org.bukkit.entity.Player> runners = plugin.getGameManager().getRunners();
+            java.util.List<org.bukkit.entity.Player> hunters = plugin.getGameManager().getHunters();
+
+            sender.sendMessage("§eRunners: §f" + runners.stream().map(org.bukkit.entity.Player::getName).collect(java.util.stream.Collectors.joining(", ")));
+            sender.sendMessage("§eHunters: §f" + hunters.stream().map(org.bukkit.entity.Player::getName).collect(java.util.stream.Collectors.joining(", ")));
         }
     }
 

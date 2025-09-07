@@ -16,6 +16,7 @@ import com.example.speedrunnerswap.game.BountyManager;
 import com.example.speedrunnerswap.game.SuddenDeathManager;
 
 import com.example.speedrunnerswap.game.KitConfigManager;
+import com.example.speedrunnerswap.utils.BukkitCompat;
 // Removed unused Bukkit import
 import org.bukkit.plugin.java.JavaPlugin;
 
@@ -33,6 +34,9 @@ public final class SpeedrunnerSwap extends JavaPlugin {
     private BountyManager bountyManager;
     private SuddenDeathManager suddenDeathManager;
     private KitConfigManager kitConfigManager;
+    // Mode selection (Dream = runners+hunters, Sapnap = runners only)
+    public enum SwapMode { DREAM, SAPNAP }
+    private SwapMode currentMode = SwapMode.DREAM;
     
     @Override
     public void onEnable() {
@@ -54,6 +58,11 @@ public final class SpeedrunnerSwap extends JavaPlugin {
         // Validate config consistency
         validatePowerUpConfig();
 
+        // Apply default mode from config
+        try {
+            this.setCurrentMode(configManager.getDefaultMode());
+        } catch (Throwable ignored) {}
+
         // Register commands
         SwapCommand swapCommand = new SwapCommand(this);
         getCommand("swap").setExecutor(swapCommand);
@@ -64,6 +73,13 @@ public final class SpeedrunnerSwap extends JavaPlugin {
         getServer().getPluginManager().registerEvents(new DragonDefeatListener(this), this);
         // Register GUI listener for menu interactions
         getServer().getPluginManager().registerEvents(new GuiListener(this, guiManager), this);
+        // Register ControlSwap GUI listeners (for Sapnap mode)
+        try {
+            getServer().getPluginManager().registerEvents(new com.example.speedrunnerswap.gui.ControlGuiListener(this), this);
+            getServer().getPluginManager().registerEvents(new com.example.speedrunnerswap.gui.AboutGuiListener(this), this);
+        } catch (Throwable ignored) {
+            // If classes are absent for any reason, avoid startup failure
+        }
         
         // Log startup with version
         String ver = getPluginMeta() != null ? getPluginMeta().getVersion() : "unknown";
@@ -168,7 +184,7 @@ public final class SpeedrunnerSwap extends JavaPlugin {
                 case "confusion" -> "nausea";
                 default -> key;
             };
-            org.bukkit.potion.PotionEffectType t = com.example.speedrunnerswap.utils.BukkitCompat.resolvePotionEffect(key);
+            org.bukkit.potion.PotionEffectType t = BukkitCompat.resolvePotionEffect(key);
             if (t == null) {
                 invalid.add(id);
             }
@@ -178,5 +194,14 @@ public final class SpeedrunnerSwap extends JavaPlugin {
         if (!invalid.isEmpty()) {
             getLogger().warning("Unknown potion effect ids in power_ups lists: " + String.join(", ", invalid));
         }
+    }
+
+    public SwapMode getCurrentMode() {
+        return currentMode;
+    }
+
+    public void setCurrentMode(SwapMode mode) {
+        if (mode == null) mode = SwapMode.DREAM;
+        this.currentMode = mode;
     }
 }

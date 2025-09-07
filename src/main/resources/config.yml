@@ -121,6 +121,14 @@ timer_visibility:
   # Whether hunters see the timer
   hunter_visibility: "never"    # Options: "always", "last_10", "never"
 
+# UI update frequency (performance tuning)
+ui:
+  update_ticks:
+    # How often to update the actionbar for timers (in ticks)
+    actionbar: 20
+    # How often to update titles for waiting runners (in ticks)
+    title: 10
+
 # Simple Voice Chat Integration (if available)
 voice_chat:
   # Whether to integrate with Simple Voice Chat
@@ -209,3 +217,8 @@ sudden_death:
 donation:
   # URL used for the clickable donate message shown when the game ends
   url: "https://donate.stripe.com/8x29AT0H58K03judnR0Ba01"
+
+# General game settings
+game:
+  # Default mode selected on server start: dream | sapnap
+  default_mode: dream

@@ -1,5 +1,5 @@
 name: SpeedrunnerSwap
-version: '2.3'
+version: '3.0.0'
 main: com.example.speedrunnerswap.SpeedrunnerSwap
 api-version: '1.21'
 authors: [muj3b]
@@ -18,7 +18,7 @@ website: https://github.com/muj3b/minecraft-speedrunner-swap-plugin
 commands:
   swap:
     description: Main command for SpeedrunnerSwap plugin
-    usage: /<command> [start|stop|pause|resume|status|creator|setrunners|sethunters|reload|gui|clearteams]
+    usage: /<command> [start|stop|pause|resume|status|creator|setrunners|sethunters|reload|gui|mode|clearteams]
     permission: speedrunnerswap.command
     
 permissions:

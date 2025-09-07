@@ -1,6 +1,7 @@
 package com.example.speedrunnerswap.game;
 
 import com.example.speedrunnerswap.SpeedrunnerSwap;
+import com.example.speedrunnerswap.utils.Msg;
 import org.bukkit.entity.Player;
 import org.bukkit.Bukkit;
 import org.bukkit.scheduler.BukkitTask;
@@ -68,18 +69,18 @@ public class StatsManager {
     public void displayStats() {
         long gameDuration = System.currentTimeMillis() - gameStartTime;
         
-        com.example.speedrunnerswap.utils.Msg.broadcast("\n§6=== Game Statistics ===");
-        com.example.speedrunnerswap.utils.Msg.broadcast("§7Total Game Time: §f" + formatTime(gameDuration));
+        Msg.broadcast("\n§6=== Game Statistics ===");
+        Msg.broadcast("§7Total Game Time: §f" + formatTime(gameDuration));
 
         for (Player player : Bukkit.getOnlinePlayers()) {
             PlayerStats stats = getStats(player);
             String role = plugin.getGameManager().isRunner(player) ? "Runner" : "Hunter";
             
-            com.example.speedrunnerswap.utils.Msg.broadcast("\n§e" + player.getName() + " §7(" + role + ")");
-            com.example.speedrunnerswap.utils.Msg.broadcast("§7Time as Active: §f" + formatTime(stats.getActiveTime()));
-            com.example.speedrunnerswap.utils.Msg.broadcast("§7Distance Traveled: §f" + String.format("%.1f", stats.getDistanceTraveled()) + " blocks");
-            com.example.speedrunnerswap.utils.Msg.broadcast("§7Kills: §f" + stats.getKills());
-            com.example.speedrunnerswap.utils.Msg.broadcast("§7Deaths: §f" + stats.getDeaths());
+            Msg.broadcast("\n§e" + player.getName() + " §7(" + role + ")");
+            Msg.broadcast("§7Time as Active: §f" + formatTime(stats.getActiveTime()));
+            Msg.broadcast("§7Distance Traveled: §f" + String.format("%.1f", stats.getDistanceTraveled()) + " blocks");
+            Msg.broadcast("§7Kills: §f" + stats.getKills());
+            Msg.broadcast("§7Deaths: §f" + stats.getDeaths());
         }
     }
 

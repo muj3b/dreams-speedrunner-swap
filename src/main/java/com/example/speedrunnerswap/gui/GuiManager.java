@@ -25,6 +25,70 @@ public class GuiManager {
         this.plugin = plugin;
     }
 
+    public void openModeSelector(Player player) {
+        int rows = 3;
+        org.bukkit.inventory.Inventory inv = org.bukkit.Bukkit.createInventory(null, rows * 9, net.kyori.adventure.text.Component.text("§6§lMode Selector"));
+
+        ItemStack filler = createItem(Material.GRAY_STAINED_GLASS_PANE, " ");
+        fillBorder(inv, filler);
+
+        // Dream's mode button
+        java.util.List<String> dreamLore = new java.util.ArrayList<>();
+        dreamLore.add("§eSpeedrunners §7+ §cHunters");
+        dreamLore.add("§7Classic manhunt with trackers, kits, and more");
+        ItemStack dream = createGuiButton(Material.DIAMOND_SWORD, "§a§lDream: Speedrunners Swap", dreamLore, "mode_dream");
+        inv.setItem(11, dream);
+
+        // Sapnap's mode button (runner-only)
+        java.util.List<String> sapLore = new java.util.ArrayList<>();
+        sapLore.add("§eSpeedrunners §7— §cNo Hunters");
+        sapLore.add("§7Team-share control to beat the game");
+        ItemStack sapnap = createGuiButton(Material.DIAMOND_BOOTS, "§b§lSapnap: Speedrunner Swap", sapLore, "mode_sapnap");
+        inv.setItem(15, sapnap);
+
+        // Default mode controls (admin only). These do not switch mode immediately; they just set the startup default.
+        boolean sapDefault = plugin.getConfigManager().getDefaultMode() == com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode.SAPNAP;
+        java.util.List<String> setDefLore = java.util.List.of("§7Set the startup default mode");
+        ItemStack setDream = createGuiButton(Material.BOOK, "§e§lSet Default: §aDream", setDefLore, "set_default_dream");
+        ItemStack setSap = createGuiButton(Material.BOOK, "§e§lSet Default: §bSapnap", setDefLore, "set_default_sapnap");
+        if (!sapDefault) setDream = createGlowingItem(setDream); else setSap = createGlowingItem(setSap);
+        inv.setItem(19, setDream);
+        inv.setItem(25, setSap);
+
+        // Force-switch helpers (admin only)
+        if (plugin.getGameManager().isGameRunning()) {
+            List<String> forceLore = java.util.List.of("§cEnds the current game", "§7and switches immediately");
+            ItemStack forceDream = createGuiButton(Material.TNT, "§c§lForce → Dream", forceLore, "force_dream");
+            ItemStack forceSap = createGuiButton(Material.TNT_MINECART, "§c§lForce → Sapnap", forceLore, "force_sapnap");
+            inv.setItem(20, forceDream);
+            inv.setItem(24, forceSap);
+        } else {
+            String def = sapDefault ? "§bSapnap" : "§aDream";
+            ItemStack info = createItem(Material.PAPER, "§e§lDefault Mode: §f" + def, java.util.List.of(
+                    "§7Use the buttons above to set", "§7or /swap mode default"));
+            inv.setItem(22, info);
+        }
+
+        player.openInventory(inv);
+    }
+
+    public void openForceConfirm(Player player, com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode target) {
+        String name = target == com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode.SAPNAP ? "Sapnap" : "Dream";
+        org.bukkit.inventory.Inventory inv = org.bukkit.Bukkit.createInventory(null, 9, net.kyori.adventure.text.Component.text("§4§lConfirm Mode Switch"));
+        ItemStack filler = createItem(Material.BLACK_STAINED_GLASS_PANE, " ");
+        for (int i = 0; i < inv.getSize(); i++) inv.setItem(i, filler);
+
+        // Back
+        inv.setItem(0, createGuiButton(Material.ARROW, "§7§lBack", java.util.List.of("§7Return"), "back_mode"));
+        // Confirm / Cancel
+        String id = (target == com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode.SAPNAP) ? "force_yes_sapnap" : "force_yes_dream";
+        ItemStack yes = createGuiButton(Material.REDSTONE_BLOCK, "§c§lConfirm", java.util.List.of("§7End current game", "§7Switch to §f" + name), id);
+        ItemStack no = createGuiButton(Material.EMERALD_BLOCK, "§a§lCancel", java.util.List.of("§7Do nothing"), "force_no");
+        inv.setItem(3, no);
+        inv.setItem(5, yes);
+        player.openInventory(inv);
+    }
+
     public String formatTime(int seconds) {
         int minutes = seconds / 60;
         int hours = minutes / 60;
@@ -273,6 +337,9 @@ public class GuiManager {
             // Border-only filler for better visual organization
             ItemStack filler = createItem(Material.BLACK_STAINED_GLASS_PANE, " ");
             fillBorder(inventory, filler);
+
+            // Back to mode selector
+            inventory.setItem(0, createGuiButton(Material.ARROW, "§7§lBack", java.util.List.of("§7Return to mode selector"), "back_mode"));
 
             // Team selector button (Top row)
             List<String> teamSelectorLore = new ArrayList<>();
@@ -571,7 +638,8 @@ public class GuiManager {
     trackerHeaderLore.add("§7Configure compass tracking:");
     trackerHeaderLore.add("§7• Hunters receive a compass to track active runner");
     ItemStack trackerHeader = createItem(Material.BOOK, "§6§lTracker Settings", trackerHeaderLore);
-    inventory.setItem(26, trackerHeader);
+    // Place next to other section headers for alignment
+    inventory.setItem(18, trackerHeader);
     inventory.setItem(0, back);
         
         // Swap Settings Section
@@ -648,22 +716,24 @@ public class GuiManager {
         boolean trackerEnabled = plugin.getConfigManager().isTrackerEnabled();
         List<String> trackerToggleLore = new ArrayList<>();
         trackerToggleLore.add("§7Current: " + (trackerEnabled ? "§aEnabled" : "§cDisabled"));
-        trackerToggleLore.add("§7Hunters receive tracking compasses");
+        trackerToggleLore.add("§7Hunters receive compasses that track the active runner.");
+        trackerToggleLore.add("§7Compass updates: §e" + plugin.getConfigManager().getTrackerUpdateTicks() + " ticks");
         ItemStack trackerToggle = createGuiButton(
                 trackerEnabled ? Material.COMPASS : Material.GRAY_DYE,
                 "§e§lTracker: " + (trackerEnabled ? "§aEnabled" : "§cDisabled"),
                 trackerToggleLore,
                 "tracker_toggle");
-        inventory.setItem(13, trackerToggle);
+        inventory.setItem(19, trackerToggle);
 
         // Hunter Swap toggle and interval
         boolean hunterSwapEnabled = plugin.getConfigManager().isHunterSwapEnabled();
         ItemStack hunterSwapToggle = createGuiButton(
                 hunterSwapEnabled ? Material.CROSSBOW : Material.GRAY_DYE,
                 "§e§lHunter Swap: " + (hunterSwapEnabled ? "§aEnabled" : "§cDisabled"),
-                List.of("§7Shuffle hunters on a timer"),
+                List.of("§7Periodically shuffle which hunter has focus",
+                        "§7Use to balance hunter coordination"),
                 "hunter_swap_toggle");
-        inventory.setItem(14, hunterSwapToggle);
+        inventory.setItem(20, hunterSwapToggle);
 
         int hunterSwapInterval = plugin.getConfigManager().getHunterSwapInterval();
         ItemStack hunterSwapIntervalItem = createGuiButton(
@@ -671,37 +741,38 @@ public class GuiManager {
                 "§e§lHunter Swap Interval",
                 List.of("§7Current: §e" + hunterSwapInterval + " seconds", "§7Left/Right: ±30s", "§7Shift: ±60s"),
                 "hunter_swap_interval");
-        inventory.setItem(15, hunterSwapIntervalItem);
+        inventory.setItem(21, hunterSwapIntervalItem);
 
         // Hot Potato mode toggle
         boolean hotPotato = plugin.getConfigManager().isHotPotatoModeEnabled();
         ItemStack hotPotatoToggle = createGuiButton(
                 hotPotato ? Material.BLAZE_POWDER : Material.GRAY_DYE,
                 "§e§lHot Potato Mode: " + (hotPotato ? "§aEnabled" : "§cDisabled"),
-                List.of("§7Experimental runner swap variant"),
+                List.of("§7Swaps when the active runner takes damage",
+                        "§7Ignores the normal timer"),
                 "hot_potato_toggle");
-        inventory.setItem(17, hotPotatoToggle);
+        inventory.setItem(22, hotPotatoToggle);
 
         // Admin tools
         ItemStack adminHeader = createItem(Material.BOOK, "§6§lAdmin Tools", List.of(
             "§7Operator utilities: force actions"
         ));
-        inventory.setItem(33, adminHeader);
+        inventory.setItem(45, adminHeader);
 
         ItemStack forceSwap = createGuiButton(Material.ENDER_PEARL, "§d§lForce Runner Swap", List.of(
             "§7Trigger immediate runner swap"
         ), "force_swap");
-        inventory.setItem(28, forceSwap);
+        inventory.setItem(46, forceSwap);
 
         ItemStack forceHunterShuffle = createGuiButton(Material.CROSSBOW, "§c§lShuffle Hunters", List.of(
             "§7Shuffle hunter order now"
         ), "force_hunter_shuffle");
-        inventory.setItem(29, forceHunterShuffle);
+        inventory.setItem(47, forceHunterShuffle);
 
         ItemStack updateCompasses = createGuiButton(Material.LODESTONE, "§b§lUpdate Compasses", List.of(
             "§7Refresh all hunter compasses"
         ), "update_compasses");
-        inventory.setItem(30, updateCompasses);
+        inventory.setItem(48, updateCompasses);
         
         // Removed duplicate swap interval and safe swap UI blocks
 
@@ -712,7 +783,7 @@ public class GuiManager {
         timerHeaderLore.add("§7• Waiting runner settings");
         timerHeaderLore.add("§7• Hunter settings");
         ItemStack timerHeader = createItem(Material.BOOK, "§6§lTimer Settings", timerHeaderLore);
-        inventory.setItem(18, timerHeader);
+        inventory.setItem(27, timerHeader);
 
         // Active Runner Timer Settings
         String runnerVisibility = plugin.getConfigManager().getRunnerTimerVisibility();
@@ -726,7 +797,7 @@ public class GuiManager {
         runnerTimerLore.add("");
         runnerTimerLore.add("§7Click to change");
         ItemStack runnerTimer = createItem(Material.CLOCK, "§e§lActive Runner Timer", runnerTimerLore);
-        inventory.setItem(19, runnerTimer);
+        inventory.setItem(28, runnerTimer);
 
         // Waiting Runner Timer Settings
         String waitingVisibility = plugin.getConfigManager().getWaitingTimerVisibility();
@@ -740,7 +811,7 @@ public class GuiManager {
         waitingTimerLore.add("");
         waitingTimerLore.add("§7Click to change");
         ItemStack waitingTimer = createItem(Material.CLOCK, "§e§lWaiting Runner Timer", waitingTimerLore);
-        inventory.setItem(20, waitingTimer);
+        inventory.setItem(29, waitingTimer);
 
         // Hunter Timer Settings
         String hunterVisibility = plugin.getConfigManager().getHunterTimerVisibility();
@@ -754,7 +825,7 @@ public class GuiManager {
         hunterTimerLore.add("");
         hunterTimerLore.add("§7Click to change");
         ItemStack hunterTimer = createItem(Material.CLOCK, "§e§lHunter Timer", hunterTimerLore);
-        inventory.setItem(21, hunterTimer);
+        inventory.setItem(30, hunterTimer);
 
         // Freeze Mechanic Section (affects hunters near active runner)
         List<String> freezeHeaderLore = new ArrayList<>();

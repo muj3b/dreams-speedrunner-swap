@@ -13,6 +13,8 @@ import org.bukkit.event.inventory.InventoryAction;
 import org.bukkit.event.player.*;
 import org.bukkit.event.player.PlayerChangedWorldEvent;
 import org.bukkit.event.entity.PlayerDeathEvent;
+import org.bukkit.event.entity.EntityDamageEvent;
+import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 import net.kyori.adventure.text.Component;
@@ -145,6 +147,18 @@ public class EventListeners implements Listener {
         Player player = event.getPlayer();
         plugin.getGameManager().handlePlayerQuit(player);
         plugin.getGameManager().updateTeams();
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void onAnyDamage(EntityDamageEvent event) {
+        if (!(event.getEntity() instanceof Player victim)) return;
+        if (!plugin.getGameManager().isGameRunning()) return;
+        // Cancel any damage to inactive runners in cages
+        if (plugin.getGameManager().isRunner(victim) && plugin.getGameManager().getActiveRunner() != victim) {
+            if ("CAGE".equalsIgnoreCase(plugin.getConfigManager().getFreezeMode())) {
+                event.setCancelled(true);
+            }
+        }
     }
 
     @EventHandler
@@ -321,4 +335,26 @@ public class EventListeners implements Listener {
 
     // Removed inventory sync method: inactive runners will not receive
     // the active runner's inventory outside of swap logic.
+
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void onEntityDamageByEntity(EntityDamageByEntityEvent event) {
+        if (!plugin.getGameManager().isGameRunning()) return;
+        if (!"CAGE".equalsIgnoreCase(plugin.getConfigManager().getFreezeMode())) return;
+
+        if (event.getEntity() instanceof Player victim) {
+            org.bukkit.entity.Entity damagerEntity = event.getDamager();
+            Player attacker = null;
+            if (damagerEntity instanceof Player p) attacker = p;
+            else if (damagerEntity instanceof org.bukkit.entity.Projectile proj && proj.getShooter() instanceof Player p2) attacker = p2;
+
+            if (attacker != null) {
+                // Cancel PvP only when both players are occupants of the shared cage
+                try {
+                    if (plugin.getGameManager().areBothPlayersInSharedCage(attacker, victim)) {
+                        event.setCancelled(true);
+                    }
+                } catch (Throwable ignored) {}
+            }
+        }
+    }
 }

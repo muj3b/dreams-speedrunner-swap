@@ -7,6 +7,7 @@ import org.bukkit.entity.Player;
 import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
 import com.example.speedrunnerswap.utils.BukkitCompat;
+import com.example.speedrunnerswap.utils.Msg;
 
 import java.util.List;
 import java.util.Random;
@@ -52,9 +53,9 @@ public class BountyManager {
     }
 
     private void announceBounty(Player target) {
-        com.example.speedrunnerswap.utils.Msg.broadcast("\n§4§l=== BOUNTY ANNOUNCED ===");
-        com.example.speedrunnerswap.utils.Msg.broadcast("§c" + target.getName() + " §ehas been marked for elimination!");
-        com.example.speedrunnerswap.utils.Msg.broadcast("§eThe hunter who eliminates them will receive special rewards!");
+        Msg.broadcast("\n§4§l=== BOUNTY ANNOUNCED ===");
+        Msg.broadcast("§c" + target.getName() + " §ehas been marked for elimination!");
+        Msg.broadcast("§eThe hunter who eliminates them will receive special rewards!");
 
         // Play sound to all players
         for (Player player : Bukkit.getOnlinePlayers()) {
@@ -70,8 +71,8 @@ public class BountyManager {
         giveRewards(hunter);
 
         // Announce bounty claimed
-        com.example.speedrunnerswap.utils.Msg.broadcast("\n§4§l=== BOUNTY CLAIMED ===");
-        com.example.speedrunnerswap.utils.Msg.broadcast("§e" + hunter.getName() + " §ahas eliminated the bounty target!");
+        Msg.broadcast("\n§4§l=== BOUNTY CLAIMED ===");
+        Msg.broadcast("§e" + hunter.getName() + " §ahas eliminated the bounty target!");
 
         // Play victory sound
         hunter.playSound(hunter.getLocation(), Sound.UI_TOAST_CHALLENGE_COMPLETE, 1.0f, 1.0f);

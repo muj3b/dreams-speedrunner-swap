@@ -1,6 +1,7 @@
 package com.example.speedrunnerswap.game;
 
 import com.example.speedrunnerswap.SpeedrunnerSwap;
+import com.example.speedrunnerswap.utils.Msg;
 import org.bukkit.Bukkit;
 import org.bukkit.World;
 import org.bukkit.WorldBorder;
@@ -36,7 +37,7 @@ public class WorldBorderManager {
             border.setSize(finalSize, shrinkDuration);
 
             // Broadcast border start message
-            com.example.speedrunnerswap.utils.Msg.broadcast("§c§lWorld Border will shrink from " +
+            Msg.broadcast("§c§lWorld Border will shrink from " +
                 initialSize + " blocks to " + finalSize + " blocks over " +
                 (shrinkDuration / 60) + " minutes!");
         }
@@ -78,7 +79,7 @@ public class WorldBorderManager {
             int finalSize = plugin.getConfig().getInt("world_border.final_size", 100);
             
             if (currentSize > finalSize) {
-                com.example.speedrunnerswap.utils.Msg.broadcast(String.format("§e§lWorld Border: §r§e%.0f blocks and shrinking!", currentSize));
+                Msg.broadcast(String.format("§e§lWorld Border: §r§e%.0f blocks and shrinking!", currentSize));
             }
         }, 20 * 60 * 5, 20 * 60 * 5); // Every 5 minutes
     }

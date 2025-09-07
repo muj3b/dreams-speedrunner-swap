@@ -463,6 +463,28 @@ public class ConfigManager {
         return config.getBoolean("broadcasts.team_changes", true);
     }
 
+    // UI update tuning
+    public int getActionBarUpdateTicks() {
+        return config.getInt("ui.update_ticks.actionbar", 20);
+    }
+
+    public int getTitleUpdateTicks() {
+        return config.getInt("ui.update_ticks.title", 10);
+    }
+
+    // Default mode persistence
+    public com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode getDefaultMode() {
+        String m = config.getString("game.default_mode", "dream");
+        if (m == null) m = "dream";
+        return "sapnap".equalsIgnoreCase(m) ? com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode.SAPNAP : com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode.DREAM;
+    }
+
+    public void setDefaultMode(com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode mode) {
+        String v = mode == com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode.SAPNAP ? "sapnap" : "dream";
+        config.set("game.default_mode", v);
+        plugin.saveConfig();
+    }
+
     public boolean isMuteInactiveRunners() {
         return config.getBoolean("voice_chat.mute_inactive_runners", true);
     }

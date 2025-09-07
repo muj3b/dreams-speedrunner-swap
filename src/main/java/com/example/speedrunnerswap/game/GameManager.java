@@ -44,9 +44,10 @@ public class GameManager {
     private BukkitTask cageTask;
     private long nextSwapTime;
     private final Map<UUID, PlayerState> playerStates;
-    // Cage management for CAGE freeze mode
-    private final Map<java.util.UUID, java.util.List<org.bukkit.block.BlockState>> builtCages = new java.util.HashMap<>();
-    private final Map<java.util.UUID, org.bukkit.Location> cageCenters = new java.util.HashMap<>();
+    // Shared cage management per-world (one cage in each world)
+    private final java.util.Map<org.bukkit.World, java.util.List<org.bukkit.block.BlockState>> sharedCageBlocks = new java.util.HashMap<>();
+    private final java.util.Map<org.bukkit.World, org.bukkit.Location> sharedCageCenters = new java.util.HashMap<>();
+    private final java.util.Set<java.util.UUID> cagedPlayers = new java.util.HashSet<>();
     
     public GameManager(SpeedrunnerSwap plugin) {
         this.plugin = plugin;
@@ -64,7 +65,11 @@ public class GameManager {
         }
         
         if (!canStartGame()) {
-            Msg.broadcast("§cGame cannot start: At least one runner and one hunter are required.");
+            if (plugin.getCurrentMode() == com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode.SAPNAP) {
+                Msg.broadcast("§cGame cannot start: Add at least one runner.");
+            } else {
+                Msg.broadcast("§cGame cannot start: At least one runner and one hunter are required.");
+            }
             return false;
         }
         
@@ -103,12 +108,14 @@ public class GameManager {
                 
                 applyInactiveEffects();
                 scheduleNextSwap();
-                scheduleNextHunterSwap();
+                if (plugin.getCurrentMode() != com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode.SAPNAP) {
+                    scheduleNextHunterSwap();
+                }
                 startActionBarUpdates();
                 startTitleUpdates();
                 startCageEnforcement();
                 
-                if (plugin.getConfigManager().isTrackerEnabled()) {
+                if (plugin.getCurrentMode() != com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode.SAPNAP && plugin.getConfigManager().isTrackerEnabled()) {
                     plugin.getTrackerManager().startTracking();
                     for (Player hunter : hunters) {
                         if (hunter.isOnline()) {
@@ -330,7 +337,11 @@ public class GameManager {
             return false;
         }
         loadTeams();
-        return !runners.isEmpty() && !hunters.isEmpty();
+        if (!runners.isEmpty()) {
+            if (plugin.getCurrentMode() == com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode.SAPNAP) return true;
+            return !hunters.isEmpty();
+        }
+        return false;
     }
 
     /**
@@ -355,8 +366,10 @@ public class GameManager {
         runners = newRunners;
         hunters = newHunters;
 
-        // If a team becomes empty due to disconnects, pause instead of ending the game
-        if (gameRunning && (runners.isEmpty() || hunters.isEmpty())) {
+        // If a team becomes empty due to disconnects, pause instead of ending the game.
+        // In runner-only mode, ignore hunters list being empty.
+        boolean teamEmpty = runners.isEmpty() || (plugin.getCurrentMode() != com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode.SAPNAP && hunters.isEmpty());
+        if (gameRunning && teamEmpty) {
             if (plugin.getConfigManager().isPauseOnDisconnect()) {
                 pauseGame();
                 if (plugin.getConfigManager().isBroadcastGameEvents()) {
@@ -428,6 +441,10 @@ public class GameManager {
             
             if (player.getGameMode() == GameMode.SPECTATOR && runners.contains(player)) {
                 player.setGameMode(GameMode.SURVIVAL);
+            }
+            // Ensure everyone can see everyone again after cleanup
+            for (Player viewer : Bukkit.getOnlinePlayers()) {
+                try { viewer.showPlayer(plugin, player); } catch (Throwable ignored) {}
             }
         }
     }
@@ -534,21 +551,22 @@ public class GameManager {
             actionBarTask.cancel();
         }
     
+        int period = Math.max(1, plugin.getConfigManager().getActionBarUpdateTicks());
         actionBarTask = Bukkit.getScheduler().runTaskTimer(plugin, () -> {
             if (!gameRunning) {
                 return;
             }
             updateActionBar();
-        }, 0L, 20L);
+        }, 0L, period);
     }
 
     private void startTitleUpdates() {
         if (titleTask != null) titleTask.cancel();
-        // Update titles a bit faster for near-immediate status feedback
+        int period = Math.max(1, plugin.getConfigManager().getTitleUpdateTicks());
         titleTask = Bukkit.getScheduler().runTaskTimer(plugin, () -> {
             if (!gameRunning || gamePaused) return;
             updateTitles();
-        }, 0L, 5L); // 0.25s for snappier updates
+        }, 0L, period);
     }
     
     private void updateActionBar() {
@@ -558,12 +576,31 @@ public class GameManager {
 
         int timeLeft = getTimeUntilNextSwap();
         for (Player player : Bukkit.getOnlinePlayers()) {
-            // Only the active runner sees the timer in the actionbar, and only for the last 10s.
-            if (player.equals(activeRunner) && timeLeft <= 10) {
+            boolean isRunner = runners.contains(player);
+            boolean isHunter = hunters.contains(player);
+            boolean isActive = player.equals(activeRunner);
+
+            String vis;
+            if (isRunner) {
+                vis = isActive ? plugin.getConfigManager().getRunnerTimerVisibility()
+                               : plugin.getConfigManager().getWaitingTimerVisibility();
+            } else if (isHunter) {
+                vis = plugin.getConfigManager().getHunterTimerVisibility();
+            } else {
+                vis = "never";
+            }
+
+            boolean show;
+            switch (String.valueOf(vis).toLowerCase()) {
+                case "always" -> show = true;
+                case "last_10" -> show = timeLeft <= 10;
+                default -> show = false;
+            }
+
+            if (show) {
                 String msg = String.format("§eSwap in: §c%ds", Math.max(0, timeLeft));
                 com.example.speedrunnerswap.utils.ActionBarUtil.sendActionBar(player, msg);
             } else {
-                // Clear any prior actionbar for others
                 com.example.speedrunnerswap.utils.ActionBarUtil.sendActionBar(player, "");
             }
         }
@@ -574,13 +611,14 @@ public class GameManager {
         
         for (Player runner : runners) {
             if (runner.equals(activeRunner)) {
-                // Remove cage if previously created
-                removeCageFor(runner);
+                // Remove player from shared cage set
+                cagedPlayers.remove(runner.getUniqueId());
                 PotionEffectType eff;
                 if ((eff = BukkitCompat.resolvePotionEffect("blindness")) != null) runner.removePotionEffect(eff);
                 if ((eff = BukkitCompat.resolvePotionEffect("darkness")) != null) runner.removePotionEffect(eff);
                 if ((eff = BukkitCompat.resolvePotionEffect("slowness")) != null) runner.removePotionEffect(eff);
                 if ((eff = BukkitCompat.resolvePotionEffect("slow_falling")) != null) runner.removePotionEffect(eff);
+                if ((eff = BukkitCompat.resolvePotionEffect("invisibility")) != null) runner.removePotionEffect(eff);
                 runner.setGameMode(GameMode.SURVIVAL);
                 // Ensure flight is disabled for the active runner to avoid anti-cheat confusion
                 try { runner.setAllowFlight(false); } catch (Exception ignored) {}
@@ -614,10 +652,13 @@ public class GameManager {
                     PotionEffectType blindness2 = BukkitCompat.resolvePotionEffect("blindness");
                     if (blindness2 != null) runner.addPotionEffect(new PotionEffect(blindness2, Integer.MAX_VALUE, 1, false, false));
                 } else if (freezeMode.equalsIgnoreCase("CAGE")) {
-                    // Teleport to a high-altitude bedrock cage and blind
-                    createCageFor(runner);
+                    // Teleport to shared bedrock cage and blind + invis
+                    createOrEnsureSharedCage(runner.getWorld());
+                    teleportToSharedCage(runner);
                     PotionEffectType blindness = BukkitCompat.resolvePotionEffect("blindness");
                     if (blindness != null) runner.addPotionEffect(new PotionEffect(blindness, Integer.MAX_VALUE, 1, false, false));
+                    PotionEffectType invis = BukkitCompat.resolvePotionEffect("invisibility");
+                    if (invis != null) runner.addPotionEffect(new PotionEffect(invis, Integer.MAX_VALUE, 1, false, false));
                     runner.setGameMode(GameMode.ADVENTURE);
                     // Allow flight while caged to prevent server kicking for "flying"
                     try { runner.setAllowFlight(true); } catch (Exception ignored) {}
@@ -689,6 +730,11 @@ public class GameManager {
             }
         }
     }
+
+    /** Public hook for GUI/actions to re-apply active/inactive effects and cages */
+    public void reapplyStates() {
+        refreshFreezeMechanic();
+    }
     
     private void performSwap() {
         if (!gameRunning || gamePaused || runners.isEmpty()) {
@@ -745,6 +791,7 @@ public class GameManager {
 
             // Apply to the next runner
             PlayerStateUtil.applyPlayerState(nextRunner, prevState);
+            try { nextRunner.updateInventory(); } catch (Throwable ignored) {}
 
             // Teleport adjustment for safe swap near the previous runner's location
             if (plugin.getConfigManager().isSafeSwapEnabled()) {
@@ -927,6 +974,24 @@ public class GameManager {
         return gamePaused;
     }
 
+    /** Shuffle the runner queue while keeping the current active runner first */
+    public boolean shuffleQueue() {
+        if (runners == null || runners.size() < 2) return false;
+        Player current = activeRunner;
+        java.util.List<Player> rest = new java.util.ArrayList<>();
+        for (Player p : runners) {
+            if (!p.equals(current)) rest.add(p);
+        }
+        java.util.Collections.shuffle(rest, new java.util.Random());
+        java.util.List<Player> newOrder = new java.util.ArrayList<>();
+        newOrder.add(current);
+        newOrder.addAll(rest);
+        runners = newOrder;
+        applyInactiveEffects();
+        refreshActionBar();
+        return true;
+    }
+
     /** Replace runners list and update config team names */
     public void setRunners(java.util.List<Player> players) {
         java.util.List<String> names = new java.util.ArrayList<>();
@@ -963,11 +1028,15 @@ public class GameManager {
                 String.format("Sneaking: %s  |  Running: %s", isSneak ? "Yes" : "No", isSprint ? "Yes" : "No"))
                 .color(NamedTextColor.YELLOW);
 
+        String waitingVis = plugin.getConfigManager().getWaitingTimerVisibility();
+        boolean waitingAlways = "always".equalsIgnoreCase(waitingVis);
+        boolean waitingLast10 = "last_10".equalsIgnoreCase(waitingVis);
+
         for (Player p : Bukkit.getOnlinePlayers()) {
             if (!runners.contains(p)) continue; // Only runners get titles
 
             boolean isActive = p.equals(current);
-            boolean shouldShow = !isActive; // waiting: always; active: never (use actionbar for last 10s)
+            boolean shouldShow = !isActive && (waitingAlways || (waitingLast10 && timeLeft <= 10));
             if (!shouldShow) continue;
 
             net.kyori.adventure.text.Component titleText = net.kyori.adventure.text.Component.text(
@@ -984,52 +1053,34 @@ public class GameManager {
         }
     }
 
-    private void createCageFor(Player runner) {
-        if (runner == null || !runner.isOnline()) return;
-        org.bukkit.Location existing = cageCenters.get(runner.getUniqueId());
-        if (existing != null) {
-            // If cage exists in another world, rebuild it here
-            if (existing.getWorld() != runner.getWorld()) {
-                removeCageFor(runner);
-            } else {
-                return; // already has a cage in this world
-            }
-        }
-
-        // Build cage in the runner's current world so freezing works in
-        // Overworld, Nether, and The End consistently.
+    private void createOrEnsureSharedCage(World world) {
+        if (world == null) world = Bukkit.getWorlds().get(0);
         Location base = plugin.getConfigManager().getLimboLocation();
-        World world = runner.getWorld();
         int y = world.getMaxHeight() - 10;
-        int index = Math.max(0, runners.indexOf(runner));
-        int spacing = 10;
-        int cx = (int) Math.round(base.getX()) + index * spacing;
+        int cx = (int) Math.round(base.getX());
         int cz = (int) Math.round(base.getZ());
-        // Place center at the cage floor level (top of the bedrock floor),
-        // so standing on the floor does not get treated as "outside" and yo-yo teleport.
         Location center = new Location(world, cx + 0.5, y, cz + 0.5);
-        // Ensure chunk is loaded
-        center.getChunk().load(true);
-
+        Location existing = sharedCageCenters.get(world);
+        if (existing != null && Math.abs(existing.getX() - center.getX()) < 0.1 && Math.abs(existing.getY() - center.getY()) < 0.1 && Math.abs(existing.getZ() - center.getZ()) < 0.1) {
+            return;
+        }
+        // Cleanup old cage in this world
+        java.util.List<org.bukkit.block.BlockState> old = sharedCageBlocks.remove(world);
+        if (old != null) {
+            for (org.bukkit.block.BlockState s : old) { try { s.update(true, false); } catch (Exception ignored) {} }
+        }
+        try { center.getChunk().load(true); } catch (Throwable ignored) {}
         java.util.List<org.bukkit.block.BlockState> changed = new java.util.ArrayList<>();
-        // Build 5x5x5 cube of bedrock with 3x3x3 air cavity, plus extended floor to catch glitches
         for (int dx = -2; dx <= 2; dx++) {
             for (int dy = -1; dy <= 3; dy++) {
                 for (int dz = -2; dz <= 2; dz++) {
                     org.bukkit.block.Block block = world.getBlockAt(cx + dx, y + dy, cz + dz);
                     boolean isShell = (dx == -2 || dx == 2 || dz == -2 || dz == 2 || dy == -1 || dy == 3);
-                    if (isShell) {
-                        changed.add(block.getState());
-                        block.setType(Material.BEDROCK, false);
-                    } else {
-                        changed.add(block.getState());
-                        block.setType(Material.AIR, false);
-                    }
+                    changed.add(block.getState());
+                    block.setType(isShell ? Material.BEDROCK : Material.AIR, false);
                 }
             }
         }
-
-        // Extended floor: 7x7 bedrock platform at y-1 to prevent falling off due to lag/glitch
         for (int dx = -3; dx <= 3; dx++) {
             for (int dz = -3; dz <= 3; dz++) {
                 org.bukkit.block.Block floor = world.getBlockAt(cx + dx, y - 1, cz + dz);
@@ -1037,35 +1088,30 @@ public class GameManager {
                 floor.setType(Material.BEDROCK, false);
             }
         }
-
-        builtCages.put(runner.getUniqueId(), changed);
-        cageCenters.put(runner.getUniqueId(), center.clone());
-        // Teleport inside cage
-        runner.teleport(center);
-        // Guard against anti-fly kicks while caged
-        try { runner.setAllowFlight(true); } catch (Exception ignored) {}
-        try { runner.setFlying(false); } catch (Exception ignored) {}
+        sharedCageBlocks.put(world, changed);
+        sharedCageCenters.put(world, center.clone());
     }
 
-    private void removeCageFor(Player runner) {
-        if (runner == null) return;
-        java.util.List<org.bukkit.block.BlockState> states = builtCages.remove(runner.getUniqueId());
-        cageCenters.remove(runner.getUniqueId());
-        if (states != null) {
-            for (org.bukkit.block.BlockState s : states) {
-                try { s.update(true, false); } catch (Exception ignored) {}
-            }
+    private void teleportToSharedCage(Player p) {
+        if (p == null || !p.isOnline()) return;
+        createOrEnsureSharedCage(p.getWorld());
+        org.bukkit.Location center = sharedCageCenters.get(p.getWorld());
+        if (center != null) {
+            p.teleport(center);
+            cagedPlayers.add(p.getUniqueId());
+            try { p.setAllowFlight(true); } catch (Exception ignored) {}
+            try { p.setFlying(false); } catch (Exception ignored) {}
         }
     }
 
     private void cleanupAllCages() {
-        java.util.Set<java.util.UUID> ids = new java.util.HashSet<>(builtCages.keySet());
-        for (java.util.UUID id : ids) {
-            Player p = Bukkit.getPlayer(id);
-            if (p != null) removeCageFor(p);
+        for (java.util.Map.Entry<org.bukkit.World, java.util.List<org.bukkit.block.BlockState>> e : sharedCageBlocks.entrySet()) {
+            java.util.List<org.bukkit.block.BlockState> list = e.getValue();
+            if (list != null) for (org.bukkit.block.BlockState s : list) { try { s.update(true, false); } catch (Exception ignored) {} }
         }
-        builtCages.clear();
-        cageCenters.clear();
+        sharedCageBlocks.clear();
+        sharedCageCenters.clear();
+        cagedPlayers.clear();
     }
 
     private void startCageEnforcement() {
@@ -1073,20 +1119,18 @@ public class GameManager {
         cageTask = Bukkit.getScheduler().runTaskTimer(plugin, () -> {
             if (!gameRunning || gamePaused) return;
             if (!"CAGE".equalsIgnoreCase(plugin.getConfigManager().getFreezeMode())) return;
-
+            // Ensure a cage exists in each runner's current world and enforce
             for (Player r : runners) {
                 if (r.equals(activeRunner)) continue;
                 if (!r.isOnline()) continue;
-                // Ensure cage exists
-                createCageFor(r);
-                org.bukkit.Location center = cageCenters.get(r.getUniqueId());
+                createOrEnsureSharedCage(r.getWorld());
+                teleportToSharedCage(r);
+                org.bukkit.Location center = sharedCageCenters.get(r.getWorld());
                 if (center == null) continue;
-
                 org.bukkit.Location loc = r.getLocation();
                 double dx = Math.abs(loc.getX() - center.getX());
                 double dy = loc.getY() - center.getY();
                 double dz = Math.abs(loc.getZ() - center.getZ());
-                // With center.y at floor top, allow a small tolerance above/below
                 boolean outside = dx > 1.2 || dz > 1.2 || dy < -0.2 || dy > 2.8;
                 if (outside) {
                     r.teleport(center);
@@ -1094,11 +1138,16 @@ public class GameManager {
                     r.setFallDistance(0f);
                     r.setNoDamageTicks(Math.max(10, r.getNoDamageTicks()));
                 } else {
-                    // Keep anti-fly protection while in cage
                     try { r.setAllowFlight(true); } catch (Exception ignored) {}
                     try { r.setFlying(false); } catch (Exception ignored) {}
                 }
             }
         }, 0L, 5L); // enforce every 0.25s
+    }
+
+    public boolean areBothPlayersInSharedCage(Player a, Player b) {
+        if (a == null || b == null) return false;
+        if (!cagedPlayers.contains(a.getUniqueId()) || !cagedPlayers.contains(b.getUniqueId())) return false;
+        return a.getWorld().equals(b.getWorld()) && sharedCageCenters.containsKey(a.getWorld());
     }
 }
