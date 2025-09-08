@@ -1,79 +1,85 @@
-# 🌀 Speedrunner Swap — Dream's Newest Challenge
+# 🌀 Speedrunner Swap — Ultimate Challenge Plugin
 
 <div align="center">
 
-![Minecraft](https://img.shields.io/badge/Minecraft-1.21+-brightgreen?style=for-the-badge&logo=minecraft)
-![Version](https://img.shields.io/badge/Version-Latest-blue?style=for-the-badge)
+![Minecraft](https://img.shields.io/badge/Minecraft-1.21.8%2B-brightgreen?style=for-the-badge&logo=minecraft)
+![API](https://img.shields.io/badge/API-Paper%2FSpigot_1.21.8-blue?style=for-the-badge)
+![Status](https://img.shields.io/badge/Status-Two_Game_Modes-9cf?style=for-the-badge)
 ![Downloads](https://img.shields.io/badge/Downloads-🔥Hot-red?style=for-the-badge)
 
 </div>
 
 ---
 
-> **🎮 The Ultimate Speedrunner Swap Experience**  
-> Bring Dream's latest "Speedrunner Swap" challenge straight to your server! Multiple speedrunners share the same player state and swap control on a configurable timer, while hunters try to stop them from beating the game.
-
-<details>
-<summary><strong>🚨 What Makes This Special?</strong></summary>
-
-This plugin is the **first of its kind**, packed with features and customization not found anywhere else: built-in GUI, randomized countdowns, safe swap options, and more. **Plus, I've added 10 brand new features that weren't in the original plugin from the video** to make the gameplay even more exciting and unpredictable!
-
-</details>
+> **🎮 Two Epic Game Modes in One Plugin!**  
+> Experience both Dream's classic **Speedrunners vs Hunters** challenge AND the innovative **Multi-Runner Control Swap** mode. Choose your adventure!
 
 ---
 
-## 📺 Watch the Original Challenge
+## 📺 Watch the Originals!
 
 <div align="center">
 
-[![Watch the original video](https://img.youtube.com/vi/Zj3G5hN-EBQ/0.jpg)](https://www.youtube.com/watch?v=Zj3G5hN-EBQ)
+**🏹 Speedrunners vs Hunters Mode**
+<iframe width="450" height="253" src="https://www.youtube-nocookie.com/embed/Zj3G5hN-EBQ" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe>
 
-*Click to watch Dream's original Speedrunner Swap video*
+**🎛️ Multi-Runner Control Mode**
+<iframe width="450" height="253" src="https://www.youtube-nocookie.com/embed/GwrAvYlT7xg" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe>
 
 </div>
 
 ---
 
-## 🚀 How It Works
+## 🎮 Game Modes
+
+### 🏹 **Speedrunners vs Hunters Mode**
+Classic Dream-style gameplay with speedrunners swapping control while hunters pursue them.
+
+**Core Mechanics:**
+- 🔄 Speedrunners swap control on intervals
+- 🧭 Hunters track with compasses  
+- ⚔️ PvP elimination mechanics
+- 🎯 Goal: Beat the Ender Dragon before getting caught
+
+### 🎛️ **Multi-Runner Control Mode** 
+Pure cooperation mode where multiple runners share one character with no hunters.
+
+**Core Mechanics:**
+- 🔄 Queue-based rotation system
+- 👥 Any number of runners (2+)
+- 🤝 Shared inventory, health, XP, effects
+- 🎯 Goal: Beat the Ender Dragon together
+
+---
+
+## 🚀 How Both Modes Work
+
+<div align="center">
 
 <table>
 <tr>
 <td width="50%">
 
-### 🔄 **Swap Mechanic**
-- ⏰ Speedrunners swap control at configurable intervals (default: 60s)
-- 🎲 Swaps can be fixed or randomized (min/max, Gaussian jitter)
-- 🥶 Inactive runners are frozen (blindness/slowness effects or spectator mode)
+### 🔄 **Swap System**
+- ⏰ Configurable intervals (default: 60s)
+- 🎲 Fixed or randomized timing
+- 🛡️ Safe swap locations
+- 🕶️ Inactive players frozen/spectating
 
 </td>
 <td width="50%">
 
-### 🤝 **Shared State**
-- 🎒 Runners share inventory, health, position, XP, and effects
-- 💬 Teamwork and communication required
-- 🔗 Seamless state transitions between players
-
-</td>
-</tr>
-<tr>
-<td width="50%">
-
-### 🏹 **Hunters**
-- 🧭 Track the active runner with a compass (periodic updates)
-- 📍 Coordinates shown in action bar
-- ⚔️ Use PvP to eliminate runners
-
-</td>
-<td width="50%">
-
-### 🎯 **Objective**
-- 🐉 Runners must beat the Ender Dragon
-- 🛡️ Hunters must stop them before they succeed
-- 🏆 Ultimate test of skill and teamwork
+### 🤝 **Shared Elements**
+- 🎒 Inventory, health, XP sync
+- 📍 Position continuity  
+- 💬 Teamwork coordination
+- 🔗 Seamless transitions
 
 </td>
 </tr>
 </table>
+
+</div>
 
 ---
 
@@ -81,102 +87,127 @@ This plugin is the **first of its kind**, packed with features and customization
 
 <div align="center">
 
-| 🎛️ **System** | 📝 **Description** |
-|:---|:---|
-| **🔄 Customizable Swap System** | Fixed/random intervals, jitter, grace period, auto-pause |
-| **🛡️ Safe Swap Mode** | Avoid dangerous locations (lava, fire, etc.) |
-| **❄️ Freeze Inactive Runners** | Effects or spectator options |
-| **🧭 Hunter Compass Tracking** | Periodic updates, coordinate display |
-| **🖥️ GUI Menus** | Team selection, settings, game management |
-| **📢 Broadcast Messages** | Swaps, game events, team changes |
-| **🎤 Simple Voice Chat Integration** | Optionally mute inactive runners |
-| **👁️ Customizable Timer Visibility** | Configure timer visibility for all player types |
-| **⚡ Version Support** | Minecraft 1.21+, Bukkit/Spigot/Paper |
+| 🎛️ **Feature** | 📝 **Description** | 🏹 **Hunters** | 🎛️ **Control** |
+|:---|:---|:---:|:---:|
+| **🔄 Customizable Swaps** | Fixed/random intervals, jitter, grace period | ✅ | ✅ |
+| **🛡️ Safe Swap Mode** | Avoid lava/fire/dangerous blocks | ✅ | ✅ |
+| **🧭 Hunter Tracking** | Compass updates, coordinate display | ✅ | ❌ |
+| **👥 Queue System** | Fair rotation for multiple runners | ❌ | ✅ |
+| **🖥️ GUI Interface** | Team selection, settings management | ✅ | ✅ |
+| **🎤 Voice Chat Support** | Mute inactive runners | ✅ | ✅ |
+| **🏰 Cage System** | Robust cross-world containment | ❌ | ✅ |
 
 </div>
 
 ---
 
-## 🎯 Exclusive New Features 
+## 🎯 Exclusive Hunter Mode Features
 ### *10 Additions Not in the Original!*
 
 <details>
 <summary><strong>🔥 Click to Reveal All New Features</strong></summary>
 
-<br>
-
-> **🌟 These features are completely original and add massive depth to the gameplay!**
+<div align="center">
 
 <table>
 <tr>
 <td>
 
 **1. 🔄 Hunter Swapping**  
-Just like the runners, hunters will also swap control at configurable intervals, adding a new layer of unpredictability
+Hunters can swap control too
 
 **2. ✨ Swap Power-Ups**  
-The newly-swapped active runner receives a random positive or negative potion effect for a short duration
+Random potion effects on swap
 
 **3. 💪 "Last Stand" Mode**  
-The final remaining runner receives a temporary strength and speed boost to give them a fighting chance
+Final runner gets strength boost
 
 **4. 🎒 Custom Kits**  
-Define custom starting kits for both runners and hunters in the configuration file
+Define starting equipment
 
-**5. 🔥 "Hot Potato" Swap Mode**  
-A new game mode where swaps are triggered by the active runner taking damage, not by a timer
+**5. 🔥 "Hot Potato" Mode**  
+Damage-triggered swaps
 
 </td>
 <td>
 
 **6. 📊 Advanced Stats**  
-End-game summary displaying detailed statistics like "time as active runner" and "kills as hunter"
+Detailed end-game statistics
 
-**7. 🌍 Shrinking World Border**  
-The world border slowly shrinks over time, forcing players closer together for a more action-packed endgame
+**7. 🌍 Shrinking Border**  
+World border forces action
 
 **8. 💰 Bounty System**  
-A random runner is assigned as a "bounty" at game start—the hunter who eliminates them receives a special reward
+Special rewards for targets
 
-**9. ⚡ Sudden Death Mode**  
-If the game runs too long, "sudden death" mode activates, teleporting all players to the End for a final battle
+**9. ⚡ Sudden Death**  
+End teleport to final battle
 
 **10. 🧭 Compass Jamming**  
-After a swap, hunters' compasses are temporarily "jammed" and point in random directions, giving the new runner an escape window
+Temporary hunter confusion
 
 </td>
 </tr>
 </table>
 
+</div>
+
 </details>
 
 ---
 
-## 🛠️ Installation
+## 🎛️ Multi-Runner Control Features
 
 <div align="center">
 
-### Quick Setup Guide
+| 🎛️ **Feature** | 📝 **Description** |
+|:---|:---|
+| **🔄 Queue Management** | Fair rotation system for any number of runners |
+| **📊 Queue HUD** | Active sees countdown; others see queue position |
+| **🌍 Cross-World Cages** | Robust cage system works in all dimensions |
+| **⏲️ Smart Timing** | Grace periods, disconnect pausing, jitter options |
+| **🎯 Victory Condition** | Dragon death triggers donation link broadcast |
+| **🛠️ Freeze Modes** | EFFECTS, SPECTATOR, LIMBO, or CAGE options |
 
 </div>
 
-```bash
-# Step 1: Download
-wget https://modrinth.com/plugin/speedrunner-swap
+---
 
-# Step 2: Install
-cp speedrunner-swap.jar /server/plugins/
+## ⚙️ Configuration
 
-# Step 3: Restart & Configure
-# Edit plugins/SpeedrunnerSwap/config.yml
+Edit `plugins/SpeedrunnerSwap/config.yml` after first run.
+
+### **Game Mode Settings**
+```yaml
+game_mode: "HUNTERS"  # HUNTERS or CONTROL
 ```
 
-| Step | Action | Details |
-|:---:|:---|:---|
-| **1** | 📥 **Download** | Get the latest `.jar` from Modrinth |
-| **2** | 📁 **Place** | Put it in your server's `plugins` folder |
-| **3** | 🔄 **Restart** | Restart your server |
-| **4** | ⚙️ **Configure** | Edit settings in `config.yml` |
+### **Common Settings**
+```yaml
+swap:
+  interval: 60
+  randomize: false
+  grace_period_ticks: 60
+safe_swap:
+  enabled: true
+  scan_radius: 5
+```
+
+### **Hunter Mode Specific**
+```yaml
+hunters:
+  tracking_enabled: true
+  pvp_enabled: true
+  compass_updates: true
+```
+
+### **Control Mode Specific**
+```yaml
+freeze_mode: "CAGE"  # EFFECTS, SPECTATOR, LIMBO, CAGE
+cage:
+  auto_rebuild: true
+  chunk_preload: true
+```
 
 ---
 
@@ -184,116 +215,70 @@ cp speedrunner-swap.jar /server/plugins/
 
 <div align="center">
 
-### 🎮 **Game Management**
+| Command | Description | Hunter Mode | Control Mode |
+|:--|:--|:---:|:---:|
+| `/swap start` | Start the game | ✅ | ✅ |
+| `/swap stop` | End the current game | ✅ | ✅ |
+| `/swap gui` | Open management interface | ✅ | ✅ |
+| `/swap status` | Show game status | ✅ | ✅ |
+| `/swap mode <hunters\|control>` | Switch game mode | ✅ | ✅ |
+| `/swap setrunners <p1> [p2] ...` | Set runner team | ✅ | ✅ |
+| `/swap sethunters <p1> [p2] ...` | Set hunter team | ✅ | ❌ |
+| `/swap shuffle` | Shuffle queue order | ❌ | ✅ |
 
-</div>
-
-<table align="center">
-<tr>
-<th width="30%">🔧 Command</th>
-<th width="50%">📝 Description</th>
-<th width="20%">🎯 Category</th>
-</tr>
-<tr>
-<td><code>/swap start</code></td>
-<td>Start a Speedrunner Swap game</td>
-<td>🟢 Control</td>
-</tr>
-<tr>
-<td><code>/swap stop</code></td>
-<td>End the current game</td>
-<td>🔴 Control</td>
-</tr>
-<tr>
-<td><code>/swap pause</code></td>
-<td>Pause the game</td>
-<td>⏸️ Control</td>
-</tr>
-<tr>
-<td><code>/swap resume</code></td>
-<td>Resume the game</td>
-<td>▶️ Control</td>
-</tr>
-<tr>
-<td><code>/swap status</code></td>
-<td>Check game status</td>
-<td>📊 Info</td>
-</tr>
-<tr>
-<td><code>/swap setrunners</code></td>
-<td>Set runner players</td>
-<td>👥 Setup</td>
-</tr>
-<tr>
-<td><code>/swap sethunters</code></td>
-<td>Set hunter players</td>
-<td>🏹 Setup</td>
-</tr>
-<tr>
-<td><code>/swap reload</code></td>
-<td>Reload configuration</td>
-<td>⚙️ Admin</td>
-</tr>
-<tr>
-<td><code>/swap gui</code></td>
-<td>Open the management GUI</td>
-<td>🖥️ Interface</td>
-</tr>
-</table>
-
-> **🔐 Permissions:** Requires `speedrunnerswap.command` permission (default: op)
-
----
-
-## 🙌 Credits
-
-<div align="center">
-
-<table>
-<tr>
-<td align="center">
-
-**🎬 Inspired by**  
-[Dream's Speedrunner Swap Manhunt](https://www.youtube.com/watch?v=Zj3G5hN-EBQ)
-
-</td>
-<td align="center">
-
-**👨‍💻 Developed by**  
-**muj3b**
-
-</td>
-</tr>
-</table>
+**Permissions:** `speedrunnerswap.command` (default: op), `speedrunnerswap.admin` (default: op)
 
 </div>
 
 ---
 
-## ❤️ Support the Project
+## 🛠️ Installation
+
+<div align="center">
+  
+| Step | Action | Details |
+|:---:|:---|:---|
+| **1** | 📥 **Download** | Get latest `speedrunnerswap-*.jar` |
+| **2** | 📁 **Install** | Place in `plugins/` directory |
+| **3** | 🔄 **Restart** | Restart your server |
+| **4** | ⚙️ **Configure** | Choose mode in `config.yml` |
+| **5** | 🎮 **Play** | Use `/swap gui` or commands to start |
+
+</div>
+
+**Requirements:** Paper 1.21.8+ recommended; Spigot 1.21.x supported with fallbacks.
+
+---
+
+## 🧱 Technical Notes
+
+### **Hunter Mode**
+- Compass tracking updates every 3 seconds
+- PvP mechanics handle elimination
+- Spectator mode for eliminated players
+- GUI-based team management
+
+### **Control Mode**  
+- Cages work across all dimensions (Overworld/Nether/End)
+- Chunk preloading prevents generation issues
+- Safe Y calculation per world environment
+- Automatic cage rebuilding on world changes
+
+---
+
+## 🙌 Credits & Support
 
 <div align="center">
 
-> **💝 Love the plugin? Show your support!**
-
-I put a **ton of work** into making Speedrunner Swap the best it can be. If you appreciate the plugin and want to help out, please consider supporting the project!
+**🎬 Inspired by:** Dream's Speedrunner Swap & Sapnap's Multi-Runner videos  
+**👨‍💻 Developed by:** muj3b
 
 [![Donate](https://img.shields.io/badge/💖_Donate-Support_Development-ff69b4?style=for-the-badge)](https://donate.stripe.com/8x29AT0H58K03judnR0Ba01)
 
-*Your support helps keep the project updated and improving!*
-
-</div>
-
 ---
 
-<div align="center">
+### 🎉 **Ready for the Ultimate Challenge?** 🚀
 
-### 🎉 **Ready to Play?**
-
-**Download now and experience the most advanced Speedrunner Swap plugin available!**
-
----
-
-**Enjoy!** 🚀
+*Two game modes, endless possibilities. Download now and choose your adventure!*
 
 </div>
