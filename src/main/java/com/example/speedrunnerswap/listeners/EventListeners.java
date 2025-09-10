@@ -69,6 +69,11 @@ public class EventListeners implements Listener {
     public void onPlayerDeath(PlayerDeathEvent event) {
         Player player = event.getEntity();
 
+        // Suppress death messages during active games to maintain mystery
+        if (plugin.getGameManager().isGameRunning()) {
+            event.deathMessage(Component.empty());
+        }
+
         // Ensure hunters don't drop tracking compasses on death
         if (plugin.getGameManager().isGameRunning() && plugin.getGameManager().isHunter(player)) {
             event.getDrops().removeIf(item -> item != null && item.getType() == Material.COMPASS);
@@ -329,6 +334,52 @@ public class EventListeners implements Listener {
                     
                     event.setCancelled(true);
                 }
+            }
+        }
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST)
+    public void onPlayerAdvancementDone(org.bukkit.event.player.PlayerAdvancementDoneEvent event) {
+        // Suppress advancement messages during active games to maintain mystery
+        if (plugin.getGameManager().isGameRunning()) {
+            event.message(null);
+        }
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST)
+    public void onPlayerBedEnter(org.bukkit.event.player.PlayerBedEnterEvent event) {
+        Player player = event.getPlayer();
+        
+        // If game is running and sleep mechanic is enabled, control who can sleep
+        if (plugin.getGameManager().isGameRunning() && plugin.getConfigManager().isSinglePlayerSleepEnabled()) {
+            // If this is a runner but not the active one, cancel the bed enter
+            if (plugin.getGameManager().isRunner(player) && !player.equals(plugin.getGameManager().getActiveRunner())) {
+                event.setCancelled(true);
+                player.sendMessage("§cOnly the active runner can sleep!");
+                return;
+            }
+            // If this is not a runner at all (hunter or spectator), cancel
+            if (!plugin.getGameManager().isRunner(player) && !plugin.getGameManager().isHunter(player)) {
+                event.setCancelled(true);
+                return;
+            }
+            
+            // If we reach here, it's the active runner entering bed - schedule night skip check
+            if (plugin.getGameManager().isRunner(player) && player.equals(plugin.getGameManager().getActiveRunner())) {
+                plugin.getServer().getScheduler().runTaskLater(plugin, () -> {
+                    if (player.isOnline() && player.isSleeping()) {
+                        org.bukkit.World world = player.getWorld();
+                        if (world.getTime() > 12000 && world.getTime() < 24000) {
+                            world.setTime(0); // Set to day
+                            world.setStorm(false);
+                            world.setThundering(false);
+                            // Notify players
+                            for (Player p : plugin.getServer().getOnlinePlayers()) {
+                                p.sendMessage("§eThe night has been skipped by the active runner!");
+                            }
+                        }
+                    }
+                }, 20L); // Check after 1 second
             }
         }
     }

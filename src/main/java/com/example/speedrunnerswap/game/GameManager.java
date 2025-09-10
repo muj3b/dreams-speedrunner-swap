@@ -67,7 +67,7 @@ public class GameManager {
         
         if (!canStartGame()) {
             if (plugin.getCurrentMode() == com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode.SAPNAP) {
-                Msg.broadcast("§cGame cannot start: Add at least one runner.");
+                Msg.broadcast("§cGame cannot start: No online players available.");
             } else {
                 Msg.broadcast("§cGame cannot start: At least one runner and one hunter are required.");
             }

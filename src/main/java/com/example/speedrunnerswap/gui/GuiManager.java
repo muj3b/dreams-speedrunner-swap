@@ -753,6 +753,17 @@ public class GuiManager {
                 "hot_potato_toggle");
         inventory.setItem(22, hotPotatoToggle);
 
+        // Single Player Sleep toggle (disabled by default for Dreams mode)
+        boolean singlePlayerSleep = plugin.getConfigManager().isSinglePlayerSleepEnabled();
+        ItemStack singlePlayerSleepToggle = createGuiButton(
+                singlePlayerSleep ? Material.WHITE_BED : Material.RED_BED,
+                "§e§lSingle Player Sleep: " + (singlePlayerSleep ? "§aEnabled" : "§cDisabled"),
+                List.of("§7Allow only active runner to skip night",
+                        "§7Disabled by default for Dreams mode",
+                        "§7Useful when inactive players are caged"),
+                "single_player_sleep_toggle");
+        inventory.setItem(23, singlePlayerSleepToggle);
+
         // Admin tools
         ItemStack adminHeader = createItem(Material.BOOK, "§6§lAdmin Tools", List.of(
             "§7Operator utilities: force actions"

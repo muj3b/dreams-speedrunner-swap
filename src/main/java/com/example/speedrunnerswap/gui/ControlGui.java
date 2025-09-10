@@ -56,8 +56,10 @@ public class ControlGui {
         // Shuffle queue
         inv.setItem(14, named(Material.NETHER_STAR, "Shuffle Queue", List.of("Keep active runner, shuffle the rest")));
 
-        // Set runners
-        inv.setItem(16, named(Material.BOOK, "Set Runners", List.of("Open the runner selector")));
+        // Set runners button only shown in non-Sapnap modes
+        if (plugin.getCurrentMode() != SpeedrunnerSwap.SwapMode.SAPNAP) {
+            inv.setItem(16, named(Material.BOOK, "Set Runners", List.of("Open the runner selector")));
+        }
 
         // Randomize toggle
         boolean randomize = plugin.getConfigManager().isSwapRandomized();
@@ -109,6 +111,12 @@ public class ControlGui {
         inv.setItem(6, named(safeSwap ? Material.SLIME_BLOCK : Material.MAGMA_BLOCK,
                 safeSwap ? "Safe Swap: ON" : "Safe Swap: OFF",
                 List.of("Avoid lava/cactus/fire on teleports")));
+
+        // Single Player Sleep toggle (enabled by default for Sapnap mode)
+        boolean singlePlayerSleep = plugin.getConfigManager().isSinglePlayerSleepEnabled();
+        inv.setItem(8, named(singlePlayerSleep ? Material.WHITE_BED : Material.RED_BED,
+                singlePlayerSleep ? "Single Player Sleep: ON" : "Single Player Sleep: OFF",
+                List.of("Allow only active runner to skip night", "Useful when other players are caged")));
 
         // Status
         inv.setItem(24, named(Material.PAPER, "Status", List.of("Show current status in chat")));

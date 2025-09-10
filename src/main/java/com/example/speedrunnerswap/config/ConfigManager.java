@@ -726,4 +726,21 @@ public class ConfigManager {
         config.set("timer_visibility.hunter_visibility", visibility);
         plugin.saveConfig();
     }
+
+    /**
+     * Get whether single player sleep is enabled
+     * @return True if only the active runner needs to sleep to skip night
+     */
+    public boolean isSinglePlayerSleepEnabled() {
+        return config.getBoolean("single_player_sleep.enabled", false);
+    }
+
+    /**
+     * Set whether single player sleep is enabled
+     * @param enabled True to allow only active runner to skip night
+     */
+    public void setSinglePlayerSleepEnabled(boolean enabled) {
+        config.set("single_player_sleep.enabled", enabled);
+        saveConfig();
+    }
 }

@@ -85,22 +85,15 @@ public class ControlGuiListener implements Listener {
         Material type = clicked.getType();
         boolean running = plugin.getGameManager().isGameRunning();
 
-        if (type == Material.ARROW) {
-            // Back to mode selector
-            plugin.getGuiManager().openModeSelector(player);
-            return;
-        }
 
         if (type == Material.LIME_WOOL) {
             if (!running) {
                 // Ensure mode is runner-only
                 plugin.setCurrentMode(SpeedrunnerSwap.SwapMode.SAPNAP);
-                // If no runners are configured, select all online players by default
-                if (plugin.getConfigManager().getRunnerNames().isEmpty()) {
-                    List<String> names = Bukkit.getOnlinePlayers().stream().map(Player::getName).collect(Collectors.toList());
-                    plugin.getConfigManager().setRunnerNames(names);
-                    plugin.getGameManager().setRunners(new ArrayList<>(Bukkit.getOnlinePlayers()));
-                }
+                // In Sapnap mode, always set all online players as runners
+                List<String> names = Bukkit.getOnlinePlayers().stream().map(Player::getName).collect(Collectors.toList());
+                plugin.getConfigManager().setRunnerNames(names);
+                plugin.getGameManager().setRunners(new ArrayList<>(Bukkit.getOnlinePlayers()));
                 plugin.getGameManager().startGame();
             }
             new ControlGui(plugin).openMainMenu(player);
@@ -126,8 +119,12 @@ public class ControlGuiListener implements Listener {
         }
 
         if (type == Material.NETHER_STAR) {
-            plugin.getGameManager().shuffleQueue();
-            player.sendMessage("§aShuffled runner queue.");
+            if (plugin.getGameManager().shuffleQueue()) {
+                player.sendMessage("§aShuffled runner queue successfully.");
+            } else {
+                player.sendMessage("§cCannot shuffle queue - need at least 2 runners.");
+            }
+            new ControlGui(plugin).openMainMenu(player);
             return;
         }
 
@@ -188,31 +185,52 @@ public class ControlGuiListener implements Listener {
         if (type == Material.SLIME_BLOCK || type == Material.MAGMA_BLOCK) {
             boolean enabled = plugin.getConfigManager().isSafeSwapEnabled();
             plugin.getConfigManager().setSafeSwapEnabled(!enabled);
-            player.sendMessage("§eSafe Swap: §a" + (!enabled));
+            player.sendMessage("§eSafe Swap: " + (!enabled ? "§aEnabled" : "§cDisabled"));
+            new ControlGui(plugin).openMainMenu(player);
+            return;
+        }
+
+        if (type == Material.WHITE_BED || type == Material.RED_BED) {
+            boolean enabled = plugin.getConfigManager().isSinglePlayerSleepEnabled();
+            plugin.getConfigManager().setSinglePlayerSleepEnabled(!enabled);
+            player.sendMessage("§eSingle Player Sleep: " + (!enabled ? "§aEnabled" : "§cDisabled"));
             new ControlGui(plugin).openMainMenu(player);
             return;
         }
 
         if (type == Material.ARROW) {
             String name = com.example.speedrunnerswap.utils.GuiCompat.getDisplayName(clicked.getItemMeta());
+            
+            // Handle interval adjustment arrows FIRST (higher priority)
+            if (name != null) {
+                if (name.equals("-5s")) {
+                    int interval = Math.max(30, plugin.getConfigManager().getSwapInterval() - 5);
+                    plugin.getConfigManager().setSwapInterval(interval);
+                    player.sendMessage("§eInterval decreased to: §a" + interval + "s");
+                    plugin.getGameManager().refreshSwapSchedule();
+                    new ControlGui(plugin).openMainMenu(player);
+                    return;
+                } else if (name.equals("+5s")) {
+                    int interval = Math.min(600, plugin.getConfigManager().getSwapInterval() + 5);
+                    plugin.getConfigManager().setSwapInterval(interval);
+                    player.sendMessage("§eInterval increased to: §a" + interval + "s");
+                    plugin.getGameManager().refreshSwapSchedule();
+                    new ControlGui(plugin).openMainMenu(player);
+                    return;
+                }
+            }
+            
+            // Handle back button (lower priority)
             if ("§7§lBack".equals(name)) {
                 plugin.getGuiManager().openModeSelector(player);
-            } else {
-                int interval = plugin.getConfigManager().getSwapInterval();
-                if (name.contains("-5")) interval -= 5; else if (name.contains("+5")) interval += 5;
-                plugin.getConfigManager().setSwapInterval(interval);
-                player.sendMessage("§eInterval set to: §a" + plugin.getConfigManager().getSwapInterval() + "s");
-                // Refresh scheduling if running
-                plugin.getGameManager().refreshSwapSchedule();
-                new ControlGui(plugin).openMainMenu(player);
+                return;
             }
-            return;
         }
 
         if (type == Material.COMPARATOR) {
             boolean randomize = plugin.getConfigManager().isSwapRandomized();
             plugin.getConfigManager().setSwapRandomized(!randomize);
-            player.sendMessage("§eRandomize swaps: §a" + (!randomize));
+            player.sendMessage("§eRandomize swaps: " + (!randomize ? "§aEnabled" : "§cDisabled"));
             new ControlGui(plugin).openMainMenu(player);
             return;
         }
@@ -229,10 +247,17 @@ public class ControlGuiListener implements Listener {
                 String runners = plugin.getGameManager().getRunners().stream().map(Player::getName).collect(Collectors.joining(", "));
                 player.sendMessage("§eRunners: §f" + runners);
             }
+            return;
         }
     }
 
     private void handleRunnerSelectorClick(Player player, ItemStack clicked, int rawSlot, int size) {
+        // In Sapnap mode, all players are runners, so return to main menu
+        if (plugin.getCurrentMode() == SpeedrunnerSwap.SwapMode.SAPNAP) {
+            new ControlGui(plugin).openMainMenu(player);
+            return;
+        }
+
         Material type = clicked.getType();
         // Bottom row buttons
         if (rawSlot >= size - 9) {

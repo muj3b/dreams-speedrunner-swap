@@ -64,12 +64,26 @@ public final class SpeedrunnerSwap extends JavaPlugin {
         // Apply default mode from config
         try {
             this.setCurrentMode(configManager.getDefaultMode());
+            // Set appropriate sleep default for the current mode
+            if (getCurrentMode() == SwapMode.SAPNAP && !getConfig().contains("single_player_sleep.enabled")) {
+                configManager.setSinglePlayerSleepEnabled(true);
+            }
         } catch (Throwable ignored) {}
 
         // Register commands
         SwapCommand swapCommand = new SwapCommand(this);
-        getCommand("swap").setExecutor(swapCommand);
-        getCommand("swap").setTabCompleter(swapCommand);
+        try {
+            if (getCommand("swap") != null) {
+                getCommand("swap").setExecutor(swapCommand);
+                getCommand("swap").setTabCompleter(swapCommand);
+                getLogger().info("Successfully registered /swap command");
+            } else {
+                getLogger().severe("Failed to register /swap command - command not found in plugin.yml");
+            }
+        } catch (Exception e) {
+            getLogger().severe("Error registering /swap command: " + e.getMessage());
+            e.printStackTrace();
+        }
         
         // Register event listeners
         getServer().getPluginManager().registerEvents(new EventListeners(this), this);

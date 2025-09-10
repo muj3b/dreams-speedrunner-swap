@@ -136,6 +136,13 @@ voice_chat:
   # Whether to mute inactive runners
   mute_inactive_runners: true
 
+# Single Player Sleep Configuration
+single_player_sleep:
+  # If enabled, only the active runner can sleep to skip night
+  # This helps when other players are caged or frozen and can't sleep
+  # Enabled by default for Sapnap mode, disabled by default for Dreams mode
+  enabled: false
+
 # Power-ups Configuration
 power_ups:
   enabled: false

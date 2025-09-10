@@ -392,6 +392,12 @@ public class GuiListener implements Listener {
                     plugin.saveConfig();
                     break;
                 }
+                case "single_player_sleep_toggle": {
+                    boolean enabled = plugin.getConfigManager().isSinglePlayerSleepEnabled();
+                    plugin.getConfigManager().setSinglePlayerSleepEnabled(!enabled);
+                    player.sendMessage("§eSingle Player Sleep: " + (!enabled ? "§aEnabled" : "§cDisabled"));
+                    break;
+                }
                 case "freeze_toggle": {
                     boolean enabled = plugin.getConfigManager().isFreezeMechanicEnabled();
                     plugin.getConfig().set("freeze_mechanic.enabled", !enabled);

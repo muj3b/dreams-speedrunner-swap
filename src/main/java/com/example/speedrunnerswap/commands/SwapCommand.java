@@ -45,8 +45,10 @@ public class SwapCommand implements CommandExecutor, TabCompleter {
                 case "creator":
                     return handleCreator(sender);
                 case "setrunners":
+                case "setrunner":
                     return handleSetRunners(sender, Arrays.copyOfRange(args, 1, args.length));
                 case "sethunters":
+                case "sethunter":
                     return handleSetHunters(sender, Arrays.copyOfRange(args, 1, args.length));
                 case "reload":
                     return handleReload(sender);
@@ -417,15 +419,16 @@ public class SwapCommand implements CommandExecutor, TabCompleter {
         
         if (args.length == 1) {
             // Subcommands
-            List<String> subCommands = Arrays.asList("start", "stop", "pause", "resume", "status", "creator", "setrunners", "sethunters", "reload", "gui", "mode", "clearteams");
+            List<String> subCommands = Arrays.asList("start", "stop", "pause", "resume", "status", "creator", "setrunners", "setrunner", "sethunters", "sethunter", "reload", "gui", "mode", "clearteams");
             for (String subCommand : subCommands) {
                 if (subCommand.startsWith(args[0].toLowerCase())) {
                     completions.add(subCommand);
                 }
             }
         } else if (args.length > 1) {
-            // Player names for setrunners and sethunters
-            if (args[0].equalsIgnoreCase("setrunners") || args[0].equalsIgnoreCase("sethunters")) {
+            // Player names for setrunners and sethunters (both singular and plural)
+            if (args[0].equalsIgnoreCase("setrunners") || args[0].equalsIgnoreCase("setrunner") || 
+                args[0].equalsIgnoreCase("sethunters") || args[0].equalsIgnoreCase("sethunter")) {
                 for (Player player : Bukkit.getOnlinePlayers()) {
                     String name = player.getName();
                     if (name.toLowerCase().startsWith(args[args.length - 1].toLowerCase())) {
