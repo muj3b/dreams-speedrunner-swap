@@ -19,6 +19,7 @@ import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
 import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.scheduler.BukkitTask;
+
 import com.example.speedrunnerswap.utils.BukkitCompat;
 import com.example.speedrunnerswap.utils.Msg;
 import org.bukkit.inventory.ItemStack;
