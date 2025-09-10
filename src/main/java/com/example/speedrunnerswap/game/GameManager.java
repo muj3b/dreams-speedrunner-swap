@@ -1107,7 +1107,7 @@ public class GameManager {
         int y = world.getMaxHeight() - 10;
         int cx = (int) Math.round(base.getX());
         int cz = (int) Math.round(base.getZ());
-        Location center = new Location(world, cx + 0.5, y, cz + 0.5);
+        Location center = new Location(world, cx + 0.5, y + 1, cz + 0.5);
         Location existing = sharedCageCenters.get(world);
         if (existing != null && Math.abs(existing.getX() - center.getX()) < 0.1 && Math.abs(existing.getY() - center.getY()) < 0.1 && Math.abs(existing.getZ() - center.getZ()) < 0.1) {
             return;
@@ -1145,7 +1145,10 @@ public class GameManager {
         createOrEnsureSharedCage(p.getWorld());
         org.bukkit.Location center = sharedCageCenters.get(p.getWorld());
         if (center != null) {
-            p.teleport(center);
+            // Ensure the player is in a safe location (not suffocating)
+            org.bukkit.Location safeLocation = center.clone();
+            safeLocation.setY(safeLocation.getY() + 0.1); // Slightly above the floor
+            p.teleport(safeLocation);
             cagedPlayers.add(p.getUniqueId());
             try { p.setAllowFlight(true); } catch (Exception ignored) {}
             try { p.setFlying(false); } catch (Exception ignored) {}
