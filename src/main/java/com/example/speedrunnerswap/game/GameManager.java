@@ -579,6 +579,7 @@ public class GameManager {
             boolean isRunner = runners.contains(player);
             boolean isHunter = hunters.contains(player);
             boolean isActive = player.equals(activeRunner);
+            boolean isCaged = cagedPlayers.contains(player.getUniqueId());
 
             String vis;
             if (isRunner) {
@@ -598,12 +599,30 @@ public class GameManager {
             }
 
             if (show) {
-                String msg = String.format("§eSwap in: §c%ds", Math.max(0, timeLeft));
-                com.example.speedrunnerswap.utils.ActionBarUtil.sendActionBar(player, msg);
+                // For caged players, show queue position instead of timer
+                if (isCaged && !isActive) {
+                    int queuePosition = getQueuePosition(player);
+                    String msg = String.format("§6Queued (%d) - You're up next", queuePosition);
+                    com.example.speedrunnerswap.utils.ActionBarUtil.sendActionBar(player, msg);
+                } else {
+                    String msg = String.format("§eSwap in: §c%ds", Math.max(0, timeLeft));
+                    com.example.speedrunnerswap.utils.ActionBarUtil.sendActionBar(player, msg);
+                }
             } else {
                 com.example.speedrunnerswap.utils.ActionBarUtil.sendActionBar(player, "");
             }
         }
+    }
+    
+    private int getQueuePosition(Player player) {
+        if (!runners.contains(player)) return 0;
+        
+        int position = 1;
+        for (Player runner : runners) {
+            if (runner.equals(player)) break;
+            if (runner.isOnline()) position++;
+        }
+        return position;
     }
     
     private void applyInactiveEffects() {
@@ -741,6 +760,9 @@ public class GameManager {
             return;
         }
 
+        // Save dragon health before swap
+        plugin.getDragonManager().onSwapStart();
+
         // Persist the current active runner's state before swapping
         if (activeRunner != null && activeRunner.isOnline()) {
             savePlayerState(activeRunner);
@@ -826,6 +848,9 @@ public class GameManager {
 
         applyInactiveEffects();
         scheduleNextSwap();
+
+        // Restore dragon health after swap
+        plugin.getDragonManager().onSwapComplete();
 
         // Suppress public chat broadcast on swap per request
 
@@ -1024,10 +1049,6 @@ public class GameManager {
         boolean isSneak = current != null && current.isSneaking();
         boolean isSprint = current != null && current.isSprinting();
 
-        net.kyori.adventure.text.Component sub = net.kyori.adventure.text.Component.text(
-                String.format("Sneaking: %s  |  Running: %s", isSneak ? "Yes" : "No", isSprint ? "Yes" : "No"))
-                .color(NamedTextColor.YELLOW);
-
         String waitingVis = plugin.getConfigManager().getWaitingTimerVisibility();
         boolean waitingAlways = "always".equalsIgnoreCase(waitingVis);
         boolean waitingLast10 = "last_10".equalsIgnoreCase(waitingVis);
@@ -1036,13 +1057,40 @@ public class GameManager {
             if (!runners.contains(p)) continue; // Only runners get titles
 
             boolean isActive = p.equals(current);
-            boolean shouldShow = !isActive && (waitingAlways || (waitingLast10 && timeLeft <= 10));
+            boolean isCaged = cagedPlayers.contains(p.getUniqueId());
+            
+            // For caged players, show large aesthetic title
+            if (isCaged && !isActive) {
+                net.kyori.adventure.text.Component titleText = net.kyori.adventure.text.Component.text(
+                        String.format("Swap in: %ds", Math.max(0, timeLeft)))
+                        .color(NamedTextColor.GOLD)
+                        .decorate(TextDecoration.BOLD);
+
+                net.kyori.adventure.text.Component sub = net.kyori.adventure.text.Component.text(
+                        String.format("Sneaking: %s  |  Running: %s", isSneak ? "Yes" : "No", isSprint ? "Yes" : "No"))
+                        .color(NamedTextColor.YELLOW);
+
+                Title title = Title.title(
+                        titleText,
+                        sub,
+                        Title.Times.times(Duration.ZERO, Duration.ofMillis(1000), Duration.ZERO)
+                );
+                p.showTitle(title);
+                continue;
+            }
+            
+            // For non-caged waiting runners, show smaller title
+            boolean shouldShow = !isActive && !isCaged && (waitingAlways || (waitingLast10 && timeLeft <= 10));
             if (!shouldShow) continue;
 
             net.kyori.adventure.text.Component titleText = net.kyori.adventure.text.Component.text(
                     String.format("Swap in: %ds", Math.max(0, timeLeft)))
-                    .color(isActive ? NamedTextColor.RED : NamedTextColor.GOLD)
+                    .color(NamedTextColor.GOLD)
                     .decorate(TextDecoration.BOLD);
+
+            net.kyori.adventure.text.Component sub = net.kyori.adventure.text.Component.text(
+                    String.format("Sneaking: %s  |  Running: %s", isSneak ? "Yes" : "No", isSprint ? "Yes" : "No"))
+                    .color(NamedTextColor.YELLOW);
 
             Title title = Title.title(
                     titleText,

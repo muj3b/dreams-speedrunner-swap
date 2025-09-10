@@ -16,6 +16,7 @@ import com.example.speedrunnerswap.game.BountyManager;
 import com.example.speedrunnerswap.game.SuddenDeathManager;
 
 import com.example.speedrunnerswap.game.KitConfigManager;
+import com.example.speedrunnerswap.game.DragonManager;
 import com.example.speedrunnerswap.utils.BukkitCompat;
 // Removed unused Bukkit import
 import org.bukkit.plugin.java.JavaPlugin;
@@ -34,6 +35,7 @@ public final class SpeedrunnerSwap extends JavaPlugin {
     private BountyManager bountyManager;
     private SuddenDeathManager suddenDeathManager;
     private KitConfigManager kitConfigManager;
+    private DragonManager dragonManager;
     // Mode selection (Dream = runners+hunters, Sapnap = runners only)
     public enum SwapMode { DREAM, SAPNAP }
     private SwapMode currentMode = SwapMode.DREAM;
@@ -54,6 +56,7 @@ public final class SpeedrunnerSwap extends JavaPlugin {
         this.bountyManager = new BountyManager(this);
         this.suddenDeathManager = new SuddenDeathManager(this);
         this.kitConfigManager = new KitConfigManager(this);
+        this.dragonManager = new DragonManager(this);
         
         // Validate config consistency
         validatePowerUpConfig();
@@ -71,6 +74,7 @@ public final class SpeedrunnerSwap extends JavaPlugin {
         // Register event listeners
         getServer().getPluginManager().registerEvents(new EventListeners(this), this);
         getServer().getPluginManager().registerEvents(new DragonDefeatListener(this), this);
+        getServer().getPluginManager().registerEvents(dragonManager, this);
         // Register GUI listener for menu interactions
         getServer().getPluginManager().registerEvents(new GuiListener(this, guiManager), this);
         // Register ControlSwap GUI listeners (for Sapnap mode)
@@ -168,6 +172,10 @@ public final class SpeedrunnerSwap extends JavaPlugin {
 
     public KitConfigManager getKitConfigManager() {
         return kitConfigManager;
+    }
+
+    public DragonManager getDragonManager() {
+        return dragonManager;
     }
 
     private void validatePowerUpConfig() {
