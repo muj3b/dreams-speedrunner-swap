@@ -621,9 +621,50 @@ public class GameManager {
         int position = 1;
         for (Player runner : runners) {
             if (runner.equals(player)) break;
-            if (runner.isOnline()) position++;
+            // Only count runners that are online and not the current active runner
+            if (runner.isOnline() && !runner.equals(activeRunner)) {
+                position++;
+            }
         }
         return position;
+    }
+    
+    /**
+     * Update hostile mob targeting when players swap
+     * This ensures mobs that were targeting the previous runner now target the new runner
+     */
+    private void updateHostileMobTargeting(Player previousRunner, Player newRunner) {
+        if (previousRunner == null || newRunner == null || !previousRunner.isOnline() || !newRunner.isOnline()) {
+            return;
+        }
+        
+        // Get all worlds to check for hostile mobs
+        for (World world : Bukkit.getWorlds()) {
+            for (Entity entity : world.getEntities()) {
+                // Check for hostile mobs that can target players
+                if (entity instanceof org.bukkit.entity.Mob) {
+                    org.bukkit.entity.Mob mob = (org.bukkit.entity.Mob) entity;
+                    
+                    // Check if this mob was targeting the previous runner
+                    if (mob.getTarget() != null && mob.getTarget().equals(previousRunner)) {
+                        // Transfer the target to the new runner
+                        mob.setTarget(newRunner);
+                    }
+                }
+                
+                // Special handling for Endermen (they have different targeting mechanics)
+                if (entity instanceof org.bukkit.entity.Enderman) {
+                    org.bukkit.entity.Enderman enderman = (org.bukkit.entity.Enderman) entity;
+                    
+                    // Endermen don't have a direct getTarget() method, but we can check if they're angry
+                    // and if the previous runner is nearby, make them angry at the new runner
+                    if (enderman.getLocation().distance(previousRunner.getLocation()) < 16) {
+                        // Make the enderman angry at the new runner
+                        enderman.setTarget(newRunner);
+                    }
+                }
+            }
+        }
     }
     
     private void applyInactiveEffects() {
@@ -852,6 +893,9 @@ public class GameManager {
 
         // Restore dragon health after swap
         plugin.getDragonManager().onSwapComplete();
+        
+        // Update hostile mob targeting
+        updateHostileMobTargeting(previousRunner, nextRunner);
 
         // Suppress public chat broadcast on swap per request
 
