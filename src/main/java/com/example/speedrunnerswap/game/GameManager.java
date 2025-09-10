@@ -1107,7 +1107,7 @@ public class GameManager {
         int y = world.getMaxHeight() - 10;
         int cx = (int) Math.round(base.getX());
         int cz = (int) Math.round(base.getZ());
-        Location center = new Location(world, cx + 0.5, y + 1, cz + 0.5);
+        Location center = new Location(world, cx + 0.5, y, cz + 0.5);
         Location existing = sharedCageCenters.get(world);
         if (existing != null && Math.abs(existing.getX() - center.getX()) < 0.1 && Math.abs(existing.getY() - center.getY()) < 0.1 && Math.abs(existing.getZ() - center.getZ()) < 0.1) {
             return;
@@ -1120,10 +1120,10 @@ public class GameManager {
         try { center.getChunk().load(true); } catch (Throwable ignored) {}
         java.util.List<org.bukkit.block.BlockState> changed = new java.util.ArrayList<>();
         for (int dx = -2; dx <= 2; dx++) {
-            for (int dy = -1; dy <= 3; dy++) {
+            for (int dy = -1; dy <= 2; dy++) {
                 for (int dz = -2; dz <= 2; dz++) {
                     org.bukkit.block.Block block = world.getBlockAt(cx + dx, y + dy, cz + dz);
-                    boolean isShell = (dx == -2 || dx == 2 || dz == -2 || dz == 2 || dy == -1 || dy == 3);
+                    boolean isShell = (dx == -2 || dx == 2 || dz == -2 || dz == 2 || dy == -1 || dy == 2);
                     changed.add(block.getState());
                     block.setType(isShell ? Material.BEDROCK : Material.AIR, false);
                 }
@@ -1145,10 +1145,8 @@ public class GameManager {
         createOrEnsureSharedCage(p.getWorld());
         org.bukkit.Location center = sharedCageCenters.get(p.getWorld());
         if (center != null) {
-            // Ensure the player is in a safe location (not suffocating)
-            org.bukkit.Location safeLocation = center.clone();
-            safeLocation.setY(safeLocation.getY() + 0.1); // Slightly above the floor
-            p.teleport(safeLocation);
+            // Teleport player to the center of the cage floor
+            p.teleport(center);
             cagedPlayers.add(p.getUniqueId());
             try { p.setAllowFlight(true); } catch (Exception ignored) {}
             try { p.setFlying(false); } catch (Exception ignored) {}
@@ -1182,7 +1180,7 @@ public class GameManager {
                 double dx = Math.abs(loc.getX() - center.getX());
                 double dy = loc.getY() - center.getY();
                 double dz = Math.abs(loc.getZ() - center.getZ());
-                boolean outside = dx > 1.2 || dz > 1.2 || dy < -0.2 || dy > 2.8;
+                boolean outside = dx > 1.2 || dz > 1.2 || dy < -0.2 || dy > 0.8;
                 if (outside) {
                     r.teleport(center);
                     r.setVelocity(new org.bukkit.util.Vector(0, 0, 0));
