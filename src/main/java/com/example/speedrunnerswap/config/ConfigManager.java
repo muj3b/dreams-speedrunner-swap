@@ -62,6 +62,25 @@ public class ConfigManager {
     }
 
     /**
+     * Beta: allow users to enable experimental intervals outside the normal bounds
+     */
+    public boolean isBetaIntervalEnabled() {
+        return config.getBoolean("swap.beta_enabled", false);
+    }
+
+    public void setBetaIntervalEnabled(boolean enabled) {
+        config.set("swap.beta_enabled", enabled);
+        saveConfig();
+    }
+
+    /**
+     * Maximum allowed swap interval for UI enforcement (default 600s)
+     */
+    public int getSwapIntervalMax() {
+        return config.getInt("swap.max_interval", 600);
+    }
+
+    /**
      * Get whether randomized swaps are enabled
      * @return True if swaps should be randomized
      */

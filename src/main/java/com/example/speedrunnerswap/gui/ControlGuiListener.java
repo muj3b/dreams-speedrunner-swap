@@ -204,16 +204,31 @@ public class ControlGuiListener implements Listener {
             // Handle interval adjustment arrows FIRST (higher priority)
             if (name != null) {
                 if (name.equals("-5s")) {
-                    int interval = Math.max(30, plugin.getConfigManager().getSwapInterval() - 5);
+                    int current = plugin.getConfigManager().getSwapInterval();
+                    boolean beta = plugin.getConfigManager().isBetaIntervalEnabled();
+                    int minAllowed = beta ? 10 : 30; // allow down to 10s in beta
+                    int interval = Math.max(minAllowed, current - 5);
                     plugin.getConfigManager().setSwapInterval(interval);
                     player.sendMessage("§eInterval decreased to: §a" + interval + "s");
+                    if (interval < 30) {
+                        player.sendMessage("§cBETA: Intervals below 30s are experimental and may be unstable.");
+                    }
+                    if (interval > plugin.getConfigManager().getSwapIntervalMax()) {
+                        player.sendMessage("§cBETA: Intervals above configured maximum are experimental.");
+                    }
                     plugin.getGameManager().refreshSwapSchedule();
                     new ControlGui(plugin).openMainMenu(player);
                     return;
                 } else if (name.equals("+5s")) {
-                    int interval = Math.min(600, plugin.getConfigManager().getSwapInterval() + 5);
+                    int current = plugin.getConfigManager().getSwapInterval();
+                    int max = plugin.getConfigManager().getSwapIntervalMax();
+                    // allow above max only if beta enabled
+                    int interval = Math.min(current + 5, plugin.getConfigManager().isBetaIntervalEnabled() ? Math.max(current + 5, max + 600) : max);
                     plugin.getConfigManager().setSwapInterval(interval);
                     player.sendMessage("§eInterval increased to: §a" + interval + "s");
+                    if (interval > plugin.getConfigManager().getSwapIntervalMax()) {
+                        player.sendMessage("§cBETA: Intervals above configured maximum are experimental and may be unstable.");
+                    }
                     plugin.getGameManager().refreshSwapSchedule();
                     new ControlGui(plugin).openMainMenu(player);
                     return;

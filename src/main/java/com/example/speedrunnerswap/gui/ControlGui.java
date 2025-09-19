@@ -92,11 +92,20 @@ public class ControlGui {
                 List.of("Cycle waiting runner timer visibility",
                         "FULL / LAST 10s / HIDDEN")));
 
-        // Interval display and adjusters
+        // Interval display and adjusters (±5s quick buttons). These support a beta mode to go below 30s
         int interval = plugin.getConfigManager().getSwapInterval();
-        inv.setItem(23, named(Material.PAPER, "Interval: " + interval + "s", List.of("Base swap interval")));
-        inv.setItem(18, named(Material.ARROW, "-5s", List.of("Decrease interval")));
-        inv.setItem(26, named(Material.ARROW, "+5s", List.of("Increase interval")));
+        boolean isBeta = plugin.getConfigManager().isBetaIntervalEnabled();
+        List<String> intervalLore = new java.util.ArrayList<>();
+        intervalLore.add("§7Base swap interval");
+        if (isBeta && interval < 30) {
+            intervalLore.add("§cBETA: Running below 30s may be unstable");
+        }
+        if (isBeta && interval > plugin.getConfigManager().getSwapIntervalMax()) {
+            intervalLore.add("§cBETA: Running above configured maximum may be unstable");
+        }
+        inv.setItem(23, named(Material.PAPER, "Interval: " + interval + "s", intervalLore));
+        inv.setItem(18, named(Material.ARROW, "-5s", List.of("Decrease interval (±5s)")));
+        inv.setItem(26, named(Material.ARROW, "+5s", List.of("Increase interval (±5s)")));
 
         // Freeze mode cycle
         String freeze = plugin.getConfigManager().getFreezeMode();
