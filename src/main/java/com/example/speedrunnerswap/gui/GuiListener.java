@@ -354,7 +354,7 @@ public class GuiListener implements Listener {
                     int delta = event.isShiftClick() ? 60 : 30;
                     if (event.isLeftClick()) current += delta;
                     if (event.isRightClick()) current -= delta;
-                    current = Math.max(30, Math.min(300, current));
+                    current = Math.max(10, current); // allow experimental low intervals; no hard upper cap
                     plugin.getConfigManager().setSwapInterval(current);
                     break;
                 }
@@ -485,7 +485,7 @@ public class GuiListener implements Listener {
                     break;
             }
         } else {
-            // Handle timer visibility clocks (created without explicit IDs)
+            // Handle timer visibility clocks and ±5s arrows (created without explicit IDs)
             String name = PlainTextComponentSerializer.plainText().serialize(clicked.getItemMeta().displayName());
             if (name.equals("§e§lActive Runner Timer")) {
                 cycleRunnerTimer(player);
@@ -493,6 +493,13 @@ public class GuiListener implements Listener {
                 cycleWaitingTimer(player);
             } else if (name.equals("§e§lHunter Timer")) {
                 cycleHunterTimer(player);
+            } else if ("-5s".equals(name)) {
+                int current = plugin.getConfigManager().getSwapInterval();
+                int val = Math.max(10, current - 5);
+                plugin.getConfigManager().setSwapInterval(val);
+            } else if ("+5s".equals(name)) {
+                int current = plugin.getConfigManager().getSwapInterval();
+                plugin.getConfigManager().setSwapInterval(current + 5);
             }
         }
 

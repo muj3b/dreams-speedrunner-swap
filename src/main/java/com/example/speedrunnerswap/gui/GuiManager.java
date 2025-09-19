@@ -671,7 +671,7 @@ public class GuiManager {
                 "random_swaps");
         inventory.setItem(10, swapTypeButton);
 
-        // Swap interval button
+        // Swap interval button (now supports ±5s arrows and beta warnings)
         int currentInterval = plugin.getConfigManager().getSwapInterval();
         List<String> swapIntervalLore = new ArrayList<>();
         swapIntervalLore.add("§7Current: §e" + currentInterval + " seconds");
@@ -680,12 +680,21 @@ public class GuiManager {
         swapIntervalLore.add("§7• Left-click: +30s");
         swapIntervalLore.add("§7• Right-click: -30s");
         swapIntervalLore.add("§7• Shift+click: ±60s");
+        if (currentInterval < 30) {
+            swapIntervalLore.add("§cBETA: Intervals below 30s are experimental and may be unstable.");
+        }
+        if (currentInterval > plugin.getConfigManager().getSwapIntervalMax()) {
+            swapIntervalLore.add("§cBETA: Intervals above the configured maximum may be unstable.");
+        }
         ItemStack intervalButton = createGuiButton(
                 Material.CLOCK,
                 "§e§lSwap Interval",
                 swapIntervalLore,
                 "swap_interval");
         inventory.setItem(11, intervalButton);
+        // Add ±5s quick adjusters near the interval control
+        inventory.setItem(13, createItem(Material.ARROW, "-5s", List.of("§7Decrease interval by 5 seconds")));
+        inventory.setItem(15, createItem(Material.ARROW, "+5s", List.of("§7Increase interval by 5 seconds")));
 
         // Safe swap button
         List<String> safeSwapLore = new ArrayList<>();

@@ -54,10 +54,12 @@ public class ConfigManager {
 
     /**
      * Set the swap interval in seconds
-     * @param interval The interval in seconds (minimum 30)
+     * @param interval The interval in seconds (experimental minimum 10)
      */
     public void setSwapInterval(int interval) {
-        config.set("swap.interval", Math.max(30, interval));
+        // Allow experimental low intervals for advanced users; warnings are surfaced in the GUI
+        int min = 10;
+        config.set("swap.interval", Math.max(min, interval));
         saveConfig();
     }
 

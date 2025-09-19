@@ -62,6 +62,8 @@ Pure cooperation mode where multiple runners share one character with no hunters
 
 ### 🔄 **Swap System**
 - ⏰ Configurable intervals (default: 60s)
+- 🎛️ GUI quick adjust: ±5s buttons and ±30/±60 via clicks
+- 🧪 Experimental: Intervals below 30s allowed with red warning (may be unstable)
 - 🎲 Fixed or randomized timing
 - 🛡️ Safe swap locations
 - 🕶️ Inactive players frozen/spectating

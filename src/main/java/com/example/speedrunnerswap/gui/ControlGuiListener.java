@@ -205,9 +205,7 @@ public class ControlGuiListener implements Listener {
             if (name != null) {
                 if (name.equals("-5s")) {
                     int current = plugin.getConfigManager().getSwapInterval();
-                    boolean beta = plugin.getConfigManager().isBetaIntervalEnabled();
-                    int minAllowed = beta ? 10 : 30; // allow down to 10s in beta
-                    int interval = Math.max(minAllowed, current - 5);
+                    int interval = Math.max(10, current - 5); // allow down to 10s with warnings
                     plugin.getConfigManager().setSwapInterval(interval);
                     player.sendMessage("§eInterval decreased to: §a" + interval + "s");
                     if (interval < 30) {
@@ -221,9 +219,7 @@ public class ControlGuiListener implements Listener {
                     return;
                 } else if (name.equals("+5s")) {
                     int current = plugin.getConfigManager().getSwapInterval();
-                    int max = plugin.getConfigManager().getSwapIntervalMax();
-                    // allow above max only if beta enabled
-                    int interval = Math.min(current + 5, plugin.getConfigManager().isBetaIntervalEnabled() ? Math.max(current + 5, max + 600) : max);
+                    int interval = current + 5; // allow exceeding configured max with warnings
                     plugin.getConfigManager().setSwapInterval(interval);
                     player.sendMessage("§eInterval increased to: §a" + interval + "s");
                     if (interval > plugin.getConfigManager().getSwapIntervalMax()) {
