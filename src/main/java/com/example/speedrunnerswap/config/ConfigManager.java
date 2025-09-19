@@ -16,9 +16,10 @@ public class ConfigManager {
 
     private final SpeedrunnerSwap plugin;
     private FileConfiguration config;
-    private List<String> runnerNames;
-    private List<String> hunterNames;
-    private Set<Material> dangerousBlocks;
+    // initialize collections to defensive defaults so callers can't hit NPEs
+    private List<String> runnerNames = new ArrayList<>();
+    private List<String> hunterNames = new ArrayList<>();
+    private Set<Material> dangerousBlocks = new HashSet<>();
     private boolean powerUpsEnabled;
     
     public ConfigManager(SpeedrunnerSwap plugin) {
