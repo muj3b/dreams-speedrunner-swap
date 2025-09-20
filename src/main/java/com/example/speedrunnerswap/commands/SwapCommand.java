@@ -58,6 +58,8 @@ public class SwapCommand implements CommandExecutor, TabCompleter {
                     return handleMode(sender, Arrays.copyOfRange(args, 1, args.length));
                 case "clearteams":
                     return handleClearTeams(sender);
+                case "tasks":
+                    return handleTasks(sender, Arrays.copyOfRange(args, 1, args.length));
                 default:
                     sender.sendMessage("§cUnknown subcommand. Use /swap for help.");
                     return false;
@@ -403,6 +405,86 @@ public class SwapCommand implements CommandExecutor, TabCompleter {
         sender.sendMessage("§aConfiguration reloaded.");
         
         return true;
+    }
+
+    private boolean handleTasks(CommandSender sender, String[] rest) {
+        if (!sender.hasPermission("speedrunnerswap.admin")) {
+            sender.sendMessage("§cYou don't have permission to manage tasks.");
+            return false;
+        }
+        if (rest.length == 0) {
+            sender.sendMessage("§eUsage: /swap tasks <list|reroll|endwhenoneleft <on|off|toggle>|reload>");
+            return true;
+        }
+        String sub = rest[0].toLowerCase();
+        switch (sub) {
+            case "list": {
+                var tmm = plugin.getTaskManagerMode();
+                if (tmm == null) { sender.sendMessage("§cTask Manager not initialized."); return false; }
+                var map = tmm.getAssignments();
+                if (map.isEmpty()) {
+                    sender.sendMessage("§7No task assignments.");
+                    return true;
+                }
+                sender.sendMessage("§6Task Assignments:");
+                for (var e : map.entrySet()) {
+                    java.util.UUID uuid = e.getKey();
+                    String taskId = e.getValue();
+                    String name = plugin.getServer().getOfflinePlayer(uuid).getName();
+                    if (name == null) name = uuid.toString().substring(0, 8);
+                    var def = tmm.getTask(taskId);
+                    String desc = def != null ? def.description() : taskId;
+                    sender.sendMessage("§e" + name + "§7: §f" + desc + " (§8"+taskId+"§7)");
+                }
+                return true;
+            }
+            case "reroll": {
+                if (plugin.getGameManager().isGameRunning()) {
+                    sender.sendMessage("§cYou can only reroll before the game starts.");
+                    return false;
+                }
+                if (plugin.getCurrentMode() != com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode.TASK) {
+                    sender.sendMessage("§cSwitch to Task Manager mode first: /swap mode task");
+                    return false;
+                }
+                var tmm = plugin.getTaskManagerMode();
+                if (tmm == null) { sender.sendMessage("§cTask Manager not initialized."); return false; }
+                // Build runner list from selected team assignments
+                java.util.List<Player> selectedRunners = new java.util.ArrayList<>();
+                for (Player p : Bukkit.getOnlinePlayers()) {
+                    var st = plugin.getGameManager().getPlayerState(p);
+                    if (st != null && st.getSelectedTeam() == com.example.speedrunnerswap.models.Team.RUNNER) selectedRunners.add(p);
+                }
+                if (selectedRunners.isEmpty()) {
+                    sender.sendMessage("§cNo selected runners found. Use the Team Selector first.");
+                    return false;
+                }
+                tmm.assignAndAnnounceTasks(selectedRunners);
+                sender.sendMessage("§aRerolled tasks for §f"+selectedRunners.size()+"§a selected runners.");
+                return true;
+            }
+            case "endwhenoneleft": {
+                boolean cur = plugin.getConfig().getBoolean("task_manager.end_when_one_left", false);
+                if (rest.length >= 2) {
+                    String opt = rest[1].toLowerCase();
+                    if (opt.equals("on") || opt.equals("true")) cur = true; else if (opt.equals("off") || opt.equals("false")) cur = false; else cur = !cur;
+                } else { cur = !cur; }
+                plugin.getConfig().set("task_manager.end_when_one_left", cur);
+                plugin.saveConfig();
+                sender.sendMessage("§eEnd When One Runner Left: " + (cur ? "§aON" : "§cOFF"));
+                return true;
+            }
+            case "reload": {
+                var tmm = plugin.getTaskManagerMode();
+                if (tmm == null) { sender.sendMessage("§cTask Manager not initialized."); return false; }
+                tmm.reloadTasks();
+                sender.sendMessage("§a[Task Manager] Tasks reloaded from config without restarting!");
+                return true;
+            }
+            default:
+                sender.sendMessage("§cUnknown tasks subcommand. Use list|reroll|endwhenoneleft|reload");
+                return false;
+        }
     }
 
     private boolean handleClearTeams(CommandSender sender) {

@@ -17,12 +17,9 @@ import org.bukkit.event.player.PlayerChangedWorldEvent;
 import org.bukkit.event.player.PlayerFishEvent;
 import org.bukkit.event.player.PlayerItemConsumeEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
-import org.bukkit.event.world.PortalCreateEvent;
-import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.inventory.ItemStack;
 
 import java.util.EnumSet;
-import java.util.Map;
 import java.util.UUID;
 
 /**
@@ -39,6 +36,7 @@ public class TaskEventListener implements Listener {
         return plugin.getCurrentMode() == SpeedrunnerSwap.SwapMode.TASK && plugin.getGameManager().isGameRunning();
     }
 
+    @SuppressWarnings("unused")
     private boolean hasTask(Player p, String id) {
         return plugin.getTaskManagerMode().getAssignedTask(p) != null && plugin.getTaskManagerMode().getAssignedTask(p).equals(id);
     }
@@ -109,6 +107,7 @@ public class TaskEventListener implements Listener {
     }
 
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    @SuppressWarnings("deprecation")
     public void onPlayerDeath(PlayerDeathEvent event) {
         if (!isTaskMode()) return;
         Player p = event.getEntity();

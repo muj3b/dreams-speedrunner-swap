@@ -1312,6 +1312,67 @@ public class GuiListener implements Listener {
         Player player = (Player) event.getWhoClicked();
         ItemStack clicked = event.getCurrentItem();
         if (clicked == null || !clicked.hasItemMeta()) return;
+
+        // Handle button IDs first (new actions)
+        String buttonId = getButtonId(clicked);
+        if (buttonId != null) {
+            switch (buttonId) {
+                case "reroll_tasks" -> {
+                    if (plugin.getGameManager().isGameRunning()) {
+                        player.sendMessage(Component.text("§cYou can only reroll before the game starts.").color(NamedTextColor.RED));
+                        return;
+                    }
+                    if (plugin.getCurrentMode() != com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode.TASK) {
+                        player.sendMessage(Component.text("§cSwitch to Task Manager mode first: /swap mode task").color(NamedTextColor.RED));
+                        return;
+                    }
+                    var tmm = plugin.getTaskManagerMode();
+                    if (tmm == null) {
+                        player.sendMessage(Component.text("§cTask Manager not initialized.").color(NamedTextColor.RED));
+                        return;
+                    }
+                    java.util.List<org.bukkit.entity.Player> selectedRunners = new java.util.ArrayList<>();
+                    for (org.bukkit.entity.Player p : org.bukkit.Bukkit.getOnlinePlayers()) {
+                        var st = plugin.getGameManager().getPlayerState(p);
+                        if (st != null && st.getSelectedTeam() == com.example.speedrunnerswap.models.Team.RUNNER) selectedRunners.add(p);
+                    }
+                    if (selectedRunners.isEmpty()) {
+                        player.sendMessage(Component.text("§cNo selected runners found. Use the Team Selector first.").color(NamedTextColor.RED));
+                        return;
+                    }
+                    tmm.assignAndAnnounceTasks(selectedRunners);
+                    player.sendMessage(Component.text("§aRerolled tasks for §f" + selectedRunners.size() + "§a selected runners.").color(NamedTextColor.GREEN));
+                    // Refresh the menu to reflect disabled/enabled state
+                    guiManager.openTaskSettingsMenu(player);
+                    return;
+                }
+                case "show_assignments" -> {
+                    var tmm = plugin.getTaskManagerMode();
+                    if (tmm == null) {
+                        player.sendMessage(Component.text("§cTask Manager not initialized.").color(NamedTextColor.RED));
+                        return;
+                    }
+                    var map = tmm.getAssignments();
+                    if (map.isEmpty()) {
+                        player.sendMessage(Component.text("§7No task assignments.").color(NamedTextColor.GRAY));
+                        return;
+                    }
+                    player.sendMessage(Component.text("§6Task Assignments:").color(NamedTextColor.GOLD));
+                    for (var e : map.entrySet()) {
+                        java.util.UUID uuid = e.getKey();
+                        String taskId = e.getValue();
+                        String pname = plugin.getServer().getOfflinePlayer(uuid).getName();
+                        if (pname == null) pname = uuid.toString().substring(0, 8);
+                        var def = tmm.getTask(taskId);
+                        String desc = def != null ? def.description() : taskId;
+                        player.sendMessage(Component.text("§e" + pname + "§7: §f" + desc + " (§8" + taskId + "§7)"));
+                    }
+                    return;
+                }
+                default -> {}
+            }
+        }
+
         String name = PlainTextComponentSerializer.plainText().serialize(clicked.getItemMeta().displayName());
 
         switch (name) {
@@ -1329,6 +1390,11 @@ public class GuiListener implements Listener {
             case "§e§lAllow Late Joiners: §aYes", "§e§lAllow Late Joiners: §cNo" -> {
                 boolean cur = plugin.getConfig().getBoolean("task_manager.allow_late_joiners", false);
                 plugin.getConfig().set("task_manager.allow_late_joiners", !cur);
+                plugin.saveConfig();
+            }
+            case "§e§lEnd When One Left: §aYes", "§e§lEnd When One Left: §cNo" -> {
+                boolean cur = plugin.getConfig().getBoolean("task_manager.end_when_one_left", false);
+                plugin.getConfig().set("task_manager.end_when_one_left", !cur);
                 plugin.saveConfig();
             }
             case "§6§lRejoin Grace (s)" -> {

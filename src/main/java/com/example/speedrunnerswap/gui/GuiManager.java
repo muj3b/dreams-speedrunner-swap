@@ -410,7 +410,7 @@ ItemStack settings = createGuiButton(Material.COMPARATOR, "§6§lDream Settings"
 
             player.openInventory(inventory);
         } catch (Exception e) {
-            plugin.getLogger().log(java.util.logging.Level.SEVERE, "Error opening Dream menu", e);
+plugin.getLogger().log(Level.SEVERE, "Error opening Dream menu", e);
         }
     }
 
@@ -447,7 +447,7 @@ ItemStack tmSettings = createGuiButton(Material.COMPARATOR, "§6§lTask Settings
 
             player.openInventory(inventory);
         } catch (Exception e) {
-            plugin.getLogger().log(java.util.logging.Level.SEVERE, "Error opening Task Manager menu", e);
+plugin.getLogger().log(Level.SEVERE, "Error opening Task Manager menu", e);
         }
     }
 
@@ -481,6 +481,31 @@ ItemStack tmSettings = createGuiButton(Material.COMPARATOR, "§6§lTask Settings
                 "§e§lAllow Late Joiners: " + (allowLate ? "§aYes" : "§cNo"),
                 List.of("§7Allow players to join mid-game and receive tasks"));
         inv.setItem(16, allowToggle);
+
+        boolean endOne = plugin.getConfig().getBoolean("task_manager.end_when_one_left", false);
+        ItemStack endOneToggle = createItem(endOne ? Material.REDSTONE_BLOCK : Material.GRAY_DYE,
+                "§e§lEnd When One Left: " + (endOne ? "§aYes" : "§cNo"),
+                List.of("§7End the game automatically when only one runner remains"));
+        inv.setItem(18, endOneToggle);
+
+        // Reroll Tasks button (only enabled before game starts)
+        boolean gameRunning = plugin.getGameManager().isGameRunning();
+        ItemStack rerollTasks = createGuiButton(
+                gameRunning ? Material.GRAY_DYE : Material.BOOK,
+                "§d§lReroll Tasks" + (gameRunning ? " §8(Game Running)" : ""),
+                gameRunning ? 
+                    List.of("§7Reroll tasks for all selected runners", "§c§lDisabled while game is running") :
+                    List.of("§7Reroll tasks for all selected runners", "§7Must have runners selected via Team Selector"),
+                "reroll_tasks");
+        inv.setItem(20, rerollTasks);
+
+        // Show Task Assignments button
+        ItemStack showAssignments = createGuiButton(
+                Material.WRITTEN_BOOK,
+                "§b§lShow Task Assignments",
+                List.of("§7Display current task assignments", "§7Shows assignments in chat"),
+                "show_assignments");
+        inv.setItem(22, showAssignments);
 
         // Assignment viewer
         var tmm = plugin.getTaskManagerMode();
@@ -1481,6 +1506,7 @@ ItemStack tmSettings = createGuiButton(Material.COMPARATOR, "§6§lTask Settings
         }
     }
     
+    @SuppressWarnings("unused")
     private List<String> getStatusLore() {
         List<String> lore = new ArrayList<>();
         
@@ -1507,6 +1533,7 @@ ItemStack tmSettings = createGuiButton(Material.COMPARATOR, "§6§lTask Settings
         
         return lore;
     }
+    
     
     // Helper methods for menu identification
     private boolean isItem(ItemStack item, Material material, String name) {

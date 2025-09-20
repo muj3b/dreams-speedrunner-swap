@@ -254,6 +254,7 @@ task_manager:
   rejoin_grace_seconds: 180
   remove_on_timeout: true
   allow_late_joiners: false
+  end_when_one_left: false
   # Runtime state (do not edit manually unless you know what you're doing)
   runtime:
     assignments: {}

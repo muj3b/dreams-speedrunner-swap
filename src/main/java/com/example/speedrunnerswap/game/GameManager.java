@@ -395,6 +395,17 @@ public class GameManager {
                 plugin.getLogger().warning("A team is empty; game continues (pause_on_disconnect=false)");
             }
         }
+
+        // End-when-one-left behavior (Task mode)
+        if (gameRunning && plugin.getCurrentMode() == com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode.TASK && plugin.getConfig().getBoolean("task_manager.end_when_one_left", false)) {
+            int online = 0;
+            for (Player r : runners) if (r.isOnline()) online++;
+            if (online <= 1) {
+                Msg.broadcast("§e[Task Manager] Ending: only one runner remains.");
+                stopGame();
+                return;
+            }
+        }
     }
 
     /**
@@ -486,7 +497,6 @@ public class GameManager {
                     long elapsed = now - e.getValue();
                     if (elapsed >= graceSec * 1000L) {
                         UUID uuid = e.getKey();
-                        Player p = Bukkit.getPlayer(uuid);
                         if (remove) {
                             // Remove from runners
                             runners.removeIf(r -> r.getUniqueId().equals(uuid));
@@ -501,6 +511,17 @@ public class GameManager {
                 for (UUID id : toRemove) {
                     runnerDisconnectAt.remove(id);
                     clearRuntimeDisconnectTime(id);
+                }
+
+                // Enforce end-when-one-left if enabled
+                if (gameRunning && plugin.getConfig().getBoolean("task_manager.end_when_one_left", false) && plugin.getCurrentMode() == com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode.TASK) {
+                    int online = 0;
+                    for (Player r : runners) if (r.isOnline()) { online++; }
+                    if (online <= 1) {
+                        Msg.broadcast("§e[Task Manager] Ending: only one runner remains.");
+                        stopGame();
+                        return;
+                    }
                 }
 
                 // If paused due to disconnect and we still have online runners, resume
@@ -923,6 +944,16 @@ public class GameManager {
     }
     
     private void performSwap() {
+        // End-when-one-left early check
+        if (gameRunning && plugin.getCurrentMode() == com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode.TASK && plugin.getConfig().getBoolean("task_manager.end_when_one_left", false)) {
+            int online = 0;
+            for (Player r : runners) if (r.isOnline()) online++;
+            if (online <= 1) {
+                Msg.broadcast("§e[Task Manager] Ending: only one runner remains.");
+                stopGame();
+                return;
+            }
+        }
         if (!gameRunning || gamePaused || runners.isEmpty()) {
             return;
         }

@@ -10,7 +10,6 @@ import org.bukkit.entity.Player;
 
 import java.time.Duration;
 import java.util.*;
-import java.util.concurrent.ThreadLocalRandom;
 
 /**
  * Handles Task Manager mode: assigns tasks and tracks per-player state.
@@ -104,7 +103,6 @@ public class TaskManagerMode {
         } catch (Throwable ignored) {}
     }
 
-    @SuppressWarnings("unchecked")
     public void loadAssignmentsFromConfig() {
         try {
             Object raw = plugin.getConfig().get("task_manager.runtime.assignments");
@@ -184,16 +182,15 @@ public class TaskManagerMode {
         register(new TaskDefinition(id, description, TaskType.COMPLEX_TASK));
         
         // Save to config
-        List<Object> customTasks = (List<Object>) plugin.getConfig().getList("task_manager.custom_tasks");
-        if (customTasks == null) {
-            customTasks = new ArrayList<>();
-        }
-        
+        List<?> rawList = plugin.getConfig().getList("task_manager.custom_tasks");
+        List<Object> customTasks = new ArrayList<>();
+        if (rawList != null) customTasks.addAll(rawList);
+
         Map<String, Object> taskMap = new HashMap<>();
         taskMap.put("id", id);
         taskMap.put("description", description);
         customTasks.add(taskMap);
-        
+
         plugin.getConfig().set("task_manager.custom_tasks", customTasks);
         plugin.saveConfig();
     }
@@ -389,6 +386,7 @@ public class TaskManagerMode {
         taskPool.add(def.id());
     }
 
+    @SuppressWarnings("unused")
     private static String nice(String id) {
         return id.toLowerCase().replace('_',' ').replace("wither skeleton", "witherskeleton");
     }

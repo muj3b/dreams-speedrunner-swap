@@ -49,8 +49,9 @@ public class ChatInputHandler implements Listener {
         activeInputs.put(player.getUniqueId(), new InputState(InputState.Type.DONATION_URL));
     }
     
-    @EventHandler
-    public void onChat(AsyncPlayerChatEvent event) {
+@SuppressWarnings("deprecation")
+@EventHandler
+public void onChat(AsyncPlayerChatEvent event) {
         Player player = event.getPlayer();
         UUID uuid = player.getUniqueId();
         
