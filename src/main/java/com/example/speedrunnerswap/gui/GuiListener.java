@@ -68,7 +68,8 @@ public class GuiListener implements Listener {
                title.contains("Last Stand") ||
                title.contains("Compass") ||
                title.contains("Sudden Death") ||
-               title.contains("Statistics");
+               title.contains("Statistics") ||
+               title.contains("Dangerous Blocks");
     }
 
     private boolean isAdminMenu(String title) {
@@ -105,6 +106,7 @@ public class GuiListener implements Listener {
 
         // Special-case handling for submenus not covered by a general section
         if (maybeHandlePowerUpDurationsMenu(event, title)) return;
+        if (maybeHandleDangerousBlocksMenu(event, title)) return;
 
         // Route to specific menu handlers
         if (title.contains("Mode Selector")) {
@@ -350,12 +352,7 @@ public class GuiListener implements Listener {
         if (buttonId != null) {
             switch (buttonId) {
                 case "swap_interval": {
-                    int current = plugin.getConfigManager().getSwapInterval();
-                    int delta = event.isShiftClick() ? 60 : 30;
-                    if (event.isLeftClick()) current += delta;
-                    if (event.isRightClick()) current -= delta;
-                    current = Math.max(10, current); // allow experimental low intervals; no hard upper cap
-                    plugin.getConfigManager().setSwapInterval(current);
+                    // No-op: interval is adjusted via ±5s arrows to keep UI concise
                     break;
                 }
                 case "random_swaps":
@@ -483,6 +480,140 @@ public class GuiListener implements Listener {
                 case "update_compasses":
                     plugin.getTrackerManager().updateAllHunterCompasses();
                     break;
+                case "swap_min_interval": {
+                    int min = plugin.getConfigManager().getMinSwapInterval();
+                    if (event.isLeftClick()) min += event.isShiftClick() ? 15 : 5;
+                    if (event.isRightClick()) min -= event.isShiftClick() ? 15 : 5;
+                    int max = plugin.getConfigManager().getMaxSwapInterval();
+                    min = Math.max(1, Math.min(min, max));
+                    plugin.getConfig().set("swap.min_interval", min);
+                    plugin.saveConfig();
+                    break;
+                }
+                case "swap_max_interval": {
+                    int max = plugin.getConfigManager().getMaxSwapInterval();
+                    if (event.isLeftClick()) max += event.isShiftClick() ? 15 : 5;
+                    if (event.isRightClick()) max -= event.isShiftClick() ? 15 : 5;
+                    int min = plugin.getConfigManager().getMinSwapInterval();
+                    max = Math.max(min, max);
+                    plugin.getConfig().set("swap.max_interval", max);
+                    plugin.saveConfig();
+                    break;
+                }
+                case "jitter_stddev": {
+                    int sd = (int) Math.round(plugin.getConfigManager().getJitterStdDev());
+                    if (event.isLeftClick()) sd += event.isShiftClick() ? 5 : 1;
+                    if (event.isRightClick()) sd -= event.isShiftClick() ? 5 : 1;
+                    sd = Math.max(0, Math.min(600, sd));
+                    plugin.getConfig().set("swap.jitter.stddev", sd);
+                    plugin.saveConfig();
+                    break;
+                }
+                case "jitter_clamp": {
+                    boolean clamp = plugin.getConfigManager().isClampJitter();
+                    plugin.getConfig().set("swap.jitter.clamp", !clamp);
+                    plugin.saveConfig();
+                    break;
+                }
+                case "grace_period": {
+                    int gp = plugin.getConfigManager().getGracePeriodTicks();
+                    if (event.isLeftClick()) gp += event.isShiftClick() ? 40 : 10;
+                    if (event.isRightClick()) gp -= event.isShiftClick() ? 40 : 10;
+                    gp = Math.max(0, Math.min(20 * 60, gp));
+                    plugin.getConfig().set("swap.grace_period_ticks", gp);
+                    plugin.saveConfig();
+                    break;
+                }
+                case "safe_h_radius": {
+                    int val = plugin.getConfigManager().getSafeSwapHorizontalRadius();
+                    if (event.isLeftClick()) val += event.isShiftClick() ? 5 : 1;
+                    if (event.isRightClick()) val -= event.isShiftClick() ? 5 : 1;
+                    val = Math.max(1, Math.min(64, val));
+                    plugin.getConfig().set("safe_swap.horizontal_radius", val);
+                    plugin.saveConfig();
+                    break;
+                }
+                case "safe_v_distance": {
+                    int val = plugin.getConfigManager().getSafeSwapVerticalDistance();
+                    if (event.isLeftClick()) val += event.isShiftClick() ? 5 : 1;
+                    if (event.isRightClick()) val -= event.isShiftClick() ? 5 : 1;
+                    val = Math.max(1, Math.min(64, val));
+                    plugin.getConfig().set("safe_swap.vertical_distance", val);
+                    plugin.saveConfig();
+                    break;
+                }
+                case "safe_dangerous_blocks": {
+                    guiManager.openDangerousBlocksMenu(player);
+                    break;
+                }
+                case "voice_chat_enabled_toggle": {
+                    boolean enabled = plugin.getConfigManager().isVoiceChatIntegrationEnabled();
+                    plugin.getConfigManager().setVoiceChatIntegrationEnabled(!enabled);
+                    break;
+                }
+                case "mute_inactive_toggle": {
+                    boolean enabled = plugin.getConfigManager().isMuteInactiveRunners();
+                    plugin.getConfig().set("voice_chat.mute_inactive_runners", !enabled);
+                    plugin.saveConfig();
+                    break;
+                }
+                case "ui_actionbar_ticks": {
+                    int val = plugin.getConfigManager().getActionBarUpdateTicks();
+                    if (event.isLeftClick()) val += 5;
+                    if (event.isRightClick()) val -= 5;
+                    val = Math.max(1, Math.min(200, val));
+                    plugin.getConfig().set("ui.update_ticks.actionbar", val);
+                    plugin.saveConfig();
+                    break;
+                }
+                case "ui_title_ticks": {
+                    int val = plugin.getConfigManager().getTitleUpdateTicks();
+                    if (event.isLeftClick()) val += event.isShiftClick() ? 5 : 1;
+                    if (event.isRightClick()) val -= event.isShiftClick() ? 5 : 1;
+                    val = Math.max(1, Math.min(200, val));
+                    plugin.getConfig().set("ui.update_ticks.title", val);
+                    plugin.saveConfig();
+                    break;
+                }
+                case "set_limbo_here": {
+                    org.bukkit.Location loc = player.getLocation();
+                    plugin.getConfig().set("limbo.world", loc.getWorld().getName());
+                    plugin.getConfig().set("limbo.x", loc.getX());
+                    plugin.getConfig().set("limbo.y", loc.getY());
+                    plugin.getConfig().set("limbo.z", loc.getZ());
+                    plugin.saveConfig();
+                    player.sendMessage("§aLimbo location updated.");
+                    break;
+                }
+                case "set_spawn_here": {
+                    org.bukkit.Location loc = player.getLocation();
+                    plugin.getConfig().set("spawn.world", loc.getWorld().getName());
+                    plugin.getConfig().set("spawn.x", loc.getX());
+                    plugin.getConfig().set("spawn.y", loc.getY());
+                    plugin.getConfig().set("spawn.z", loc.getZ());
+                    plugin.saveConfig();
+                    player.sendMessage("§aSpawn location updated.");
+                    break;
+                }
+                case "beta_intervals_toggle": {
+                    boolean enabled = plugin.getConfigManager().isBetaIntervalEnabled();
+                    plugin.getConfigManager().setBetaIntervalEnabled(!enabled);
+                    break;
+                }
+                case "apply_mode_default_toggle": {
+                    boolean enabled = plugin.getConfigManager().getApplyDefaultOnModeSwitch();
+                    plugin.getConfigManager().setApplyDefaultOnModeSwitch(!enabled);
+                    break;
+                }
+                case "swap_interval_reset": {
+                    plugin.getConfigManager().applyModeDefaultInterval(plugin.getCurrentMode());
+                    break;
+                }
+                case "swap_interval_save_default": {
+                    int curr = plugin.getConfigManager().getSwapInterval();
+                    plugin.getConfigManager().setModeDefaultInterval(plugin.getCurrentMode(), curr);
+                    break;
+                }
             }
         } else {
             // Handle timer visibility clocks and ±5s arrows (created without explicit IDs)
@@ -495,11 +626,20 @@ public class GuiListener implements Listener {
                 cycleHunterTimer(player);
             } else if ("-5s".equals(name)) {
                 int current = plugin.getConfigManager().getSwapInterval();
-                int val = Math.max(10, current - 5);
+                boolean beta = plugin.getConfigManager().isBetaIntervalEnabled();
+                int min = beta ? 10 : plugin.getConfigManager().getMinSwapInterval();
+                int max = plugin.getConfigManager().getSwapIntervalMax();
+                int val = current - 5;
+                val = beta ? Math.max(min, val) : Math.max(min, Math.min(max, val));
                 plugin.getConfigManager().setSwapInterval(val);
             } else if ("+5s".equals(name)) {
                 int current = plugin.getConfigManager().getSwapInterval();
-                plugin.getConfigManager().setSwapInterval(current + 5);
+                boolean beta = plugin.getConfigManager().isBetaIntervalEnabled();
+                int min = beta ? 10 : plugin.getConfigManager().getMinSwapInterval();
+                int max = plugin.getConfigManager().getSwapIntervalMax();
+                int val = current + 5;
+                val = beta ? Math.max(min, val) : Math.max(min, Math.min(max, val));
+                plugin.getConfigManager().setSwapInterval(val);
             }
         }
 
@@ -674,6 +814,12 @@ public class GuiListener implements Listener {
         return true;
     }
 
+    private boolean maybeHandleDangerousBlocksMenu(InventoryClickEvent event, String title) {
+        if (!title.contains("Dangerous Blocks")) return false;
+        handleDangerousBlocksClick(event);
+        return true;
+    }
+
     private void handlePowerUpDurationsClick(InventoryClickEvent event) {
         Player player = (Player) event.getWhoClicked();
         ItemStack clicked = event.getCurrentItem();
@@ -721,6 +867,32 @@ public class GuiListener implements Listener {
         } else if (changed) {
             guiManager.openPowerUpDurationsMenu(player);
         }
+    }
+
+    private void handleDangerousBlocksClick(InventoryClickEvent event) {
+        Player player = (Player) event.getWhoClicked();
+        ItemStack clicked = event.getCurrentItem();
+        if (clicked == null || !clicked.hasItemMeta()) return;
+        String name = PlainTextComponentSerializer.plainText().serialize(clicked.getItemMeta().displayName());
+        if (isBackButton(clicked)) {
+            guiManager.openSettingsMenu(player);
+            return;
+        }
+        try {
+            org.bukkit.Material mat = org.bukkit.Material.matchMaterial(name.replace("§e", "").trim());
+            if (mat != null) {
+                java.util.Set<org.bukkit.Material> set = plugin.getConfigManager().getDangerousBlocks();
+                if (set.contains(mat)) {
+                    // Remove and persist back to config list
+                    set.remove(mat);
+                    java.util.List<String> list = new java.util.ArrayList<>();
+                    for (org.bukkit.Material m : set) list.add(m.name());
+                    plugin.getConfig().set("safe_swap.dangerous_blocks", list);
+                    plugin.saveConfig();
+                }
+                guiManager.openDangerousBlocksMenu(player);
+            }
+        } catch (Exception ignored) {}
     }
 
     private void handleWorldBorderClick(InventoryClickEvent event) {
@@ -839,6 +1011,47 @@ public class GuiListener implements Listener {
         if (name.equals("§c§lClear Bounty")) {
             plugin.getBountyManager().clearBounty();
             guiManager.openBountyMenu(player);
+            return;
+        }
+        if (name.equals("§6§lBounty Cooldown (s)")) {
+            int val = plugin.getConfig().getInt("bounty.cooldown", 300);
+            if (event.isLeftClick()) val += 30;
+            if (event.isRightClick()) val -= 30;
+            val = Math.max(30, Math.min(3600, val));
+            plugin.getConfig().set("bounty.cooldown", val);
+            plugin.saveConfig();
+            guiManager.openBountyMenu(player);
+            return;
+        }
+        if (name.equals("§e§lGlow Duration (s)")) {
+            int val = plugin.getConfig().getInt("bounty.glow_duration", 300);
+            if (event.isLeftClick()) val += 30;
+            if (event.isRightClick()) val -= 30;
+            val = Math.max(30, Math.min(3600, val));
+            plugin.getConfig().set("bounty.glow_duration", val);
+            plugin.saveConfig();
+            guiManager.openBountyMenu(player);
+            return;
+        }
+        if (name.equals("§e§lReward Strength (s)")) {
+            int val = plugin.getConfig().getInt("bounty.rewards.strength_duration", 300);
+            if (event.isLeftClick()) val += 30;
+            if (event.isRightClick()) val -= 30;
+            val = Math.max(30, Math.min(3600, val));
+            plugin.getConfig().set("bounty.rewards.strength_duration", val);
+            plugin.saveConfig();
+            guiManager.openBountyMenu(player);
+            return;
+        }
+        if (name.equals("§e§lReward Speed (s)")) {
+            int val = plugin.getConfig().getInt("bounty.rewards.speed_duration", 300);
+            if (event.isLeftClick()) val += 30;
+            if (event.isRightClick()) val -= 30;
+            val = Math.max(30, Math.min(3600, val));
+            plugin.getConfig().set("bounty.rewards.speed_duration", val);
+            plugin.saveConfig();
+            guiManager.openBountyMenu(player);
+            return;
         }
     }
 
@@ -870,6 +1083,15 @@ public class GuiListener implements Listener {
                 if (event.isRightClick()) amp--;
                 amp = Math.max(0, Math.min(5, amp));
                 plugin.getConfig().set("last_stand.strength_amplifier", amp);
+                plugin.saveConfig();
+                guiManager.openLastStandMenu(player);
+            }
+            case "§b§lSpeed Amplifier" -> {
+                int amp = plugin.getConfigManager().getLastStandSpeedAmplifier();
+                if (event.isLeftClick()) amp++;
+                if (event.isRightClick()) amp--;
+                amp = Math.max(0, Math.min(5, amp));
+                plugin.getConfig().set("last_stand.speed_amplifier", amp);
                 plugin.saveConfig();
                 guiManager.openLastStandMenu(player);
             }
@@ -910,6 +1132,14 @@ public class GuiListener implements Listener {
             case "§c§lClear End Portal Hint (this world)" -> {
                 plugin.getConfigManager().clearEndPortalHint(player.getWorld());
                 player.sendMessage(Component.text("§eCleared End Portal hint for world §f" + player.getWorld().getName()));
+                guiManager.openCompassSettingsMenu(player);
+            }
+            case "§6§lJam Max Distance (blocks)" -> {
+                int dist = plugin.getConfigManager().getCompassJamMaxDistance();
+                if (event.isLeftClick()) dist += 25;
+                if (event.isRightClick()) dist -= 25;
+                dist = Math.max(0, Math.min(100000, dist));
+                plugin.getConfigManager().setCompassJamMaxDistance(dist);
                 guiManager.openCompassSettingsMenu(player);
             }
             default -> {}
@@ -1001,6 +1231,32 @@ public class GuiListener implements Listener {
             case "§e§lDisplay Statistics" -> plugin.getStatsManager().displayStats();
             case "§a§lStart Tracking" -> plugin.getStatsManager().startTracking();
             case "§c§lStop Tracking" -> plugin.getStatsManager().stopTracking();
+            case "§e§lStats: §aEnabled", "§e§lStats: §cDisabled" -> {
+                boolean current = plugin.getConfig().getBoolean("stats.enabled", true);
+                plugin.getConfig().set("stats.enabled", !current);
+                plugin.saveConfig();
+            }
+            case "§e§lPeriodic Display: §aEnabled", "§e§lPeriodic Display: §cDisabled" -> {
+                boolean current = plugin.getConfig().getBoolean("stats.periodic_display", false);
+                plugin.getConfig().set("stats.periodic_display", !current);
+                plugin.saveConfig();
+            }
+            case "§6§lPeriodic Interval (s)" -> {
+                int val = plugin.getConfig().getInt("stats.periodic_display_interval", 300);
+                if (event.isLeftClick()) val += 30;
+                if (event.isRightClick()) val -= 30;
+                val = Math.max(30, Math.min(3600, val));
+                plugin.getConfig().set("stats.periodic_display_interval", val);
+                plugin.saveConfig();
+            }
+            case "§6§lDistance Update (ticks)" -> {
+                int val = plugin.getConfig().getInt("stats.distance_update_ticks", 20);
+                if (event.isLeftClick()) val += 5;
+                if (event.isRightClick()) val -= 5;
+                val = Math.max(1, Math.min(200, val));
+                plugin.getConfig().set("stats.distance_update_ticks", val);
+                plugin.saveConfig();
+            }
             default -> {}
         }
         guiManager.openStatisticsMenu(player);

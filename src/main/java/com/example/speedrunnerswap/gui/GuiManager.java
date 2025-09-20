@@ -104,6 +104,25 @@ public class GuiManager {
         }
     }
     
+    // Dangerous Blocks editor
+    public void openDangerousBlocksMenu(Player player) {
+        Inventory inv = Bukkit.createInventory(null, 54, Component.text("§6§lDangerous Blocks"));
+        ItemStack filler = createItem(Material.BLACK_STAINED_GLASS_PANE, " ");
+        fillBorder(inv, filler);
+        inv.setItem(0, createItem(Material.ARROW, "§7§lBack", List.of("§7Return to settings")));
+        java.util.Set<org.bukkit.Material> set = plugin.getConfigManager().getDangerousBlocks();
+        int slot = 10;
+        for (org.bukkit.Material mat : org.bukkit.Material.values()) {
+            if (slot >= 44) break; // show a subset to avoid overflow
+            if (!set.contains(mat)) continue; // only show configured ones to keep concise
+            ItemStack it = createItem(mat, "§e" + mat.name(), List.of("§7Click to remove from list"));
+            inv.setItem(slot++, it);
+        }
+        // Hint to add more via config for now
+        inv.setItem(49, createItem(Material.PAPER, "§7Note", List.of("§7To add new blocks, use config.yml", "§7GUI supports removal quickly")));
+        player.openInventory(inv);
+    }
+    
     public void openPositiveEffectsMenu(Player player) {
         Inventory inventory = Bukkit.createInventory(null, 36, Component.text("§a§lPositive Effects"));
         
@@ -676,12 +695,12 @@ public class GuiManager {
         List<String> swapIntervalLore = new ArrayList<>();
         swapIntervalLore.add("§7Current: §e" + currentInterval + " seconds");
         swapIntervalLore.add("");
-        swapIntervalLore.add("§7Click to change");
-        swapIntervalLore.add("§7• Left-click: +30s");
-        swapIntervalLore.add("§7• Right-click: -30s");
-        swapIntervalLore.add("§7• Shift+click: ±60s");
+        swapIntervalLore.add("§7Use arrows below to adjust (±5s)");
         if (currentInterval < 30) {
             swapIntervalLore.add("§cBETA: Intervals below 30s are experimental and may be unstable.");
+        }
+        if (currentInterval < 15) {
+            swapIntervalLore.add("§cWarning: Intervals under 15s may impact performance.");
         }
         if (currentInterval > plugin.getConfigManager().getSwapIntervalMax()) {
             swapIntervalLore.add("§cBETA: Intervals above the configured maximum may be unstable.");
@@ -695,6 +714,45 @@ public class GuiManager {
         // Add ±5s quick adjusters near the interval control
         inventory.setItem(13, createItem(Material.ARROW, "-5s", List.of("§7Decrease interval by 5 seconds")));
         inventory.setItem(15, createItem(Material.ARROW, "+5s", List.of("§7Increase interval by 5 seconds")));
+
+        // Experimental intervals toggle
+        boolean beta = plugin.getConfigManager().isBetaIntervalEnabled();
+        List<String> betaLore = new ArrayList<>();
+        betaLore.add("§7Allow intervals below " + plugin.getConfigManager().getMinSwapInterval() + "s and above max");
+        betaLore.add("§7Shows red warnings when used");
+        ItemStack betaToggle = createGuiButton(
+                beta ? Material.REDSTONE_TORCH : Material.LEVER,
+                "§e§lExperimental Intervals: " + (beta ? "§aEnabled" : "§cDisabled"),
+                betaLore,
+                "beta_intervals_toggle");
+        inventory.setItem(24, betaToggle);
+
+        // Apply default on mode switch toggle
+        boolean applyDefault = plugin.getConfigManager().getApplyDefaultOnModeSwitch();
+        ItemStack applyDefaultToggle = createGuiButton(
+                applyDefault ? Material.NOTE_BLOCK : Material.GRAY_DYE,
+                "§e§lApply Mode Default on Switch: " + (applyDefault ? "§aYes" : "§cNo"),
+                List.of("§7When switching Dream/Sapnap, set interval",
+                        "§7to that mode's default if game not running"),
+                "apply_mode_default_toggle");
+        inventory.setItem(17, applyDefaultToggle);
+
+        // Reset interval to current mode default
+        int modeDefault = plugin.getConfigManager().getModeDefaultInterval(plugin.getCurrentMode());
+        ItemStack resetInterval = createGuiButton(
+                Material.BARRIER,
+                "§e§lReset Interval",
+                List.of("§7Reset to this mode's default: §e" + modeDefault + "s"),
+                "swap_interval_reset");
+        inventory.setItem(25, resetInterval);
+
+        // Save current as mode default
+        ItemStack saveDefault = createGuiButton(
+                Material.BOOK,
+                "§e§lSave as Mode Default",
+                List.of("§7Set current interval (§e" + currentInterval + "s§7)", "§7as default for this mode"),
+                "swap_interval_save_default");
+        inventory.setItem(26, saveDefault);
 
         // Safe swap button
         List<String> safeSwapLore = new ArrayList<>();
@@ -901,6 +959,118 @@ public class GuiManager {
                 "freeze_max_distance");
         inventory.setItem(41, freezeDistanceItem);
         
+        // Advanced Swap Settings
+        int minInterval = plugin.getConfigManager().getMinSwapInterval();
+        ItemStack minIntervalItem = createGuiButton(
+                Material.LEVER,
+                "§e§lRandom Min Interval (s)",
+                List.of("§7Current: §e" + minInterval, "§7Left/Right: ±5", "§7Shift: ±15"),
+                "swap_min_interval");
+        inventory.setItem(33, minIntervalItem);
+        
+        int maxInterval = plugin.getConfigManager().getMaxSwapInterval();
+        ItemStack maxIntervalItem = createGuiButton(
+                Material.LEVER,
+                "§e§lRandom Max Interval (s)",
+                List.of("§7Current: §e" + maxInterval, "§7Left/Right: ±5", "§7Shift: ±15"),
+                "swap_max_interval");
+        inventory.setItem(34, maxIntervalItem);
+        
+        int stddev = (int) Math.round(plugin.getConfigManager().getJitterStdDev());
+        ItemStack jitterItem = createGuiButton(
+                Material.REDSTONE,
+                "§6§lJitter StdDev (s)",
+                List.of("§7Current: §e" + stddev, "§7Left/Right: ±1", "§7Shift: ±5"),
+                "jitter_stddev");
+        inventory.setItem(35, jitterItem);
+        
+        boolean clamp = plugin.getConfigManager().isClampJitter();
+        ItemStack clampItem = createGuiButton(
+                clamp ? Material.LIME_DYE : Material.GRAY_DYE,
+                "§e§lClamp Jitter: " + (clamp ? "§aEnabled" : "§cDisabled"),
+                List.of("§7Keep jittered value within min/max"),
+                "jitter_clamp");
+        inventory.setItem(42, clampItem);
+        
+        int grace = plugin.getConfigManager().getGracePeriodTicks();
+        ItemStack graceItem = createGuiButton(
+                Material.SHIELD,
+                "§6§lSwap Grace (ticks)",
+                List.of("§7Current: §e" + grace, "§7Left/Right: ±10", "§7Shift: ±40"),
+                "grace_period");
+        inventory.setItem(43, graceItem);
+        
+        // Safe Swap details
+        ItemStack safeRadius = createGuiButton(
+                Material.GLOWSTONE,
+                "§e§lSafeSwap Horizontal Radius",
+                List.of("§7Current: §e" + plugin.getConfigManager().getSafeSwapHorizontalRadius(), "§7Left/Right: ±1", "§7Shift: ±5"),
+                "safe_h_radius");
+        inventory.setItem(49, safeRadius);
+        
+        ItemStack safeVertical = createGuiButton(
+                Material.LADDER,
+                "§e§lSafeSwap Vertical Distance",
+                List.of("§7Current: §e" + plugin.getConfigManager().getSafeSwapVerticalDistance(), "§7Left/Right: ±1", "§7Shift: ±5"),
+                "safe_v_distance");
+        inventory.setItem(50, safeVertical);
+        
+        ItemStack dangerousBlocks = createGuiButton(
+                Material.MAGMA_BLOCK,
+                "§6§lDangerous Blocks",
+                List.of("§7Click to edit list of avoided blocks"),
+                "safe_dangerous_blocks");
+        inventory.setItem(51, dangerousBlocks);
+        
+        // Voice Chat
+        boolean vc = plugin.getConfigManager().isVoiceChatIntegrationEnabled();
+        ItemStack vcToggle = createGuiButton(
+                vc ? Material.NOTE_BLOCK : Material.GRAY_DYE,
+                "§e§lVoice Chat Integration: " + (vc ? "§aEnabled" : "§cDisabled"),
+                List.of("§7Requires Simple Voice Chat plugin"),
+                "voice_chat_enabled_toggle");
+        inventory.setItem(52, vcToggle);
+        
+        boolean muteInactive = plugin.getConfigManager().isMuteInactiveRunners();
+        ItemStack muteToggle = createGuiButton(
+                muteInactive ? Material.MUSIC_DISC_13 : Material.MUSIC_DISC_11,
+                "§e§lMute Inactive Runners: " + (muteInactive ? "§aEnabled" : "§cDisabled"),
+                List.of("§7Mute inactive runners in voice chat"),
+                "mute_inactive_toggle");
+        inventory.setItem(53, muteToggle);
+        
+        // UI Tuning
+        int abTicks = plugin.getConfigManager().getActionBarUpdateTicks();
+        ItemStack abItem = createGuiButton(
+                Material.REPEATER,
+                "§6§lActionbar Update (ticks)",
+                List.of("§7Current: §e" + abTicks, "§7Left/Right: ±5"),
+                "ui_actionbar_ticks");
+        inventory.setItem(44, abItem);
+        
+        int titleTicks = plugin.getConfigManager().getTitleUpdateTicks();
+        ItemStack titleItem = createGuiButton(
+                Material.REPEATER,
+                "§6§lTitle Update (ticks)",
+                List.of("§7Current: §e" + titleTicks, "§7Left/Right: ±1", "§7Shift: ±5"),
+                "ui_title_ticks");
+        inventory.setItem(32, titleItem);
+        
+        // Locations
+        ItemStack setLimbo = createGuiButton(
+                Material.ENDER_PEARL,
+                "§e§lSet Limbo Here",
+                List.of("§7Set limbo world and coordinates to your location"),
+                "set_limbo_here");
+        inventory.setItem(47, setLimbo);
+        
+        ItemStack setSpawn = createGuiButton(
+                Material.RESPAWN_ANCHOR,
+                "§e§lSet Spawn Here",
+                List.of("§7Set post-game spawn location to your location"),
+                "set_spawn_here");
+        inventory.setItem(48, setSpawn);
+        
         player.openInventory(inventory);
     }
 
@@ -986,6 +1156,23 @@ public class GuiManager {
     ItemStack clear = createItem(Material.BARRIER, "§c§lClear Bounty", List.of("§7Click to clear current bounty"));
     inv.setItem(15, clear);
 
+    // Cooldowns and durations
+    int cooldown = plugin.getConfig().getInt("bounty.cooldown", 300);
+    ItemStack cdItem = createItem(Material.CLOCK, "§6§lBounty Cooldown (s)", List.of("§7Current: §f" + cooldown, "§7Left/Right: ±30"));
+    inv.setItem(20, cdItem);
+
+    int glow = plugin.getConfig().getInt("bounty.glow_duration", 300);
+    ItemStack glowItem = createItem(Material.GLOWSTONE_DUST, "§e§lGlow Duration (s)", List.of("§7Current: §f" + glow, "§7Left/Right: ±30"));
+    inv.setItem(22, glowItem);
+
+    int rewardStr = plugin.getConfig().getInt("bounty.rewards.strength_duration", 300);
+    ItemStack rewardStrItem = createItem(Material.BLAZE_POWDER, "§e§lReward Strength (s)", List.of("§7Current: §f" + rewardStr, "§7Left/Right: ±30"));
+    inv.setItem(24, rewardStrItem);
+
+    int rewardSpd = plugin.getConfig().getInt("bounty.rewards.speed_duration", 300);
+    ItemStack rewardSpdItem = createItem(Material.SUGAR, "§e§lReward Speed (s)", List.of("§7Current: §f" + rewardSpd, "§7Left/Right: ±30"));
+    inv.setItem(26, rewardSpdItem);
+
     player.openInventory(inv);
     }
 
@@ -1012,6 +1199,10 @@ public class GuiManager {
     ItemStack strengthItem = createItem(Material.BLAZE_POWDER, "§e§lStrength Amplifier", List.of("§7Current: §f" + strength, "§7Left/Right click to adjust"));
     inv.setItem(15, strengthItem);
 
+    int speed = plugin.getConfigManager().getLastStandSpeedAmplifier();
+    ItemStack speedItem = createItem(Material.SUGAR, "§b§lSpeed Amplifier", List.of("§7Current: §f" + speed, "§7Left/Right click to adjust"));
+    inv.setItem(13, speedItem);
+
     player.openInventory(inv);
     }
 
@@ -1032,6 +1223,10 @@ public class GuiManager {
     int jamDuration = plugin.getConfigManager().getCompassJamDuration();
     ItemStack jamDurationItem = createItem(Material.CLOCK, "§6§lJam Duration (ticks)", List.of("§7Current: §f" + jamDuration, "§7Left/Right click to +/- 20 ticks"));
     inv.setItem(15, jamDurationItem);
+
+    int jamMax = plugin.getConfigManager().getCompassJamMaxDistance();
+    ItemStack jamMaxItem = createItem(Material.SPYGLASS, "§6§lJam Max Distance (blocks)", List.of("§7Current: §f" + jamMax, "§7Left/Right click to +/- 25"));
+    inv.setItem(16, jamMaxItem);
 
     // End Portal hint controls (per-world)
     org.bukkit.World world = player.getWorld();
@@ -1094,6 +1289,25 @@ public class GuiManager {
 
     ItemStack stop = createItem(Material.RED_CONCRETE, "§c§lStop Tracking", List.of("§7Click to stop and broadcast stats"));
     inv.setItem(22, stop);
+
+    // Configurable options
+    boolean statsEnabled = plugin.getConfig().getBoolean("stats.enabled", true);
+    ItemStack statsToggle = createItem(statsEnabled ? Material.LIME_DYE : Material.GRAY_DYE,
+        "§e§lStats: " + (statsEnabled ? "§aEnabled" : "§cDisabled"), List.of("§7Toggle stats system"));
+    inv.setItem(12, statsToggle);
+
+    boolean periodic = plugin.getConfig().getBoolean("stats.periodic_display", false);
+    ItemStack periodicToggle = createItem(periodic ? Material.LANTERN : Material.SOUL_LANTERN,
+        "§e§lPeriodic Display: " + (periodic ? "§aEnabled" : "§cDisabled"), List.of("§7Toggle periodic in-game displays"));
+    inv.setItem(14, periodicToggle);
+
+    int periodicInterval = plugin.getConfig().getInt("stats.periodic_display_interval", 300);
+    ItemStack periodicItem = createItem(Material.CLOCK, "§6§lPeriodic Interval (s)", List.of("§7Current: §f" + periodicInterval, "§7Left/Right: ±30"));
+    inv.setItem(20, periodicItem);
+
+    int distanceTicks = plugin.getConfig().getInt("stats.distance_update_ticks", 20);
+    ItemStack distanceItem = createItem(Material.REPEATER, "§6§lDistance Update (ticks)", List.of("§7Current: §f" + distanceTicks, "§7Left/Right: ±5"));
+    inv.setItem(24, distanceItem);
 
     player.openInventory(inv);
     }

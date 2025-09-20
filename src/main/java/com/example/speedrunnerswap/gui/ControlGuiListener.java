@@ -129,11 +129,26 @@ public class ControlGuiListener implements Listener {
         }
 
         if (type == Material.BOOK) {
-            // Initialize pending selection with current config
-            Set<String> initial = new HashSet<>(plugin.getConfigManager().getRunnerNames());
-            pendingRunnerSelections.put(player.getUniqueId(), initial);
-            new ControlGui(plugin).openRunnerSelector(player);
-            return;
+            String name = com.example.speedrunnerswap.utils.GuiCompat.getDisplayName(clicked.getItemMeta());
+            if ("Set Runners".equals(name)) {
+                // Initialize pending selection with current config
+                Set<String> initial = new HashSet<>(plugin.getConfigManager().getRunnerNames());
+                pendingRunnerSelections.put(player.getUniqueId(), initial);
+                new ControlGui(plugin).openRunnerSelector(player);
+                return;
+            }
+        }
+
+        // Save current as this mode's default
+        if (type == Material.WRITABLE_BOOK) {
+            String name = com.example.speedrunnerswap.utils.GuiCompat.getDisplayName(clicked.getItemMeta());
+            if ("Save as Mode Default".equals(name)) {
+                int curr = plugin.getConfigManager().getSwapInterval();
+                plugin.getConfigManager().setModeDefaultInterval(plugin.getCurrentMode(), curr);
+                player.sendMessage("§aSaved " + curr + "s as default for this mode.");
+                new ControlGui(plugin).openMainMenu(player);
+                return;
+            }
         }
 
         if (type == Material.CLOCK) {
@@ -198,6 +213,42 @@ public class ControlGuiListener implements Listener {
             return;
         }
 
+        // Experimental intervals toggle
+        if (type == Material.LEVER || type == Material.REDSTONE_TORCH) {
+            String name = com.example.speedrunnerswap.utils.GuiCompat.getDisplayName(clicked.getItemMeta());
+            if (name != null && name.startsWith("Experimental Intervals:")) {
+                boolean enabled = plugin.getConfigManager().isBetaIntervalEnabled();
+                plugin.getConfigManager().setBetaIntervalEnabled(!enabled);
+                player.sendMessage("§eExperimental Intervals: " + (!enabled ? "§aEnabled" : "§cDisabled"));
+                new ControlGui(plugin).openMainMenu(player);
+                return;
+            }
+        }
+
+        // Apply default on mode switch toggle
+        if (type == Material.NOTE_BLOCK || type == Material.GRAY_DYE) {
+            String name = com.example.speedrunnerswap.utils.GuiCompat.getDisplayName(clicked.getItemMeta());
+            if (name != null && name.startsWith("Apply Mode Default on Switch:")) {
+                boolean current = plugin.getConfigManager().getApplyDefaultOnModeSwitch();
+                plugin.getConfigManager().setApplyDefaultOnModeSwitch(!current);
+                player.sendMessage("§eApply Default on Switch: " + (!current ? "§aYes" : "§cNo"));
+                new ControlGui(plugin).openMainMenu(player);
+                return;
+            }
+        }
+
+        // Reset interval to mode default
+        if (type == Material.BARRIER) {
+            String name = com.example.speedrunnerswap.utils.GuiCompat.getDisplayName(clicked.getItemMeta());
+            if ("Reset Interval".equals(name)) {
+                plugin.getConfigManager().applyModeDefaultInterval(plugin.getCurrentMode());
+                plugin.getGameManager().refreshSwapSchedule();
+                player.sendMessage("§eInterval reset to mode default.");
+                new ControlGui(plugin).openMainMenu(player);
+                return;
+            }
+        }
+
         if (type == Material.ARROW) {
             String name = com.example.speedrunnerswap.utils.GuiCompat.getDisplayName(clicked.getItemMeta());
             
@@ -205,13 +256,18 @@ public class ControlGuiListener implements Listener {
             if (name != null) {
                 if (name.equals("-5s")) {
                     int current = plugin.getConfigManager().getSwapInterval();
-                    int interval = Math.max(10, current - 5); // allow down to 10s with warnings
+                    boolean beta = plugin.getConfigManager().isBetaIntervalEnabled();
+                    int minAllowed = beta ? 10 : plugin.getConfigManager().getMinSwapInterval();
+                    int maxAllowed = plugin.getConfigManager().getSwapIntervalMax();
+                    int interval = current - 5;
+                    interval = beta ? Math.max(minAllowed, interval) : Math.max(minAllowed, Math.min(maxAllowed, interval));
                     plugin.getConfigManager().setSwapInterval(interval);
                     player.sendMessage("§eInterval decreased to: §a" + interval + "s");
                     if (interval < 30) {
                         player.sendMessage("§cBETA: Intervals below 30s are experimental and may be unstable.");
+                        if (interval < 15) player.sendMessage("§cWarning: Intervals under 15s may impact performance.");
                     }
-                    if (interval > plugin.getConfigManager().getSwapIntervalMax()) {
+                    if (interval > maxAllowed) {
                         player.sendMessage("§cBETA: Intervals above configured maximum are experimental.");
                     }
                     plugin.getGameManager().refreshSwapSchedule();
@@ -219,10 +275,14 @@ public class ControlGuiListener implements Listener {
                     return;
                 } else if (name.equals("+5s")) {
                     int current = plugin.getConfigManager().getSwapInterval();
-                    int interval = current + 5; // allow exceeding configured max with warnings
+                    boolean beta = plugin.getConfigManager().isBetaIntervalEnabled();
+                    int minAllowed = beta ? 10 : plugin.getConfigManager().getMinSwapInterval();
+                    int maxAllowed = plugin.getConfigManager().getSwapIntervalMax();
+                    int interval = current + 5;
+                    interval = beta ? Math.max(minAllowed, interval) : Math.max(minAllowed, Math.min(maxAllowed, interval));
                     plugin.getConfigManager().setSwapInterval(interval);
                     player.sendMessage("§eInterval increased to: §a" + interval + "s");
-                    if (interval > plugin.getConfigManager().getSwapIntervalMax()) {
+                    if (interval > maxAllowed) {
                         player.sendMessage("§cBETA: Intervals above configured maximum are experimental and may be unstable.");
                     }
                     plugin.getGameManager().refreshSwapSchedule();
@@ -247,18 +307,21 @@ public class ControlGuiListener implements Listener {
         }
 
         if (type == Material.PAPER) {
-            // Print status
-            player.sendMessage("§6=== Runner-Only Status ===");
-            player.sendMessage("§eGame Running: §f" + plugin.getGameManager().isGameRunning());
-            player.sendMessage("§eGame Paused: §f" + plugin.getGameManager().isGamePaused());
-            if (plugin.getGameManager().isGameRunning()) {
-                Player active = plugin.getGameManager().getActiveRunner();
-                player.sendMessage("§eActive Runner: §f" + (active != null ? active.getName() : "None"));
-                player.sendMessage("§eTime Until Next Swap: §f" + plugin.getGameManager().getTimeUntilNextSwap() + "s");
-                String runners = plugin.getGameManager().getRunners().stream().map(Player::getName).collect(Collectors.joining(", "));
-                player.sendMessage("§eRunners: §f" + runners);
+            String name = com.example.speedrunnerswap.utils.GuiCompat.getDisplayName(clicked.getItemMeta());
+            if ("Status".equals(name)) {
+                // Print status
+                player.sendMessage("§6=== Runner-Only Status ===");
+                player.sendMessage("§eGame Running: §f" + plugin.getGameManager().isGameRunning());
+                player.sendMessage("§eGame Paused: §f" + plugin.getGameManager().isGamePaused());
+                if (plugin.getGameManager().isGameRunning()) {
+                    Player active = plugin.getGameManager().getActiveRunner();
+                    player.sendMessage("§eActive Runner: §f" + (active != null ? active.getName() : "None"));
+                    player.sendMessage("§eTime Until Next Swap: §f" + plugin.getGameManager().getTimeUntilNextSwap() + "s");
+                    String runners = plugin.getGameManager().getRunners().stream().map(Player::getName).collect(Collectors.joining(", "));
+                    player.sendMessage("§eRunners: §f" + runners);
+                }
+                return;
             }
-            return;
         }
     }
 

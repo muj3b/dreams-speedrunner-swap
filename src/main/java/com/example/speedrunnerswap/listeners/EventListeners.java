@@ -284,6 +284,7 @@ public class EventListeners implements Listener {
                title.contains("Compass") ||
                title.contains("Sudden Death") ||
                title.contains("Statistics") ||
+               title.contains("Dangerous Blocks") ||
                title.contains("Edit ") && title.contains(" Kit");
     }
 

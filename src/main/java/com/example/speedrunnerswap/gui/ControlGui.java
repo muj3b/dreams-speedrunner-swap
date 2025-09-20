@@ -99,6 +99,7 @@ public class ControlGui {
         intervalLore.add("§7Base swap interval");
         if (isBeta && interval < 30) {
             intervalLore.add("§cBETA: Running below 30s may be unstable");
+            if (interval < 15) intervalLore.add("§cWarning: <15s may impact performance");
         }
         if (isBeta && interval > plugin.getConfigManager().getSwapIntervalMax()) {
             intervalLore.add("§cBETA: Running above configured maximum may be unstable");
@@ -106,6 +107,14 @@ public class ControlGui {
         inv.setItem(23, named(Material.PAPER, "Interval: " + interval + "s", intervalLore));
         inv.setItem(18, named(Material.ARROW, "-5s", List.of("Decrease interval (±5s)")));
         inv.setItem(26, named(Material.ARROW, "+5s", List.of("Increase interval (±5s)")));
+
+        // Experimental intervals toggle (runner-only control GUI)
+        boolean betaToggle = plugin.getConfigManager().isBetaIntervalEnabled();
+        inv.setItem(25, named(
+                betaToggle ? Material.REDSTONE_TORCH : Material.LEVER,
+                "Experimental Intervals: " + (betaToggle ? "ON" : "OFF"),
+                List.of("Allow <30s and >max intervals", "Shows red warnings in UI")
+        ));
 
         // Freeze mode cycle
         String freeze = plugin.getConfigManager().getFreezeMode();
@@ -127,8 +136,20 @@ public class ControlGui {
                 singlePlayerSleep ? "Single Player Sleep: ON" : "Single Player Sleep: OFF",
                 List.of("Allow only active runner to skip night", "Useful when other players are caged")));
 
-        // Status
-        inv.setItem(24, named(Material.PAPER, "Status", List.of("Show current status in chat")));
+        // Reset interval to current mode default (replaces Status)
+        int modeDefault = plugin.getConfigManager().getModeDefaultInterval(plugin.getCurrentMode());
+        inv.setItem(24, named(Material.BARRIER, "Reset Interval", List.of("Reset to mode default: "+modeDefault+"s")));
+
+        // Apply default on mode switch toggle
+        boolean applyDefault = plugin.getConfigManager().getApplyDefaultOnModeSwitch();
+        inv.setItem(17, named(applyDefault ? Material.NOTE_BLOCK : Material.GRAY_DYE,
+                "Apply Mode Default on Switch: " + (applyDefault ? "Yes" : "No"),
+                List.of("When switching modes, apply the default",
+                        "interval if the game is not running")));
+
+        // Save current as this mode's default
+        inv.setItem(16, named(Material.WRITABLE_BOOK, "Save as Mode Default",
+                List.of("Set current interval ("+interval+"s)", "as this mode's default")));
 
         player.openInventory(inv);
     }

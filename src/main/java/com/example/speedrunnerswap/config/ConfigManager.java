@@ -54,32 +54,23 @@ public class ConfigManager {
 
     /**
      * Set the swap interval in seconds
-     * @param interval The interval in seconds (experimental minimum 10)
+     * @param interval The interval in seconds (clamped based on experimental toggle)
      */
     public void setSwapInterval(int interval) {
-        // Allow experimental low intervals for advanced users; warnings are surfaced in the GUI
-        int min = 10;
-        config.set("swap.interval", Math.max(min, interval));
+        boolean beta = isBetaIntervalEnabled();
+        int min = beta ? 10 : getMinSwapInterval();
+        int max = getSwapIntervalMax();
+        int clamped = beta ? Math.max(min, interval) : Math.max(min, Math.min(max, interval));
+        config.set("swap.interval", clamped);
         saveConfig();
     }
 
-    /**
-     * Beta: allow users to enable experimental intervals outside the normal bounds
-     */
-    public boolean isBetaIntervalEnabled() {
-        return config.getBoolean("swap.beta_enabled", false);
-    }
-
-    public void setBetaIntervalEnabled(boolean enabled) {
-        config.set("swap.beta_enabled", enabled);
-        saveConfig();
-    }
 
     /**
      * Maximum allowed swap interval for UI enforcement (default 600s)
      */
     public int getSwapIntervalMax() {
-        return config.getInt("swap.max_interval", 600);
+        return config.getInt("swap.max_interval", 90);
     }
 
     /**
@@ -275,7 +266,8 @@ public class ConfigManager {
      * @return The maximum swap interval
      */
     public int getMaxSwapInterval() {
-        return config.getInt("swap.max_interval", 90);
+        // Deprecated alias; prefer getSwapIntervalMax()
+        return getSwapIntervalMax();
     }
     
     /**
@@ -575,6 +567,15 @@ public class ConfigManager {
         return config.getInt("tracker.compass_jamming.duration_ticks", 100);
     }
 
+    public int getCompassJamMaxDistance() {
+        return config.getInt("tracker.compass_jamming.max_jam_distance", 500);
+    }
+
+    public void setCompassJamMaxDistance(int blocks) {
+        config.set("tracker.compass_jamming.max_jam_distance", Math.max(0, blocks));
+        plugin.saveConfig();
+    }
+
     // End portal hint per-world (used when target is in THE_END)
     public org.bukkit.Location getEndPortalHint(org.bukkit.World world) {
         if (world == null) return null;
@@ -755,6 +756,48 @@ public class ConfigManager {
      */
     public boolean isSinglePlayerSleepEnabled() {
         return config.getBoolean("single_player_sleep.enabled", false);
+    }
+    
+    // Experimental interval toggle
+    public boolean isBetaIntervalEnabled() {
+        return config.getBoolean("swap.beta_enabled", true);
+    }
+    
+    public void setBetaIntervalEnabled(boolean enabled) {
+        config.set("swap.beta_enabled", enabled);
+        saveConfig();
+    }
+    
+    // Apply default interval on mode switch
+    public boolean getApplyDefaultOnModeSwitch() {
+        return config.getBoolean("swap.apply_default_on_mode_switch", true);
+    }
+    
+    public void setApplyDefaultOnModeSwitch(boolean enabled) {
+        config.set("swap.apply_default_on_mode_switch", enabled);
+        saveConfig();
+    }
+    
+    // Per-mode default intervals
+    public int getModeDefaultInterval(com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode mode) {
+        String key = (mode == com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode.SAPNAP)
+                ? "swap.default_intervals.sapnap"
+                : "swap.default_intervals.dream";
+        return config.getInt(key, 60);
+    }
+    
+    public void setModeDefaultInterval(com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode mode, int seconds) {
+        String key = (mode == com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode.SAPNAP)
+                ? "swap.default_intervals.sapnap"
+                : "swap.default_intervals.dream";
+        seconds = Math.max(10, seconds);
+        config.set(key, seconds);
+        saveConfig();
+    }
+    
+    public void applyModeDefaultInterval(com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode mode) {
+        int seconds = getModeDefaultInterval(mode);
+        setSwapInterval(seconds);
     }
 
     /**

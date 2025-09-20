@@ -63,7 +63,8 @@ Pure cooperation mode where multiple runners share one character with no hunters
 ### 🔄 **Swap System**
 - ⏰ Configurable intervals (default: 60s)
 - 🎛️ GUI quick adjust: ±5s buttons and ±30/±60 via clicks
-- 🧪 Experimental: Intervals below 30s allowed with red warning (may be unstable)
+- 🧪 Experimental Intervals toggle: allow <30s and >max with red warnings
+- ♻️ Reset to Defaults: restore per-mode default with one click
 - 🎲 Fixed or randomized timing
 - 🛡️ Safe swap locations
 - 🕶️ Inactive players frozen/spectating
@@ -189,7 +190,17 @@ game_mode: "HUNTERS"  # HUNTERS or CONTROL
 swap:
   interval: 60
   randomize: false
-  grace_period_ticks: 60
+  # Enable experimental intervals (<30s and >max) via GUI toggle
+  beta_enabled: false
+  # Apply per-mode default interval when switching modes (if game not running)
+  apply_default_on_mode_switch: true
+  # Min/max used when randomize is true
+  min_interval: 30
+  max_interval: 90
+  # Per-mode defaults used by Reset button and optional auto-apply
+  default_intervals:
+    dream: 60
+    sapnap: 60
 safe_swap:
   enabled: true
   scan_radius: 5

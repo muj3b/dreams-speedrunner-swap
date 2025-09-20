@@ -225,5 +225,12 @@ public final class SpeedrunnerSwap extends JavaPlugin {
     public void setCurrentMode(SwapMode mode) {
         if (mode == null) mode = SwapMode.DREAM;
         this.currentMode = mode;
+        // Optionally apply the per-mode default interval when switching modes (if enabled)
+        try {
+            if (configManager != null && gameManager != null && configManager.getApplyDefaultOnModeSwitch() && !gameManager.isGameRunning()) {
+                configManager.applyModeDefaultInterval(this.currentMode);
+                gameManager.refreshSwapSchedule();
+            }
+        } catch (Throwable ignored) {}
     }
 }

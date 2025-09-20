@@ -12,9 +12,17 @@ swap:
   randomize: false
   # Base interval in seconds (or mean if randomized)
   interval: 60
+  # Enable experimental intervals (<30s and >max) via GUI toggle
+  beta_enabled: true
+  # Apply per-mode default interval when switching modes (if game not running)
+  apply_default_on_mode_switch: true
   # Min and max interval in seconds (only used if randomize is true)
   min_interval: 30
   max_interval: 90
+  # Per-mode default intervals
+  default_intervals:
+    dream: 60
+    sapnap: 60
   # Jitter settings (only used if randomize is true)
   jitter:
     # Standard deviation in seconds
