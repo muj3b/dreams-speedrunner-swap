@@ -43,8 +43,10 @@ public class GameManager {
     private BukkitTask titleTask;
     private BukkitTask freezeCheckTask;
     private BukkitTask cageTask;
+    private BukkitTask runnerTimeoutTask;
     private long nextSwapTime;
     private final Map<UUID, PlayerState> playerStates;
+    private final Map<UUID, Long> runnerDisconnectAt = new HashMap<>();
     // Shared cage management per-world (one cage in each world)
     private final java.util.Map<org.bukkit.World, java.util.List<org.bukkit.block.BlockState>> sharedCageBlocks = new java.util.HashMap<>();
     private final java.util.Map<org.bukkit.World, org.bukkit.Location> sharedCageCenters = new java.util.HashMap<>();
@@ -109,12 +111,22 @@ public class GameManager {
                 
                 applyInactiveEffects();
                 scheduleNextSwap();
-                if (plugin.getCurrentMode() != com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode.SAPNAP) {
+                if (plugin.getCurrentMode() == com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode.DREAM) {
                     scheduleNextHunterSwap();
                 }
                 startActionBarUpdates();
+
+                // If Task Manager mode, assign tasks and announce to each runner
+                if (plugin.getCurrentMode() == com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode.TASK) {
+                    try { plugin.getTaskManagerMode().assignAndAnnounceTasks(runners); } catch (Throwable t) {
+                        plugin.getLogger().warning("Task assignment failed: " + t.getMessage());
+                    }
+                }
                 startTitleUpdates();
                 startCageEnforcement();
+                if (plugin.getCurrentMode() == com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode.TASK) {
+                    startRunnerTimeoutWatcher();
+                }
                 
                 if (plugin.getCurrentMode() != com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode.SAPNAP && plugin.getConfigManager().isTrackerEnabled()) {
                     plugin.getTrackerManager().startTracking();
@@ -183,6 +195,7 @@ public class GameManager {
         if (titleTask != null) titleTask.cancel();
         if (freezeCheckTask != null) freezeCheckTask.cancel();
         if (cageTask != null) { cageTask.cancel(); cageTask = null; }
+        if (runnerTimeoutTask != null) { runnerTimeoutTask.cancel(); runnerTimeoutTask = null; }
         plugin.getTrackerManager().stopTracking();
         try { plugin.getStatsManager().stopTracking(); } catch (Exception ignored) {}
 
@@ -339,7 +352,8 @@ public class GameManager {
         }
         loadTeams();
         if (!runners.isEmpty()) {
-            if (plugin.getCurrentMode() == com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode.SAPNAP) return true;
+            if (plugin.getCurrentMode() == com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode.SAPNAP ||
+                plugin.getCurrentMode() == com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode.TASK) return true;
             return !hunters.isEmpty();
         }
         return false;
@@ -392,8 +406,20 @@ public class GameManager {
             return;
         }
 
+        if (isRunner(player)) {
+            runnerDisconnectAt.put(player.getUniqueId(), System.currentTimeMillis());
+            // Persist runtime disconnect time for Task mode
+            if (plugin.getCurrentMode() == com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode.TASK) {
+                setRuntimeDisconnectTime(player.getUniqueId(), System.currentTimeMillis());
+            }
+        }
+
+        boolean pauseOnDc = plugin.getCurrentMode() == com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode.TASK
+                ? plugin.getConfig().getBoolean("task_manager.pause_on_disconnect", plugin.getConfigManager().isPauseOnDisconnect())
+                : plugin.getConfigManager().isPauseOnDisconnect();
+
         if (player.equals(activeRunner)) {
-            if (plugin.getConfigManager().isPauseOnDisconnect()) {
+            if (pauseOnDc) {
                 pauseGame();
             } else {
                 performSwap();
@@ -401,6 +427,105 @@ public class GameManager {
         }
         
         savePlayerState(player);
+    }
+
+    /** Handle player rejoin */
+    public void handlePlayerJoin(Player player) {
+        if (!gameRunning) return;
+        if (plugin.getCurrentMode() == com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode.TASK) {
+            // If they had an assignment, ensure they're in runners
+            var tmm = plugin.getTaskManagerMode();
+            if (tmm != null && tmm.getAssignedTask(player) != null) {
+                if (!isRunner(player)) {
+                    // Add back into runners at end of queue
+                    runners.add(player);
+                }
+                // Remind their task
+                var def = tmm.getTask(tmm.getAssignedTask(player));
+                if (def != null) {
+                    player.sendMessage(Component.text("[Task Manager] Your task:").color(NamedTextColor.GOLD));
+                    player.sendMessage(Component.text(" → " + def.description()).color(NamedTextColor.YELLOW));
+                }
+            } else if (plugin.getConfig().getBoolean("task_manager.allow_late_joiners", false)) {
+                // Late joiner allowed: add as runner and optionally assign a task if pool available
+                if (!isRunner(player)) {
+                    runners.add(player);
+                }
+                if (tmm != null && tmm.getAssignedTask(player) == null) {
+                    tmm.assignAndAnnounceTasks(java.util.List.of(player));
+                }
+            }
+
+            // Clear disconnect record
+            runnerDisconnectAt.remove(player.getUniqueId());
+            clearRuntimeDisconnectTime(player.getUniqueId());
+
+            // If paused and we have at least one online runner, resume automatically
+            if (isGamePaused()) {
+                boolean anyOnline = false;
+                for (Player r : runners) if (r.isOnline()) { anyOnline = true; break; }
+                if (anyOnline) {
+                    resumeGame();
+                }
+            }
+        }
+    }
+
+    private void startRunnerTimeoutWatcher() {
+        if (runnerTimeoutTask != null) runnerTimeoutTask.cancel();
+        runnerTimeoutTask = new BukkitRunnable() {
+            @Override public void run() {
+                if (!gameRunning) return;
+                long now = System.currentTimeMillis();
+                int graceSec = plugin.getConfig().getInt("task_manager.rejoin_grace_seconds", 180);
+                boolean remove = plugin.getConfig().getBoolean("task_manager.remove_on_timeout", true);
+                boolean pauseOnDc = plugin.getConfig().getBoolean("task_manager.pause_on_disconnect", true);
+
+                java.util.List<UUID> toRemove = new java.util.ArrayList<>();
+                for (var e : runnerDisconnectAt.entrySet()) {
+                    long elapsed = now - e.getValue();
+                    if (elapsed >= graceSec * 1000L) {
+                        UUID uuid = e.getKey();
+                        Player p = Bukkit.getPlayer(uuid);
+                        if (remove) {
+                            // Remove from runners
+                            runners.removeIf(r -> r.getUniqueId().equals(uuid));
+                            toRemove.add(uuid);
+                        }
+                        // If active runner, move on
+                        if (activeRunner != null && activeRunner.getUniqueId().equals(uuid)) {
+                            performSwap();
+                        }
+                    }
+                }
+                for (UUID id : toRemove) {
+                    runnerDisconnectAt.remove(id);
+                    clearRuntimeDisconnectTime(id);
+                }
+
+                // If paused due to disconnect and we still have online runners, resume
+                if (gamePaused && pauseOnDc) {
+                    boolean anyOnline = false;
+                    for (Player r : runners) if (r.isOnline()) { anyOnline = true; break; }
+                    if (anyOnline) resumeGame();
+                }
+            }
+        }.runTaskTimer(plugin, 20L, 20L * 5);
+    }
+
+    private void setRuntimeDisconnectTime(UUID uuid, long when) {
+        try {
+            String path = "task_manager.runtime.disconnect_times." + uuid;
+            plugin.getConfig().set(path, when);
+            plugin.saveConfig();
+        } catch (Throwable ignored) {}
+    }
+    private void clearRuntimeDisconnectTime(UUID uuid) {
+        try {
+            String path = "task_manager.runtime.disconnect_times." + uuid;
+            plugin.getConfig().set(path, null);
+            plugin.saveConfig();
+        } catch (Throwable ignored) {}
     }
 
     /**

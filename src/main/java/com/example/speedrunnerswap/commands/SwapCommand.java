@@ -78,8 +78,8 @@ public class SwapCommand implements CommandExecutor, TabCompleter {
 
         if (rest.length == 0) {
             sender.sendMessage("§eCurrent mode: §f" + plugin.getCurrentMode().name().toLowerCase());
-            sender.sendMessage("§7Usage: /swap mode <dream|sapnap> [--force]");
-            sender.sendMessage("§7       /swap mode default <dream|sapnap>");
+            sender.sendMessage("§7Usage: /swap mode <dream|sapnap|task> [--force]");
+            sender.sendMessage("§7       /swap mode default <dream|sapnap|task>");
             return true;
         }
 
@@ -92,11 +92,15 @@ public class SwapCommand implements CommandExecutor, TabCompleter {
                 return true;
             }
             String val = rest[1].toLowerCase();
-            if (!val.equals("dream") && !val.equals("sapnap")) {
+            if (!val.equals("dream") && !val.equals("sapnap") && !val.equals("task")) {
                 sender.sendMessage("§cUnknown mode: " + val);
                 return false;
             }
-            com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode m = val.equals("sapnap") ? com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode.SAPNAP : com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode.DREAM;
+            com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode m = switch (val) {
+                case "sapnap" -> com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode.SAPNAP;
+                case "task" -> com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode.TASK;
+                default -> com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode.DREAM;
+            };
             plugin.getConfigManager().setDefaultMode(m);
             sender.sendMessage("§aDefault mode set to §f" + val + "§a.");
             return true;
@@ -126,8 +130,13 @@ public class SwapCommand implements CommandExecutor, TabCompleter {
                     try { new com.example.speedrunnerswap.gui.ControlGui(plugin).openMainMenu(p); } catch (Throwable ignored) {}
                 }
                 return true;
+            case "task":
+                plugin.setCurrentMode(com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode.TASK);
+                sender.sendMessage("§aMode set to §6Task Manager§a (runners only, secret tasks)");
+                if (sender instanceof Player p) plugin.getGuiManager().openMainMenu(p);
+                return true;
             default:
-                sender.sendMessage("§cUnknown mode: " + mode + ". Use dream|sapnap");
+                sender.sendMessage("§cUnknown mode: " + mode + ". Use dream|sapnap|task");
                 return false;
         }
     }

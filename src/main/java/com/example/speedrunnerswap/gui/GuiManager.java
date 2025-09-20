@@ -2,6 +2,7 @@ package com.example.speedrunnerswap.gui;
 
 import com.example.speedrunnerswap.SpeedrunnerSwap;
 import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
@@ -44,7 +45,14 @@ public class GuiManager {
         sapLore.add("§eSpeedrunners §7— §cNo Hunters");
         sapLore.add("§7Team-share control to beat the game");
         ItemStack sapnap = createGuiButton(Material.DIAMOND_BOOTS, "§b§lSapnap: Speedrunner Swap", sapLore, "mode_sapnap");
-        inv.setItem(15, sapnap);
+        inv.setItem(13, sapnap);
+
+        // Task Manager mode button (runner-only with secret tasks)
+        java.util.List<String> taskLore = new java.util.ArrayList<>();
+        taskLore.add("§eEach runner gets a secret task");
+        taskLore.add("§7First to complete wins");
+        ItemStack taskMode = createGuiButton(Material.TARGET, "§6§lTask Manager Swap", taskLore, "mode_task");
+        inv.setItem(15, taskMode);
 
         // Default mode controls (admin only). These do not switch mode immediately; they just set the startup default.
         boolean sapDefault = plugin.getConfigManager().getDefaultMode() == com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode.SAPNAP;
@@ -60,8 +68,10 @@ public class GuiManager {
             List<String> forceLore = java.util.List.of("§cEnds the current game", "§7and switches immediately");
             ItemStack forceDream = createGuiButton(Material.TNT, "§c§lForce → Dream", forceLore, "force_dream");
             ItemStack forceSap = createGuiButton(Material.TNT_MINECART, "§c§lForce → Sapnap", forceLore, "force_sapnap");
-            inv.setItem(20, forceDream);
-            inv.setItem(24, forceSap);
+            ItemStack forceTask = createGuiButton(Material.TNT, "§c§lForce → Task", forceLore, "force_task");
+            inv.setItem(19, forceDream);
+            inv.setItem(22, forceTask);
+            inv.setItem(25, forceSap);
         } else {
             String def = sapDefault ? "§bSapnap" : "§aDream";
             ItemStack info = createItem(Material.PAPER, "§e§lDefault Mode: §f" + def, java.util.List.of(
@@ -345,11 +355,29 @@ public class GuiManager {
     }
 
     public void openMainMenu(Player player) {
+        // Route to mode-specific menu
+        switch (plugin.getCurrentMode()) {
+            case DREAM:
+                openDreamMenu(player);
+                break;
+            case SAPNAP:
+                // Sapnap has its own GUI system
+                try {
+                    new com.example.speedrunnerswap.gui.ControlGui(plugin).openMainMenu(player);
+                } catch (Throwable t) {
+                    player.sendMessage("§cFailed to open Sapnap menu.");
+                }
+                break;
+            case TASK:
+                openTaskManagerMenu(player);
+                break;
+        }
+    }
+    
+    public void openDreamMenu(Player player) {
         try {
-            String title = plugin.getConfigManager().getGuiMainMenuTitle();
-        int rows = plugin.getConfigManager().getGuiMainMenuRows();
-        rows = Math.max(rows, 6); // ensure enough space for layout (needs at least 54 slots)
-            rows = clampRows(rows);
+            String title = "§a§lDream's Speedrunner Swap";
+            int rows = 6;
 
             Inventory inventory = Bukkit.createInventory(null, rows * 9, Component.text(title));
 
@@ -360,165 +388,148 @@ public class GuiManager {
             // Back to mode selector
             inventory.setItem(0, createGuiButton(Material.ARROW, "§7§lBack", java.util.List.of("§7Return to mode selector"), "back_mode"));
 
-            // Team selector button (Top row)
+            // Team selector button
             List<String> teamSelectorLore = new ArrayList<>();
-            teamSelectorLore.add("§7Click to open the team selection menu");
-            teamSelectorLore.add("§7Here you can:");
-            teamSelectorLore.add("§7• Assign players to teams");
-            teamSelectorLore.add("§7• View current team assignments");
-            teamSelectorLore.add("§7• Manage runner and hunter roles");
+            teamSelectorLore.add("§7Assign players to Runner/Hunter teams");
             ItemStack teamSelector = createGuiButton(Material.PLAYER_HEAD, "§e§lTeam Selector", teamSelectorLore, "team_selector");
             inventory.setItem(10, teamSelector);
 
-    // World Border Settings (Top row)
-        List<String> borderLore = new ArrayList<>();
-        borderLore.add("§7Configure world border settings:");
-        borderLore.add("§7• Set initial and final size");
-        borderLore.add("§7• Adjust shrink duration");
-        borderLore.add("§7• Toggle border shrinking");
-        ItemStack borderSettings = createGuiButton(Material.BARRIER, "§c§lWorld Border", borderLore, "world_border");
-        inventory.setItem(12, borderSettings);
+            // Dream-specific settings
+ItemStack settings = createGuiButton(Material.COMPARATOR, "§6§lDream Settings",
+                    java.util.List.of("§7Open Dream-mode specific settings"), "dream_settings");
+            inventory.setItem(12, settings);
 
-        // Power-ups Settings (Top row)
-        List<String> powerupsLore = new ArrayList<>();
-        powerupsLore.add("§7Configure power-up settings:");
-        powerupsLore.add("§7• Enable/disable power-ups");
-        powerupsLore.add("§7• Customize effects");
-        powerupsLore.add("§7• Adjust durations");
-        ItemStack powerupsSettings = createGuiButton(Material.POTION, "§d§lPower-ups", powerupsLore, "power_ups");
-        inventory.setItem(14, powerupsSettings);
+            // World Border
+            ItemStack borderSettings = createGuiButton(Material.BARRIER, "§c§lWorld Border",
+                    java.util.List.of("§7Configure world border for Dream mode"), "world_border");
+            inventory.setItem(14, borderSettings);
+            // Power-ups
+            ItemStack powerupsSettings = createGuiButton(Material.POTION, "§d§lPower-ups",
+                    java.util.List.of("§7Configure power-ups for Dream mode"), "power_ups");
+            inventory.setItem(16, powerupsSettings);
 
-        // Kit Settings (Top row)
-        List<String> kitsLore = new ArrayList<>();
-        kitsLore.add("§7Configure custom kits:");
-        kitsLore.add("§7• Edit runner kits");
-        kitsLore.add("§7• Edit hunter kits");
-        kitsLore.add("§7• Manage equipment");
-        ItemStack kitsSettings = createGuiButton(Material.DIAMOND_CHESTPLATE, "§b§lKits", kitsLore, "kits");
-        inventory.setItem(16, kitsSettings);
-
-        // Bounty System (Middle row)
-        List<String> bountyLore = new ArrayList<>();
-        bountyLore.add("§7Configure bounty system:");
-        bountyLore.add("§7• Set bounty rewards");
-        bountyLore.add("§7• Adjust durations");
-        bountyLore.add("§7• Manage effects");
-        ItemStack bountySettings = createGuiButton(Material.GOLDEN_APPLE, "§6§lBounty System", bountyLore, "bounty");
-        inventory.setItem(28, bountySettings);
-
-        // Last Stand Settings (Middle row)
-        List<String> lastStandLore = new ArrayList<>();
-        lastStandLore.add("§7Configure Last Stand mode:");
-        lastStandLore.add("§7• Set buff strengths");
-        lastStandLore.add("§7• Adjust duration");
-        lastStandLore.add("§7• Toggle feature");
-        ItemStack lastStandSettings = createGuiButton(Material.TOTEM_OF_UNDYING, "§e§lLast Stand", lastStandLore, "last_stand");
-        inventory.setItem(30, lastStandSettings);
-
-        // Compass Settings (Middle row)
-        List<String> compassLore = new ArrayList<>();
-        compassLore.add("§7Configure compass settings:");
-        compassLore.add("§7• Set jamming duration");
-        compassLore.add("§7• Adjust tracking");
-        compassLore.add("§7• Toggle features");
-        ItemStack compassSettings = createGuiButton(Material.COMPASS, "§9§lCompass Settings", compassLore, "compass");
-        inventory.setItem(32, compassSettings);
-
-        // Sudden Death Settings (Middle row)
-        List<String> suddenDeathLore = new ArrayList<>();
-        suddenDeathLore.add("§7Configure Sudden Death mode:");
-        suddenDeathLore.add("§7• Set activation time");
-        suddenDeathLore.add("§7• Customize effects");
-        suddenDeathLore.add("§7• Set arena location");
-        ItemStack suddenDeathSettings = createGuiButton(Material.DRAGON_HEAD, "§4§lSudden Death", suddenDeathLore, "sudden_death");
-        inventory.setItem(34, suddenDeathSettings);
-
-        // Stats Settings (Bottom row)
-        List<String> statsLore = new ArrayList<>();
-        statsLore.add("§7Configure statistics:");
-        statsLore.add("§7• Toggle stat tracking");
-        statsLore.add("§7• Set display options");
-        statsLore.add("§7• View current stats");
-        ItemStack statsSettings = createGuiButton(Material.BOOK, "§a§lStatistics", statsLore, "statistics");
-        inventory.setItem(48, statsSettings);
-        
-        // Settings button
-        List<String> settingsLore = new ArrayList<>();
-        settingsLore.add("§7Click to configure plugin settings");
-        settingsLore.add("§7Manage:");
-        settingsLore.add("§7• Swap intervals and type");
-        settingsLore.add("§7• Safety features");
-        settingsLore.add("§7• Tracking options");
-        settingsLore.add("§7• Game mechanics");
-        ItemStack settings = createGuiButton(Material.COMPARATOR, "§a§lSettings", settingsLore, "settings");
-        inventory.setItem(15, settings);
-        
-        // Game control buttons
-        if (plugin.getGameManager().isGameRunning()) {
-            if (plugin.getGameManager().isGamePaused()) {
-                List<String> resumeLore = new ArrayList<>();
-                resumeLore.add("§7Click to resume the game");
-                resumeLore.add("§7This will:");
-                resumeLore.add("§7• Reactivate the swap timer");
-                resumeLore.add("§7• Allow runner movement");
-                resumeLore.add("§7• Resume all game mechanics");
-                ItemStack resume = createItem(Material.LIME_CONCRETE, "§a§lResume Game", resumeLore);
-                inventory.setItem(22, createGlowingItem(resume));
-            } else {
-                List<String> pauseLore = new ArrayList<>();
-                pauseLore.add("§7Click to pause the game");
-                pauseLore.add("§7This will:");
-                pauseLore.add("§7• Stop the swap timer");
-                pauseLore.add("§7• Freeze current positions");
-                pauseLore.add("§7• Maintain current game state");
-                ItemStack pause = createItem(Material.YELLOW_CONCRETE, "§e§lPause Game", pauseLore);
-                inventory.setItem(22, createGlowingItem(pause));
-            }
-            
-            List<String> stopLore = new ArrayList<>();
-            stopLore.add("§c§lWARNING: This will end the current game!");
-            stopLore.add("§7This action:");
-            stopLore.add("§7• Ends the current game session");
-            stopLore.add("§7• Resets all player states");
-            stopLore.add("§7• Returns players to spawn");
-            ItemStack stop = createItem(Material.RED_CONCRETE, "§c§lStop Game", stopLore);
-            inventory.setItem(31, createGlowingItem(stop));
-        } else {
-            List<String> startLore = new ArrayList<>();
-            boolean canStart = plugin.getGameManager().canStartGame();
-            if (canStart) {
-                startLore.add("§7Click to start the game");
-                startLore.add("§7Requirements met:");
-                startLore.add("§a✔ Sufficient players");
-                startLore.add("§a✔ Teams configured");
-                startLore.add("");
-                startLore.add("§7Game will begin immediately!");
-            } else {
-                startLore.add("§cCannot start game:");
-                startLore.add("§7Requirements:");
-                startLore.add(plugin.getGameManager().getRunners().size() > 0 ? "§a✔" : "§c✘" + " At least one runner");
-                startLore.add(plugin.getGameManager().getHunters().size() > 0 ? "§a✔" : "§c✘" + " At least one hunter");
-                startLore.add("");
-                startLore.add("§7Configure teams to start!");
-            }
-            ItemStack start = createItem(Material.GREEN_CONCRETE, "§a§lStart Game", startLore);
-            inventory.setItem(22, canStart ? createGlowingItem(start) : start);
-        }
-        
-        // Status button with enhanced information
-        ItemStack status = createItem(Material.COMPASS, "§b§lGame Status", getStatusLore());
-        inventory.setItem(40, status);
-        
             player.openInventory(inventory);
         } catch (Exception e) {
-            // Log and notify player so we can see full stacktrace in server logs
-            plugin.getLogger().log(Level.SEVERE, "Failed to open main GUI for player " + (player == null ? "UNKNOWN" : player.getName()), e);
-            if (player != null && player.isOnline()) {
-                player.sendMessage("§cFailed to open menu due to an internal error. Check server logs for details.");
-            }
+            plugin.getLogger().log(java.util.logging.Level.SEVERE, "Error opening Dream menu", e);
         }
     }
-    
+
+    public void openTaskManagerMenu(Player player) {
+        try {
+            String title = "§6§lTask Manager";
+            int rows = 6;
+            Inventory inventory = Bukkit.createInventory(null, rows * 9, Component.text(title));
+            ItemStack filler = createItem(Material.BLACK_STAINED_GLASS_PANE, " ");
+            fillBorder(inventory, filler);
+
+            // Back to mode selector
+            inventory.setItem(0, createGuiButton(Material.ARROW, "§7§lBack", java.util.List.of("§7Return to mode selector"), "back_mode"));
+
+            // Runners only roster
+            ItemStack runners = createGuiButton(Material.PLAYER_HEAD, "§e§lRunners",
+                    java.util.List.of("§7Assign players as runners (no hunters)"), "team_selector");
+            inventory.setItem(10, runners);
+
+            // Task Manager Settings
+ItemStack tmSettings = createGuiButton(Material.COMPARATOR, "§6§lTask Settings",
+                    java.util.List.of("§7Open Task Manager settings"), "task_settings");
+            inventory.setItem(12, tmSettings);
+
+            // Custom Tasks
+            ItemStack customTasks = createGuiButton(Material.TARGET, "§d§lCustom Tasks",
+                    java.util.List.of("§7Manage custom tasks"), "custom_tasks_menu");
+            inventory.setItem(14, customTasks);
+
+            // Statistics
+            ItemStack stats = createGuiButton(Material.BOOK, "§a§lStatistics",
+                    java.util.List.of("§7Open statistics controls"), "statistics");
+            inventory.setItem(16, stats);
+
+            player.openInventory(inventory);
+        } catch (Exception e) {
+            plugin.getLogger().log(java.util.logging.Level.SEVERE, "Error opening Task Manager menu", e);
+        }
+    }
+
+    public void openTaskSettingsMenu(Player player) {
+        Inventory inv = Bukkit.createInventory(null, 54, Component.text("§6§lTask Settings"));
+        ItemStack filler = createItem(Material.BLACK_STAINED_GLASS_PANE, " ");
+        fillBorder(inv, filler);
+
+        // Back
+        inv.setItem(0, createItem(Material.ARROW, "§7§lBack", List.of("§7Return to Task Manager")));
+
+        boolean pause = plugin.getConfig().getBoolean("task_manager.pause_on_disconnect", true);
+        ItemStack pauseToggle = createItem(pause ? Material.REDSTONE_TORCH : Material.LEVER,
+                "§e§lPause On Disconnect: " + (pause ? "§aEnabled" : "§cDisabled"),
+                List.of("§7When a runner disconnects, pause the game"));
+        inv.setItem(10, pauseToggle);
+
+        int grace = plugin.getConfig().getInt("task_manager.rejoin_grace_seconds", 180);
+        ItemStack graceItem = createItem(Material.CLOCK, "§6§lRejoin Grace (s)",
+                List.of("§7Current: §f" + grace, "§7Left/Right: ±10", "§7Shift: ±30"));
+        inv.setItem(12, graceItem);
+
+        boolean remove = plugin.getConfig().getBoolean("task_manager.remove_on_timeout", true);
+        ItemStack removeToggle = createItem(remove ? Material.BARRIER : Material.IRON_DOOR,
+                "§e§lRemove On Timeout: " + (remove ? "§aYes" : "§cNo"),
+                List.of("§7If runner exceeds grace, remove from queue"));
+        inv.setItem(14, removeToggle);
+
+        boolean allowLate = plugin.getConfig().getBoolean("task_manager.allow_late_joiners", false);
+        ItemStack allowToggle = createItem(allowLate ? Material.LIME_DYE : Material.GRAY_DYE,
+                "§e§lAllow Late Joiners: " + (allowLate ? "§aYes" : "§cNo"),
+                List.of("§7Allow players to join mid-game and receive tasks"));
+        inv.setItem(16, allowToggle);
+
+        // Assignment viewer
+        var tmm = plugin.getTaskManagerMode();
+        if (tmm != null) {
+            int slot = 28;
+            for (var entry : tmm.getAssignments().entrySet()) {
+                java.util.UUID uuid = entry.getKey();
+                String taskId = entry.getValue();
+                var def = tmm.getTask(taskId);
+                String name = plugin.getServer().getOfflinePlayer(uuid).getName();
+                if (name == null) name = uuid.toString().substring(0, 8);
+                ItemStack it = createItem(Material.PAPER, "§e" + name, List.of("§7" + (def != null ? def.description() : taskId)));
+                inv.setItem(slot++, it);
+                if (slot >= 44) break;
+            }
+            if (tmm.getAssignments().isEmpty()) {
+                inv.setItem(31, createItem(Material.BOOK, "§7No assignments yet", List.of("§7Start a Task game to assign")));
+            }
+        }
+
+        // Reload tasks button
+        inv.setItem(53, createItem(Material.BOOK, "§6§lReload Tasks", List.of("§7Reload tasks from config")));
+
+        player.openInventory(inv);
+    }
+
+    public void openDreamSettingsMenu(Player player) {
+        Inventory inv = Bukkit.createInventory(null, 27, Component.text("§a§lDream Settings"));
+        ItemStack filler = createItem(Material.BLACK_STAINED_GLASS_PANE, " ");
+        fillBorder(inv, filler);
+        inv.setItem(0, createItem(Material.ARROW, "§7§lBack", List.of("§7Return to Dream menu")));
+
+        boolean tracker = plugin.getConfigManager().isTrackerEnabled();
+        ItemStack trackerToggle = createGuiButton(tracker ? Material.COMPASS : Material.GRAY_DYE,
+                "§e§lTracker: " + (tracker ? "§aEnabled" : "§cDisabled"),
+                List.of("§7Toggle hunter tracking compass"),
+                "dream_tracker_toggle");
+        inv.setItem(11, trackerToggle);
+
+        boolean singleSleep = plugin.getConfigManager().isSinglePlayerSleepEnabled();
+        ItemStack sleepToggle = createGuiButton(singleSleep ? Material.RED_BED : Material.GRAY_BED,
+                "§e§lSingle Player Sleep: " + (singleSleep ? "§aEnabled" : "§cDisabled"),
+                List.of("§7Only active runner can sleep"),
+                "dream_single_sleep_toggle");
+        inv.setItem(15, sleepToggle);
+
+        player.openInventory(inv);
+    }
+
     public void openTeamSelector(Player player) {
         String title = plugin.getConfigManager().getGuiTeamSelectorTitle();
         int rows = plugin.getConfigManager().getGuiTeamSelectorRows();
@@ -1071,6 +1082,17 @@ public class GuiManager {
                 "set_spawn_here");
         inventory.setItem(48, setSpawn);
         
+        // Custom Tasks Management (for Task Manager mode)
+        ItemStack customTasks = createGuiButton(
+                Material.TARGET,
+                "§d§lCustom Tasks",
+                List.of("§7Manage custom tasks for Task Manager mode",
+                        "§7• View all tasks", 
+                        "§7• Add custom tasks",
+                        "§7• Remove custom tasks"),
+                "custom_tasks_menu");
+        inventory.setItem(45, customTasks);
+        
         player.openInventory(inventory);
     }
 
@@ -1310,6 +1332,77 @@ public class GuiManager {
     inv.setItem(24, distanceItem);
 
     player.openInventory(inv);
+    }
+    
+    public void openCustomTasksMenu(Player player) {
+        Inventory inv = Bukkit.createInventory(null, 54, Component.text("§d§lCustom Tasks Manager"));
+        ItemStack filler = createItem(Material.BLACK_STAINED_GLASS_PANE, " ");
+        fillBorder(inv, filler);
+        
+        ItemStack back = createItem(Material.ARROW, "§7§lBack", List.of("§7Return to Settings"));
+        inv.setItem(0, back);
+        
+        // Header info
+        boolean includeDefaults = plugin.getConfig().getBoolean("task_manager.include_default_tasks", true);
+        ItemStack toggleDefaults = createItem(
+            includeDefaults ? Material.LIME_DYE : Material.GRAY_DYE,
+            "§e§lInclude Default Tasks: " + (includeDefaults ? "§aEnabled" : "§cDisabled"),
+            List.of("§7Toggle whether built-in tasks are included")
+        );
+        inv.setItem(4, toggleDefaults);
+        
+        // Add new task button
+        ItemStack addTask = createItem(Material.EMERALD, "§a§lAdd New Task", 
+            List.of("§7Click to add a custom task", "§7You'll be prompted in chat"));
+        inv.setItem(8, addTask);
+        
+        // Reload tasks button
+        ItemStack reloadTasks = createItem(Material.BOOK, "§6§lReload Tasks",
+            List.of("§7Reload all tasks from config"));
+        inv.setItem(53, reloadTasks);
+        
+        // Display custom tasks
+        var taskMode = plugin.getTaskManagerMode();
+        if (taskMode != null) {
+            List<String> customIds = taskMode.getCustomTaskIds();
+            int slot = 9;
+            for (String taskId : customIds) {
+                if (slot >= 45) break; // Leave room for bottom border
+                
+                var task = taskMode.getTask(taskId);
+                if (task != null) {
+                    ItemStack taskItem = createItem(Material.PAPER, "§e" + taskId,
+                        List.of("§7" + task.description(), "", "§cClick to remove"));
+                    inv.setItem(slot, taskItem);
+                }
+                slot++;
+            }
+            
+            // If no custom tasks
+            if (customIds.isEmpty()) {
+                ItemStack noTasks = createItem(Material.BARRIER, "§cNo Custom Tasks",
+                    List.of("§7Click 'Add New Task' to create one"));
+                inv.setItem(22, noTasks);
+            }
+        }
+        
+        player.openInventory(inv);
+    }
+    
+    // Method to prompt player for task input
+    public void promptTaskInput(Player player, String type) {
+        player.closeInventory();
+        if (type.equals("id")) {
+            player.sendMessage(Component.text("[Task Manager] Enter a unique task ID (e.g., 'build_nether_house'):").color(NamedTextColor.YELLOW));
+            player.sendMessage(Component.text("Type 'cancel' to abort").color(NamedTextColor.GRAY));
+            // Store state for chat listener
+            plugin.getChatInputHandler().expectTaskId(player);
+        } else if (type.equals("description")) {
+            player.sendMessage(Component.text("[Task Manager] Enter the task description:").color(NamedTextColor.YELLOW));
+            player.sendMessage(Component.text("Type 'cancel' to abort").color(NamedTextColor.GRAY));
+            // Store state for chat listener
+            plugin.getChatInputHandler().expectTaskDescription(player);
+        }
     }
     
     private int clampRows(int rows) {

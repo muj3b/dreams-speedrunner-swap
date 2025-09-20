@@ -2,6 +2,7 @@ package com.example.speedrunnerswap.gui;
 
 import com.example.speedrunnerswap.SpeedrunnerSwap;
 import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.Bukkit;
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 import org.bukkit.Material;
@@ -69,7 +70,8 @@ public class GuiListener implements Listener {
                title.contains("Compass") ||
                title.contains("Sudden Death") ||
                title.contains("Statistics") ||
-               title.contains("Dangerous Blocks");
+               title.contains("Dangerous Blocks") ||
+               title.contains("Custom Tasks");
     }
 
     private boolean isAdminMenu(String title) {
@@ -93,9 +95,16 @@ public class GuiListener implements Listener {
         
         // If this button carries a specific id, route it first (before generic back buttons)
         String earlyId = getButtonId(clickedItem);
-        if ("back_mode".equals(earlyId)) {
-            guiManager.openModeSelector(player);
-            return;
+        if (earlyId != null) {
+            switch (earlyId) {
+                case "back_mode" -> { guiManager.openModeSelector(player); return; }
+                case "statistics" -> { guiManager.openStatisticsMenu(player); return; }
+                case "world_border" -> { guiManager.openWorldBorderMenu(player); return; }
+                case "power_ups" -> { guiManager.openPowerUpsMenu(player); return; }
+                case "team_selector" -> { guiManager.openTeamSelector(player); return; }
+                case "task_settings" -> { guiManager.openTaskSettingsMenu(player); return; }
+                case "dream_settings" -> { guiManager.openDreamSettingsMenu(player); return; }
+            }
         }
 
         // Handle back buttons first
@@ -148,6 +157,12 @@ public class GuiListener implements Listener {
             handleLastStandClick(event);
         } else if (title.contains("Statistics")) {
             handleStatisticsClick(event);
+        } else if (title.contains("Custom Tasks")) {
+            handleCustomTasksClick(event);
+        } else if (title.contains("Task Settings")) {
+            handleTaskSettingsClick(event);
+        } else if (title.contains("Dream Settings")) {
+            handleDreamSettingsClick(event);
         }
     }
 
@@ -167,6 +182,19 @@ public class GuiListener implements Listener {
                 return;
             }
             plugin.setCurrentMode(com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode.DREAM);
+            guiManager.openMainMenu(player);
+            return;
+        }
+        if ("mode_task".equals(id)) {
+            if (plugin.getGameManager().isGameRunning()) {
+                if (!player.hasPermission("speedrunnerswap.admin")) {
+                    player.sendMessage(Component.text("§cStop the current game before switching modes."));
+                    return;
+                }
+                guiManager.openForceConfirm(player, com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode.TASK);
+                return;
+            }
+            plugin.setCurrentMode(com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode.TASK);
             guiManager.openMainMenu(player);
             return;
         }
@@ -194,6 +222,16 @@ public class GuiListener implements Listener {
                 return;
             }
             plugin.setCurrentMode(com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode.DREAM);
+            guiManager.openMainMenu(player);
+            return;
+        }
+        if ("force_task".equals(id)) {
+            if (plugin.getGameManager().isGameRunning()) {
+                if (!player.hasPermission("speedrunnerswap.admin")) return;
+                guiManager.openForceConfirm(player, com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode.TASK);
+                return;
+            }
+            plugin.setCurrentMode(com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode.TASK);
             guiManager.openMainMenu(player);
             return;
         }
@@ -613,6 +651,18 @@ public class GuiListener implements Listener {
                     int curr = plugin.getConfigManager().getSwapInterval();
                     plugin.getConfigManager().setModeDefaultInterval(plugin.getCurrentMode(), curr);
                     break;
+                }
+                case "custom_tasks_menu": {
+                    guiManager.openCustomTasksMenu(player);
+                    return; // Don't refresh settings menu
+                }
+                case "task_settings": {
+                    guiManager.openTaskSettingsMenu(player);
+                    return;
+                }
+                case "dream_settings": {
+                    guiManager.openDreamSettingsMenu(player);
+                    return;
                 }
             }
         } else {
@@ -1219,6 +1269,105 @@ public class GuiListener implements Listener {
 
         // Return to kits menu
         guiManager.openKitsMenu(player);
+    }
+
+    private void handleCustomTasksClick(InventoryClickEvent event) {
+        Player player = (Player) event.getWhoClicked();
+        ItemStack clicked = event.getCurrentItem();
+        if (clicked == null || !clicked.hasItemMeta()) return;
+        String name = PlainTextComponentSerializer.plainText().serialize(clicked.getItemMeta().displayName());
+        
+        if (name.equals("§7§lBack")) {
+            guiManager.openSettingsMenu(player);
+        } else if (name.startsWith("§e§lInclude Default Tasks:")) {
+            boolean current = plugin.getConfig().getBoolean("task_manager.include_default_tasks", true);
+            plugin.getConfig().set("task_manager.include_default_tasks", !current);
+            plugin.saveConfig();
+            var taskMode = plugin.getTaskManagerMode();
+            if (taskMode != null) {
+                taskMode.reloadTasks();
+            }
+            guiManager.openCustomTasksMenu(player);
+        } else if (name.equals("§a§lAdd New Task")) {
+            guiManager.promptTaskInput(player, "id");
+        } else if (name.equals("§6§lReload Tasks")) {
+            var taskMode = plugin.getTaskManagerMode();
+            if (taskMode != null) {
+                taskMode.reloadTasks();
+                player.sendMessage(Component.text("[Task Manager] Tasks reloaded from config!").color(NamedTextColor.GREEN));
+            }
+            guiManager.openCustomTasksMenu(player);
+        } else if (name.startsWith("§e")) {
+            // Custom task item - remove it
+            String taskId = name.substring(2); // Remove color code
+            var taskMode = plugin.getTaskManagerMode();
+            if (taskMode != null && taskMode.removeCustomTask(taskId)) {
+                player.sendMessage(Component.text("[Task Manager] Removed task: " + taskId).color(NamedTextColor.YELLOW));
+            }
+            guiManager.openCustomTasksMenu(player);
+        }
+    }
+    
+    private void handleTaskSettingsClick(InventoryClickEvent event) {
+        Player player = (Player) event.getWhoClicked();
+        ItemStack clicked = event.getCurrentItem();
+        if (clicked == null || !clicked.hasItemMeta()) return;
+        String name = PlainTextComponentSerializer.plainText().serialize(clicked.getItemMeta().displayName());
+
+        switch (name) {
+            case "§7§lBack" -> guiManager.openTaskManagerMenu(player);
+            case "§e§lPause On Disconnect: §aEnabled", "§e§lPause On Disconnect: §cDisabled" -> {
+                boolean cur = plugin.getConfig().getBoolean("task_manager.pause_on_disconnect", true);
+                plugin.getConfig().set("task_manager.pause_on_disconnect", !cur);
+                plugin.saveConfig();
+            }
+            case "§e§lRemove On Timeout: §aYes", "§e§lRemove On Timeout: §cNo" -> {
+                boolean cur = plugin.getConfig().getBoolean("task_manager.remove_on_timeout", true);
+                plugin.getConfig().set("task_manager.remove_on_timeout", !cur);
+                plugin.saveConfig();
+            }
+            case "§e§lAllow Late Joiners: §aYes", "§e§lAllow Late Joiners: §cNo" -> {
+                boolean cur = plugin.getConfig().getBoolean("task_manager.allow_late_joiners", false);
+                plugin.getConfig().set("task_manager.allow_late_joiners", !cur);
+                plugin.saveConfig();
+            }
+            case "§6§lRejoin Grace (s)" -> {
+                int val = plugin.getConfig().getInt("task_manager.rejoin_grace_seconds", 180);
+                int delta = event.isShiftClick() ? 30 : 10;
+                if (event.isLeftClick()) val += delta;
+                if (event.isRightClick()) val -= delta;
+                val = Math.max(10, Math.min(3600, val));
+                plugin.getConfig().set("task_manager.rejoin_grace_seconds", val);
+                plugin.saveConfig();
+            }
+            case "§6§lReload Tasks" -> {
+                var tmm = plugin.getTaskManagerMode();
+                if (tmm != null) tmm.reloadTasks();
+                player.sendMessage(Component.text("[Task Manager] Reloaded tasks.").color(NamedTextColor.GREEN));
+            }
+            default -> {}
+        }
+        guiManager.openTaskSettingsMenu(player);
+    }
+
+    private void handleDreamSettingsClick(InventoryClickEvent event) {
+        Player player = (Player) event.getWhoClicked();
+        ItemStack clicked = event.getCurrentItem();
+        if (clicked == null || !clicked.hasItemMeta()) return;
+        String name = PlainTextComponentSerializer.plainText().serialize(clicked.getItemMeta().displayName());
+        switch (name) {
+            case "§7§lBack" -> guiManager.openDreamMenu(player);
+            case "§e§lTracker: §aEnabled", "§e§lTracker: §cDisabled" -> {
+                boolean en = plugin.getConfigManager().isTrackerEnabled();
+                plugin.getConfigManager().setTrackerEnabled(!en);
+            }
+            case "§e§lSingle Player Sleep: §aEnabled", "§e§lSingle Player Sleep: §cDisabled" -> {
+                boolean en = plugin.getConfigManager().isSinglePlayerSleepEnabled();
+                plugin.getConfigManager().setSinglePlayerSleepEnabled(!en);
+            }
+            default -> {}
+        }
+        guiManager.openDreamSettingsMenu(player);
     }
 
     private void handleStatisticsClick(InventoryClickEvent event) {

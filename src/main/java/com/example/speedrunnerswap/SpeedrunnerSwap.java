@@ -17,6 +17,7 @@ import com.example.speedrunnerswap.game.SuddenDeathManager;
 
 import com.example.speedrunnerswap.game.KitConfigManager;
 import com.example.speedrunnerswap.game.DragonManager;
+import com.example.speedrunnerswap.gui.ChatInputHandler;
 import com.example.speedrunnerswap.utils.BukkitCompat;
 // Removed unused Bukkit import
 import org.bukkit.plugin.java.JavaPlugin;
@@ -36,8 +37,11 @@ public final class SpeedrunnerSwap extends JavaPlugin {
     private SuddenDeathManager suddenDeathManager;
     private KitConfigManager kitConfigManager;
     private DragonManager dragonManager;
-    // Mode selection (Dream = runners+hunters, Sapnap = runners only)
-    public enum SwapMode { DREAM, SAPNAP }
+    private ChatInputHandler chatInputHandler;
+    // Task Manager mode
+    private com.example.speedrunnerswap.task.TaskManagerMode taskManagerMode;
+    // Mode selection (Dream = runners+hunters, Sapnap = runners only, Task Manager = runners only with secret tasks)
+    public enum SwapMode { DREAM, SAPNAP, TASK }
     private SwapMode currentMode = SwapMode.DREAM;
     
     @Override
@@ -57,6 +61,10 @@ public final class SpeedrunnerSwap extends JavaPlugin {
         this.suddenDeathManager = new SuddenDeathManager(this);
         this.kitConfigManager = new KitConfigManager(this);
         this.dragonManager = new DragonManager(this);
+        this.chatInputHandler = new ChatInputHandler(this);
+        
+        // Initialize Task Manager mode
+        this.taskManagerMode = new com.example.speedrunnerswap.task.TaskManagerMode(this);
         
         // Validate config consistency
         validatePowerUpConfig();
@@ -89,6 +97,8 @@ public final class SpeedrunnerSwap extends JavaPlugin {
         getServer().getPluginManager().registerEvents(new EventListeners(this), this);
         getServer().getPluginManager().registerEvents(new DragonDefeatListener(this), this);
         getServer().getPluginManager().registerEvents(dragonManager, this);
+        // Task Manager event listeners
+        getServer().getPluginManager().registerEvents(new com.example.speedrunnerswap.task.TaskEventListener(this), this);
         // Register GUI listener for menu interactions
         getServer().getPluginManager().registerEvents(new GuiListener(this, guiManager), this);
         // Register ControlSwap GUI listeners (for Sapnap mode)
@@ -98,6 +108,8 @@ public final class SpeedrunnerSwap extends JavaPlugin {
         } catch (Throwable ignored) {
             // If classes are absent for any reason, avoid startup failure
         }
+        // Register chat input handler for custom tasks
+        getServer().getPluginManager().registerEvents(chatInputHandler, this);
         
         // Log startup with version
         String ver = getPluginMeta() != null ? getPluginMeta().getVersion() : "unknown";
@@ -158,6 +170,10 @@ public final class SpeedrunnerSwap extends JavaPlugin {
         return trackerManager;
     }
 
+    public com.example.speedrunnerswap.task.TaskManagerMode getTaskManagerMode() {
+        return taskManagerMode;
+    }
+
     public PowerUpManager getPowerUpManager() {
         return powerUpManager;
     }
@@ -186,6 +202,10 @@ public final class SpeedrunnerSwap extends JavaPlugin {
 
     public KitConfigManager getKitConfigManager() {
         return kitConfigManager;
+    }
+    
+    public ChatInputHandler getChatInputHandler() {
+        return chatInputHandler;
     }
 
     public DragonManager getDragonManager() {
@@ -225,6 +245,10 @@ public final class SpeedrunnerSwap extends JavaPlugin {
     public void setCurrentMode(SwapMode mode) {
         if (mode == null) mode = SwapMode.DREAM;
         this.currentMode = mode;
+        // When switching to Task Manager mode, ensure tracker is disabled and hunters list is ignored
+        if (this.currentMode == SwapMode.TASK) {
+            try { getConfigManager().setTrackerEnabled(false); } catch (Exception ignored) {}
+        }
         // Optionally apply the per-mode default interval when switching modes (if enabled)
         try {
             if (configManager != null && gameManager != null && configManager.getApplyDefaultOnModeSwitch() && !gameManager.isGameRunning()) {

@@ -38,9 +38,11 @@ public class EventListeners implements Listener {
     public void onPlayerJoin(PlayerJoinEvent event) {
         Player player = event.getPlayer();
         
-        // If the player is a hunter, give them a tracking compass
         if (plugin.getGameManager() != null && plugin.getGameManager().isGameRunning()) {
+            // Handle task mode rejoin logic and resume if needed
+            plugin.getGameManager().handlePlayerJoin(player);
             plugin.getGameManager().updateTeams();
+            // If the player is a hunter, give them a tracking compass
             if (plugin.getGameManager().isHunter(player) && plugin.getTrackerManager() != null) {
                 plugin.getTrackerManager().giveTrackingCompass(player);
             }
