@@ -193,8 +193,8 @@ public class SwapCommand implements CommandExecutor, TabCompleter {
         }
 
         try {
-            // Open 2-button mode selector first
-            plugin.getGuiManager().openModeSelector((Player) sender);
+            // Open direct gamemode selector - allows access to each gamemode's main menu
+            plugin.getGuiManager().openDirectGamemodeSelector((Player) sender);
             return true;
         } catch (Exception e) {
             sender.sendMessage("§cError opening GUI: " + e.getMessage());

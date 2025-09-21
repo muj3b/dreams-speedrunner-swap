@@ -26,6 +26,72 @@ public class GuiManager {
         this.plugin = plugin;
     }
 
+    // New direct gamemode selector - opens each gamemode's actual main menu
+    public void openDirectGamemodeSelector(Player player) {
+        int rows = 3;
+        org.bukkit.inventory.Inventory inv = org.bukkit.Bukkit.createInventory(null, rows * 9, net.kyori.adventure.text.Component.text("§6§lSpeedrunner Swap - Choose Gamemode"));
+
+        ItemStack filler = createItem(Material.BLACK_STAINED_GLASS_PANE, " ");
+        fillBorder(inv, filler);
+
+        boolean gameRunning = plugin.getGameManager().isGameRunning();
+        String currentMode = plugin.getCurrentMode().name();
+
+        // Dream's Speedrunners vs Hunters mode - opens Dream's main menu directly
+        java.util.List<String> dreamLore = new java.util.ArrayList<>();
+        dreamLore.add("§e§lSpeedrunners §7+ §c§lHunters");
+        dreamLore.add("§7Classic manhunt with tracking & PvP");
+        dreamLore.add("");
+        dreamLore.add("§b• §7Hunters track runners with compasses");
+        dreamLore.add("§b• §7Power-ups, world border, bounties");
+        dreamLore.add("§b• §7Team vs team competition");
+        dreamLore.add("");
+        dreamLore.add("§a§lClick to open Dream menu directly!");
+        if (currentMode.equals("DREAM")) {
+            dreamLore.add("§e● Currently Selected Mode");
+        }
+        ItemStack dream = createGuiButton(Material.DIAMOND_SWORD, "§a§lDream: Speedrunners vs Hunters", dreamLore, "direct_dream_menu");
+        if (currentMode.equals("DREAM")) dream = createGlowingItem(dream);
+        inv.setItem(11, dream);
+
+        // Sapnap's Multi-Runner Cooperation mode - opens Sapnap's main menu directly
+        java.util.List<String> sapLore = new java.util.ArrayList<>();
+        sapLore.add("§b§lMulti-Runner Cooperation");
+        sapLore.add("§7Pure teamwork - no hunters!");
+        sapLore.add("");
+        sapLore.add("§b• §7Share one character between runners");
+        sapLore.add("§b• §7Cooperative dragon defeat");
+        sapLore.add("§b• §7Queue-based rotation system");
+        sapLore.add("");
+        sapLore.add("§a§lClick to open Sapnap menu directly!");
+        if (currentMode.equals("SAPNAP")) {
+            sapLore.add("§e● Currently Selected Mode");
+        }
+        ItemStack sapnap = createGuiButton(Material.DIAMOND_BOOTS, "§b§lSapnap: Multi-Runner Swap", sapLore, "direct_sapnap_menu");
+        if (currentMode.equals("SAPNAP")) sapnap = createGlowingItem(sapnap);
+        inv.setItem(13, sapnap);
+
+        // Task Manager mode with secret tasks - opens Task Manager's main menu directly
+        java.util.List<String> taskLore = new java.util.ArrayList<>();
+        taskLore.add("§d§lSecret Task Competition");
+        taskLore.add("§7Each runner gets hidden objectives");
+        taskLore.add("");
+        taskLore.add("§b• §7Individual secret tasks");
+        taskLore.add("§b• §7First to complete wins");
+        taskLore.add("§b• §7Customizable task pool");
+        taskLore.add("");
+        taskLore.add("§a§lClick to open Task Manager menu directly!");
+        if (currentMode.equals("TASK")) {
+            taskLore.add("§e● Currently Selected Mode");
+        }
+        ItemStack taskMode = createGuiButton(Material.TARGET, "§6§lTask Manager Swap", taskLore, "direct_task_menu");
+        if (currentMode.equals("TASK")) taskMode = createGlowingItem(taskMode);
+        inv.setItem(15, taskMode);
+
+        player.openInventory(inv);
+    }
+
+    // Keep the old mode selector for backward compatibility if needed
     public void openModeSelector(Player player) {
         int rows = 3;
         org.bukkit.inventory.Inventory inv = org.bukkit.Bukkit.createInventory(null, rows * 9, net.kyori.adventure.text.Component.text("§6§lSpeedrunner Swap - Mode Selection"));
@@ -464,38 +530,59 @@ public class GuiManager {
             // === DREAM-SPECIFIC FEATURES ===
             inventory.setItem(21, createGuiButton(Material.COMPASS, "§6§lHunter Tracking", 
                 List.of("§7Configure compass tracking system", 
-                        "§7Current: " + (plugin.getConfigManager().isTrackerEnabled() ? "§aEnabled" : "§cDisabled")), 
+                        "§7Current: " + (plugin.getConfigManager().isTrackerEnabled() ? "§aEnabled" : "§cDisabled"),
+                        "§7§oHunters use compasses to find runners",
+                        "§7§oAdjust update rate and jamming settings",
+                        "§7§nClick to configure tracking"), 
                 "dream_tracking"));
 
             inventory.setItem(23, createGuiButton(Material.POTION, "§d§lPower-ups", 
                 List.of("§7Random effects on swap", 
-                        "§7Current: " + (plugin.getConfigManager().isPowerUpsEnabled() ? "§aEnabled" : "§cDisabled")), 
+                        "§7Current: " + (plugin.getConfigManager().isPowerUpsEnabled() ? "§aEnabled" : "§cDisabled"),
+                        "§7§oBoth positive and negative effects",
+                        "§7§oAdds unpredictability to gameplay",
+                        "§7§nClick to configure effects"), 
                 "power_ups"));
 
             inventory.setItem(25, createGuiButton(Material.BARRIER, "§c§lWorld Border", 
                 List.of("§7Shrinking world boundary", 
-                        "§7Forces final confrontation"), 
+                        "§7Forces final confrontation",
+                        "§7§oGradually shrinks over time",
+                        "§7§oCreates intense endgame scenarios",
+                        "§7§nClick to configure border"), 
                 "world_border"));
 
             // === ADVANCED FEATURES ===
             inventory.setItem(28, createGuiButton(Material.GOLD_INGOT, "§6§lBounty System", 
                 List.of("§7Special hunter rewards", 
-                        "§7Current: " + (plugin.getConfig().getBoolean("bounty.enabled", false) ? "§aEnabled" : "§cDisabled")), 
+                        "§7Current: " + (plugin.getConfig().getBoolean("bounty.enabled", false) ? "§aEnabled" : "§cDisabled"),
+                        "§7§oTarget specific runners for bonuses",
+                        "§7§oGives glowing effect to targets",
+                        "§7§nClick to configure bounties"), 
                 "bounty"));
 
             inventory.setItem(30, createGuiButton(Material.TOTEM_OF_UNDYING, "§e§lLast Stand", 
                 List.of("§7Final runner power boost", 
-                        "§7Current: " + (plugin.getConfigManager().isLastStandEnabled() ? "§aEnabled" : "§cDisabled")), 
+                        "§7Current: " + (plugin.getConfigManager().isLastStandEnabled() ? "§aEnabled" : "§cDisabled"),
+                        "§7§oStrength and speed when low health",
+                        "§7§oGives runners final fighting chance",
+                        "§7§nClick to configure effects"), 
                 "last_stand"));
 
             inventory.setItem(32, createGuiButton(Material.DRAGON_HEAD, "§4§lSudden Death", 
                 List.of("§7End dimension final battle", 
-                        "§7Current: " + (plugin.getConfig().getBoolean("sudden_death.enabled", false) ? "§aEnabled" : "§cDisabled")), 
+                        "§7Current: " + (plugin.getConfig().getBoolean("sudden_death.enabled", false) ? "§aEnabled" : "§cDisabled"),
+                        "§7§oForces final showdown in The End",
+                        "§7§oActivates after set time limit",
+                        "§7§nClick to configure sudden death"), 
                 "sudden_death"));
 
             inventory.setItem(34, createGuiButton(Material.DIAMOND_CHESTPLATE, "§b§lCustom Kits", 
                 List.of("§7Starting equipment setup", 
-                        "§7Current: " + (plugin.getConfigManager().isKitsEnabled() ? "§aEnabled" : "§cDisabled")), 
+                        "§7Current: " + (plugin.getConfigManager().isKitsEnabled() ? "§aEnabled" : "§cDisabled"),
+                        "§7§oDifferent kits for each team",
+                        "§7§oBalances early game advantages",
+                        "§7§nClick to edit kits"), 
                 "kits"));
 
             // === SETTINGS & ADMIN ===
@@ -597,30 +684,46 @@ public class GuiManager {
             // === TASK MANAGEMENT SECTION ===
             inventory.setItem(21, createGuiButton(Material.TARGET, "§d§lTask Settings", 
                 List.of("§7Configure task competition rules", 
-                        "§7Timeouts, late joiners, disconnects"), 
+                        "§7Timeouts, late joiners, disconnects",
+                        "§7§oPause on disconnect behavior",
+                        "§7§oRejoin grace periods and timeouts",
+                        "§7§oGame ending conditions",
+                        "§7§nClick to configure rules"), 
                 "task_settings"));
 
             inventory.setItem(23, createGuiButton(Material.WRITABLE_BOOK, "§6§lCustom Tasks", 
                 List.of("§7Manage custom task pool", 
                         "§7Add, remove, or modify tasks", 
-                        "§7Built-in tasks: " + (plugin.getConfig().getBoolean("task_manager.include_default_tasks", true) ? "§aIncluded" : "§cExcluded")), 
+                        "§7Built-in tasks: " + (plugin.getConfig().getBoolean("task_manager.include_default_tasks", true) ? "§aIncluded" : "§cExcluded"),
+                        "§7§oCreate your own challenge tasks",
+                        "§7§oEdit descriptions and requirements",
+                        "§7§nClick to manage tasks"), 
                 "custom_tasks_menu"));
 
             inventory.setItem(25, createGuiButton(Material.BOOK, "§b§lTask Assignments", 
                 List.of("§7View current task assignments", 
                         "§7Reroll tasks (when not running)", 
-                        "§7Currently assigned: §e" + assignedTasks), 
+                        "§7Currently assigned: §e" + assignedTasks,
+                        "§7§oSee who has which secret task",
+                        "§7§oReassign tasks before game starts",
+                        "§7§nClick to view assignments"), 
                 "task_assignments"));
 
             // === COMPETITION FEATURES ===
             inventory.setItem(28, createGuiButton(Material.EXPERIENCE_BOTTLE, "§a§lTask Statistics", 
                 List.of("§7View competition statistics", 
-                        "§7Track completion rates and times"), 
+                        "§7Track completion rates and times",
+                        "§7§oPlayer performance metrics",
+                        "§7§oGame duration and success rates",
+                        "§7§nClick to view statistics"), 
                 "statistics"));
 
             inventory.setItem(30, createGuiButton(Material.NETHER_STAR, "§e§lShuffle Tasks", 
                 List.of("§7Reassign all runner tasks", 
-                        gameRunning ? "§cCannot shuffle during game" : "§7Generate new task assignments"), 
+                        gameRunning ? "§cCannot shuffle during game" : "§7Generate new task assignments",
+                        "§7§oGives everyone new secret tasks",
+                        "§7§oOnly works before game starts",
+                        gameRunning ? "" : "§7§nClick to reroll tasks"), 
                 gameRunning ? "" : "reroll_tasks"));
 
             // === SETTINGS & ADMIN ===
@@ -1730,19 +1833,38 @@ public class GuiManager {
         ItemStack enableToggle = createGuiButton(
             lastStandEnabled ? Material.TOTEM_OF_UNDYING : Material.BARRIER,
             "§c§lLast Stand: " + (lastStandEnabled ? "§aEnabled" : "§cDisabled"),
-            List.of("§7Special effects when low on health"),
+            List.of("§7Special effects when low on health",
+                    "§7Click to toggle on/off"),
             "toggle_last_stand");
         inventory.setItem(11, enableToggle);
         
         ItemStack threshold = createGuiButton(Material.RED_DYE, "§c§lHealth Threshold",
-            List.of("§7Current: §f" + healthThreshold + " hearts", "§7Left/Right click: ±1"),
+            List.of("§7Current: §f" + healthThreshold + " hearts", 
+                    "§7Left click: +1 heart",
+                    "§7Right click: -1 heart"),
             "last_stand_threshold");
         inventory.setItem(13, threshold);
         
         ItemStack durationItem = createGuiButton(Material.CLOCK, "§c§lDuration",
-            List.of("§7Current: §f" + duration + " seconds", "§7Left/Right click: ±5"),
+            List.of("§7Current: §f" + duration + " seconds", 
+                    "§7Left click: +5 seconds",
+                    "§7Right click: -5 seconds"),
             "last_stand_duration");
         inventory.setItem(15, durationItem);
+        
+        ItemStack strengthAmp = createGuiButton(Material.IRON_SWORD, "§e§lStrength Amplifier",
+            List.of("§7Current: §f" + plugin.getConfigManager().getLastStandStrengthAmplifier(),
+                    "§7Left click: +1 level",
+                    "§7Right click: -1 level"),
+            "last_stand_strength");
+        inventory.setItem(20, strengthAmp);
+        
+        ItemStack speedAmp = createGuiButton(Material.SUGAR, "§b§lSpeed Amplifier",
+            List.of("§7Current: §f" + plugin.getConfigManager().getLastStandSpeedAmplifier(),
+                    "§7Left click: +1 level",
+                    "§7Right click: -1 level"),
+            "last_stand_speed");
+        inventory.setItem(24, speedAmp);
         
         player.openInventory(inventory);
     }
@@ -1805,32 +1927,61 @@ public class GuiManager {
         int triggerTime = plugin.getConfig().getInt("sudden_death.trigger_time", 1800); // 30 minutes
         boolean noRegen = plugin.getConfig().getBoolean("sudden_death.no_regen", true);
         boolean oneHit = plugin.getConfig().getBoolean("sudden_death.one_hit_kill", false);
+        boolean gameRunning = plugin.getGameManager().isGameRunning();
+        boolean suddenDeathActive = plugin.getSuddenDeathManager().isActive();
         
         ItemStack enableToggle = createGuiButton(
             suddenDeathEnabled ? Material.WITHER_SKELETON_SKULL : Material.BARRIER,
             "§4§lSudden Death: " + (suddenDeathEnabled ? "§aEnabled" : "§cDisabled"),
-            List.of("§7Activate after long games"),
+            List.of("§7Activate after long games",
+                    "§7Click to toggle on/off"),
             "toggle_sudden_death");
         inventory.setItem(11, enableToggle);
         
         ItemStack triggerTimeItem = createGuiButton(Material.CLOCK, "§4§lTrigger Time",
-            List.of("§7Current: §f" + (triggerTime/60) + " minutes", "§7Left/Right click: ±5 min"),
+            List.of("§7Current: §f" + (triggerTime/60) + " minutes", 
+                    "§7Left click: +5 minutes",
+                    "§7Right click: -5 minutes"),
             "sudden_death_time");
         inventory.setItem(13, triggerTimeItem);
         
         ItemStack noRegenToggle = createGuiButton(
             noRegen ? Material.ROTTEN_FLESH : Material.GOLDEN_APPLE,
             "§4§lNo Regeneration: " + (noRegen ? "§aEnabled" : "§cDisabled"),
-            List.of("§7Disable natural health regen"),
+            List.of("§7Disable natural health regen",
+                    "§7Click to toggle"),
             "sudden_death_no_regen");
         inventory.setItem(15, noRegenToggle);
         
         ItemStack oneHitToggle = createGuiButton(
             oneHit ? Material.NETHERITE_SWORD : Material.WOODEN_SWORD,
             "§4§lOne Hit Kill: " + (oneHit ? "§aEnabled" : "§cDisabled"),
-            List.of("§7Any damage kills instantly"),
+            List.of("§7Any damage kills instantly",
+                    "§7§cExtremely dangerous mode!",
+                    "§7Click to toggle"),
             "sudden_death_one_hit");
         inventory.setItem(17, oneHitToggle);
+        
+        // Control buttons
+        if (gameRunning && !suddenDeathActive) {
+            ItemStack activateNow = createGuiButton(Material.TNT, "§c§lActivate Now",
+                List.of("§7Force immediate sudden death",
+                        "§7§cWarning: Will teleport all players!"),
+                "activate_sudden_death_now");
+            inventory.setItem(29, activateNow);
+        }
+        
+        if (plugin.getSuddenDeathManager().isScheduled()) {
+            ItemStack cancel = createGuiButton(Material.BARRIER, "§e§lCancel Scheduled",
+                List.of("§7Cancel automatic sudden death"),
+                "cancel_sudden_death");
+            inventory.setItem(31, cancel);
+        } else if (gameRunning) {
+            ItemStack schedule = createGuiButton(Material.CLOCK, "§e§lSchedule Activation",
+                List.of("§7Auto-activate after delay time"),
+                "schedule_sudden_death");
+            inventory.setItem(31, schedule);
+        }
         
         player.openInventory(inventory);
     }

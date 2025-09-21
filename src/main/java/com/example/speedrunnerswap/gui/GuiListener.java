@@ -65,6 +65,7 @@ public class GuiListener implements Listener {
         // Include all plugin menus and the kit editor
         return title.contains("SpeedrunnerSwap") ||
                title.contains("Mode Selector") ||
+               title.contains("Choose Gamemode") ||
                title.contains("Confirm Mode Switch") ||
                title.contains("Main Menu") ||
                title.contains("Team Selector") ||
@@ -123,6 +124,29 @@ public class GuiListener implements Listener {
                 case "task_settings" -> { guiManager.openTaskSettingsMenu(player); return; }
                 case "dream_settings" -> { guiManager.openDreamSettingsMenu(player); return; }
                 case "advanced_config_root" -> { guiManager.openAdvancedConfigMenu(player, "", 0); return; }
+                case "direct_dream_menu" -> {
+                    // Direct access to Dream mode main menu
+                    plugin.setCurrentMode(com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode.DREAM);
+                    guiManager.openMainMenu(player);
+                    return;
+                }
+                case "direct_sapnap_menu" -> {
+                    // Direct access to Sapnap mode main menu
+                    plugin.setCurrentMode(com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode.SAPNAP);
+                    try {
+                        new com.example.speedrunnerswap.gui.ControlGui(plugin).openMainMenu(player);
+                    } catch (Throwable t) {
+                        player.sendMessage("§cSapnap GUI failed to open: " + t.getMessage());
+                        plugin.getLogger().warning("Sapnap GUI error: " + t.getMessage());
+                    }
+                    return;
+                }
+                case "direct_task_menu" -> {
+                    // Direct access to Task Manager mode main menu
+                    plugin.setCurrentMode(com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode.TASK);
+                    guiManager.openMainMenu(player);
+                    return;
+                }
             }
         }
 
@@ -139,6 +163,11 @@ public class GuiListener implements Listener {
         // Route to specific menu handlers
         if (title.contains("Mode Selector")) {
             handleModeSelectorClick(event);
+            return;
+        }
+        // Handle the new direct gamemode selector
+        if (title.contains("Choose Gamemode")) {
+            handleDirectGamemodeSelectorClick(event);
             return;
         }
         // Main menu: support both legacy "Main Menu" and configurable titles like "SpeedrunnerSwap Menu"
@@ -192,6 +221,31 @@ public class GuiListener implements Listener {
             handleAdvancedConfigClick(event);
         } else if (title.contains("List Editor")) {
             handleConfigListClick(event);
+        }
+    }
+
+    private void handleDirectGamemodeSelectorClick(InventoryClickEvent event) {
+        Player player = (Player) event.getWhoClicked();
+        ItemStack clicked = event.getCurrentItem();
+        if (clicked == null || !clicked.hasItemMeta()) return;
+        String id = getButtonId(clicked);
+        
+        // The button IDs are already handled in the early routing above,
+        // but let's add a fallback handler for safety
+        if ("direct_dream_menu".equals(id)) {
+            plugin.setCurrentMode(com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode.DREAM);
+            guiManager.openMainMenu(player);
+        } else if ("direct_sapnap_menu".equals(id)) {
+            plugin.setCurrentMode(com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode.SAPNAP);
+            try {
+                new com.example.speedrunnerswap.gui.ControlGui(plugin).openMainMenu(player);
+            } catch (Throwable t) {
+                player.sendMessage("§cSapnap GUI failed to open: " + t.getMessage());
+                plugin.getLogger().warning("Sapnap GUI error: " + t.getMessage());
+            }
+        } else if ("direct_task_menu".equals(id)) {
+            plugin.setCurrentMode(com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode.TASK);
+            guiManager.openMainMenu(player);
         }
     }
 
@@ -1138,8 +1192,54 @@ public class GuiListener implements Listener {
         Player player = (Player) event.getWhoClicked();
         ItemStack clicked = event.getCurrentItem();
         if (clicked == null || !clicked.hasItemMeta()) return;
+        
+        String buttonId = getButtonId(clicked);
+        if (buttonId != null) {
+            switch (buttonId) {
+                case "toggle_last_stand" -> {
+                    boolean enabled = plugin.getConfigManager().isLastStandEnabled();
+                    plugin.getConfig().set("last_stand.enabled", !enabled);
+                    plugin.saveConfig();
+                }
+                case "last_stand_threshold" -> {
+                    int threshold = plugin.getConfig().getInt("last_stand.health_threshold", 4);
+                    if (event.isLeftClick()) threshold++;
+                    if (event.isRightClick()) threshold--;
+                    threshold = Math.max(1, Math.min(20, threshold));
+                    plugin.getConfig().set("last_stand.health_threshold", threshold);
+                    plugin.saveConfig();
+                }
+                case "last_stand_duration" -> {
+                    int duration = plugin.getConfig().getInt("last_stand.duration", 30);
+                    if (event.isLeftClick()) duration += 5;
+                    if (event.isRightClick()) duration -= 5;
+                    duration = Math.max(5, Math.min(300, duration));
+                    plugin.getConfig().set("last_stand.duration", duration);
+                    plugin.saveConfig();
+                }
+                case "last_stand_strength" -> {
+                    int amp = plugin.getConfigManager().getLastStandStrengthAmplifier();
+                    if (event.isLeftClick()) amp++;
+                    if (event.isRightClick()) amp--;
+                    amp = Math.max(0, Math.min(5, amp));
+                    plugin.getConfig().set("last_stand.strength_amplifier", amp);
+                    plugin.saveConfig();
+                }
+                case "last_stand_speed" -> {
+                    int amp = plugin.getConfigManager().getLastStandSpeedAmplifier();
+                    if (event.isLeftClick()) amp++;
+                    if (event.isRightClick()) amp--;
+                    amp = Math.max(0, Math.min(5, amp));
+                    plugin.getConfig().set("last_stand.speed_amplifier", amp);
+                    plugin.saveConfig();
+                }
+            }
+            guiManager.openLastStandMenu(player);
+            return;
+        }
+        
+        // Fallback to old display name handling
         String name = PlainTextComponentSerializer.plainText().serialize(clicked.getItemMeta().displayName());
-
         switch (name) {
             case "§e§lLast Stand: §aEnabled", "§e§lLast Stand: §cDisabled" -> {
                 boolean enabled = plugin.getConfigManager().isLastStandEnabled();
@@ -1229,8 +1329,53 @@ public class GuiListener implements Listener {
         Player player = (Player) event.getWhoClicked();
         ItemStack clicked = event.getCurrentItem();
         if (clicked == null || !clicked.hasItemMeta()) return;
+        
+        String buttonId = getButtonId(clicked);
+        if (buttonId != null) {
+            switch (buttonId) {
+                case "toggle_sudden_death" -> {
+                    boolean enabled = plugin.getConfig().getBoolean("sudden_death.enabled", false);
+                    plugin.getConfig().set("sudden_death.enabled", !enabled);
+                    plugin.saveConfig();
+                }
+                case "sudden_death_time" -> {
+                    int time = plugin.getConfig().getInt("sudden_death.trigger_time", 1800);
+                    int delta = 5 * 60; // 5 minutes
+                    if (event.isLeftClick()) time += delta;
+                    if (event.isRightClick()) time -= delta;
+                    time = Math.max(300, Math.min(21600, time)); // 5 min to 6 hours
+                    plugin.getConfig().set("sudden_death.trigger_time", time);
+                    plugin.saveConfig();
+                }
+                case "sudden_death_no_regen" -> {
+                    boolean noRegen = plugin.getConfig().getBoolean("sudden_death.no_regen", true);
+                    plugin.getConfig().set("sudden_death.no_regen", !noRegen);
+                    plugin.saveConfig();
+                }
+                case "sudden_death_one_hit" -> {
+                    boolean oneHit = plugin.getConfig().getBoolean("sudden_death.one_hit_kill", false);
+                    plugin.getConfig().set("sudden_death.one_hit_kill", !oneHit);
+                    plugin.saveConfig();
+                }
+                case "activate_sudden_death_now" -> {
+                    plugin.getSuddenDeathManager().activateSuddenDeath();
+                    player.sendMessage("§4Sudden Death activated!");
+                }
+                case "cancel_sudden_death" -> {
+                    plugin.getSuddenDeathManager().cancelSchedule();
+                    player.sendMessage("§eScheduled Sudden Death cancelled.");
+                }
+                case "schedule_sudden_death" -> {
+                    plugin.getSuddenDeathManager().scheduleSuddenDeath();
+                    player.sendMessage("§eSudden Death scheduled.");
+                }
+            }
+            guiManager.openSuddenDeathMenu(player);
+            return;
+        }
+        
+        // Fallback to old display name handling 
         String name = PlainTextComponentSerializer.plainText().serialize(clicked.getItemMeta().displayName());
-
         switch (name) {
             case "§4§lSudden Death: §aActive" -> {
                 // Toggle off
