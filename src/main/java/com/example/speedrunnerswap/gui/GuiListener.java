@@ -194,9 +194,9 @@ public class GuiListener implements Listener {
         ItemStack clicked = event.getCurrentItem();
         if (clicked == null || !clicked.hasItemMeta()) return;
         String id = getButtonId(clicked);
+        
         if ("mode_dream".equals(id)) {
             if (plugin.getGameManager().isGameRunning()) {
-                // Show confirm UI instead of doing nothing
                 if (!player.hasPermission("speedrunnerswap.admin")) {
                     player.sendMessage(Component.text("§cStop the current game before switching modes."));
                     return;
@@ -208,6 +208,7 @@ public class GuiListener implements Listener {
             guiManager.openMainMenu(player);
             return;
         }
+        
         if ("mode_task".equals(id)) {
             if (plugin.getGameManager().isGameRunning()) {
                 if (!player.hasPermission("speedrunnerswap.admin")) {
@@ -221,6 +222,7 @@ public class GuiListener implements Listener {
             guiManager.openMainMenu(player);
             return;
         }
+        
         if ("mode_sapnap".equals(id)) {
             if (plugin.getGameManager().isGameRunning()) {
                 if (!player.hasPermission("speedrunnerswap.admin")) {
@@ -234,40 +236,25 @@ public class GuiListener implements Listener {
             try {
                 new com.example.speedrunnerswap.gui.ControlGui(plugin).openMainMenu(player);
             } catch (Throwable t) {
-                player.sendMessage("§cRunner-only GUI failed to open. Using text commands.");
+                player.sendMessage("§cSapnap GUI failed to open: " + t.getMessage());
             }
             return;
         }
-        if ("force_dream".equals(id)) {
-            if (plugin.getGameManager().isGameRunning()) {
-                if (!player.hasPermission("speedrunnerswap.admin")) return;
-                guiManager.openForceConfirm(player, com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode.DREAM);
+        
+        if ("admin_force_stop".equals(id)) {
+            if (!player.hasPermission("speedrunnerswap.admin")) {
+                player.sendMessage(Component.text("§cYou don't have permission for admin actions."));
                 return;
             }
-            plugin.setCurrentMode(com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode.DREAM);
-            guiManager.openMainMenu(player);
-            return;
-        }
-        if ("force_task".equals(id)) {
             if (plugin.getGameManager().isGameRunning()) {
-                if (!player.hasPermission("speedrunnerswap.admin")) return;
-                guiManager.openForceConfirm(player, com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode.TASK);
-                return;
+                plugin.getGameManager().stopGame();
+                player.sendMessage(Component.text("§aGame force-stopped. You can now switch modes."));
             }
-            plugin.setCurrentMode(com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode.TASK);
-            guiManager.openMainMenu(player);
+            guiManager.openModeSelector(player);
             return;
         }
-        if ("force_sapnap".equals(id)) {
-            if (plugin.getGameManager().isGameRunning()) {
-                if (!player.hasPermission("speedrunnerswap.admin")) return;
-                guiManager.openForceConfirm(player, com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode.SAPNAP);
-                return;
-            }
-            plugin.setCurrentMode(com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode.SAPNAP);
-            try { new com.example.speedrunnerswap.gui.ControlGui(plugin).openMainMenu(player); } catch (Throwable ignored) {}
-            return;
-        }
+        
+        // Handle force confirm dialogs
         if ("force_yes_dream".equals(id)) {
             if (!player.hasPermission("speedrunnerswap.admin")) return;
             if (plugin.getGameManager().isGameRunning()) plugin.getGameManager().stopGame();
@@ -275,33 +262,30 @@ public class GuiListener implements Listener {
             guiManager.openMainMenu(player);
             return;
         }
+        
         if ("force_yes_sapnap".equals(id)) {
             if (!player.hasPermission("speedrunnerswap.admin")) return;
             if (plugin.getGameManager().isGameRunning()) plugin.getGameManager().stopGame();
             plugin.setCurrentMode(com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode.SAPNAP);
-            try { new com.example.speedrunnerswap.gui.ControlGui(plugin).openMainMenu(player); } catch (Throwable ignored) {}
+            try { 
+                new com.example.speedrunnerswap.gui.ControlGui(plugin).openMainMenu(player); 
+            } catch (Throwable ignored) {
+                player.sendMessage("§cSapnap GUI failed to open.");
+            }
             return;
         }
+        
+        if ("force_yes_task".equals(id)) {
+            if (!player.hasPermission("speedrunnerswap.admin")) return;
+            if (plugin.getGameManager().isGameRunning()) plugin.getGameManager().stopGame();
+            plugin.setCurrentMode(com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode.TASK);
+            guiManager.openMainMenu(player);
+            return;
+        }
+        
         if ("force_no".equals(id)) {
             guiManager.openModeSelector(player);
             return;
-        }
-        if ("set_default_dream".equals(id)) {
-            if (!player.hasPermission("speedrunnerswap.admin")) return;
-            plugin.getConfigManager().setDefaultMode(com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode.DREAM);
-            player.sendMessage(Component.text("§aDefault mode set to §fDream§a."));
-            guiManager.openModeSelector(player);
-            return;
-        }
-        if ("set_default_sapnap".equals(id)) {
-            if (!player.hasPermission("speedrunnerswap.admin")) return;
-            plugin.getConfigManager().setDefaultMode(com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode.SAPNAP);
-            player.sendMessage(Component.text("§aDefault mode set to §fSapnap§a."));
-            guiManager.openModeSelector(player);
-            return;
-        }
-        if ("back_mode".equals(id)) {
-            guiManager.openModeSelector(player);
         }
     }
 
@@ -315,93 +299,89 @@ public class GuiListener implements Listener {
         String buttonId = getButtonId(clicked);
         if (buttonId != null) {
             switch (buttonId) {
+                case "start_game" -> {
+                    if (!plugin.getGameManager().isGameRunning()) {
+                        if (plugin.getGameManager().startGame()) {
+                            player.sendMessage(Component.text("§aGame started successfully!"));
+                        } else {
+                            player.sendMessage(Component.text("§cFailed to start game. Check team assignments."));
+                        }
+                    }
+                    guiManager.openMainMenu(player);
+                }
+                case "stop_game" -> {
+                    if (plugin.getGameManager().isGameRunning()) {
+                        plugin.getGameManager().stopGame();
+                        player.sendMessage(Component.text("§cGame stopped."));
+                    }
+                    guiManager.openMainMenu(player);
+                }
+                case "pause_game" -> {
+                    if (plugin.getGameManager().isGameRunning() && !plugin.getGameManager().isGamePaused()) {
+                        plugin.getGameManager().pauseGame();
+                        player.sendMessage(Component.text("§eGame paused."));
+                    }
+                    guiManager.openMainMenu(player);
+                }
+                case "resume_game" -> {
+                    if (plugin.getGameManager().isGameRunning() && plugin.getGameManager().isGamePaused()) {
+                        plugin.getGameManager().resumeGame();
+                        player.sendMessage(Component.text("§aGame resumed."));
+                    }
+                    guiManager.openMainMenu(player);
+                }
                 case "team_selector" -> guiManager.openTeamSelector(player);
-                case "settings" -> guiManager.openSettingsMenu(player);
+                case "advanced_settings" -> guiManager.openSettingsMenu(player);
                 case "power_ups" -> guiManager.openPowerUpsMenu(player);
                 case "world_border" -> guiManager.openWorldBorderMenu(player);
                 case "kits" -> guiManager.openKitsMenu(player);
                 case "bounty" -> guiManager.openBountyMenu(player);
                 case "last_stand" -> guiManager.openLastStandMenu(player);
-                case "compass" -> guiManager.openCompassSettingsMenu(player);
+                case "dream_tracking" -> guiManager.openCompassSettingsMenu(player);
                 case "sudden_death" -> guiManager.openSuddenDeathMenu(player);
                 case "statistics" -> guiManager.openStatisticsMenu(player);
+                case "task_settings" -> guiManager.openTaskSettingsMenu(player);
+                case "custom_tasks_menu" -> guiManager.openCustomTasksMenu(player);
+                case "task_assignments" -> {
+                    // Show task assignments
+                    var tmm = plugin.getTaskManagerMode();
+                    if (tmm != null && !tmm.getAssignments().isEmpty()) {
+                        player.sendMessage("§6=== Current Task Assignments ===");
+                        for (var entry : tmm.getAssignments().entrySet()) {
+                            String name = plugin.getServer().getOfflinePlayer(entry.getKey()).getName();
+                            var task = tmm.getTask(entry.getValue());
+                            player.sendMessage("§b" + name + ": §7" + (task != null ? task.description() : entry.getValue()));
+                        }
+                        player.sendMessage("§6===========================");
+                    } else {
+                        player.sendMessage("§eNo task assignments yet. Start a game to assign tasks.");
+                    }
+                }
+                case "reroll_tasks" -> {
+                    if (!plugin.getGameManager().isGameRunning()) {
+                        var tmm = plugin.getTaskManagerMode();
+                        if (tmm != null) {
+                            tmm.assignAndAnnounceTasks(plugin.getGameManager().getRunners());
+                            player.sendMessage("§aTask assignments have been rerolled!");
+                        }
+                    } else {
+                        player.sendMessage("§cCannot reroll tasks while game is running.");
+                    }
+                    guiManager.openMainMenu(player);
+                }
             }
             return;
         }
 
-        // Fallback: route based on display name text
-        String name = PlainTextComponentSerializer.plainText().serialize(clicked.getItemMeta().displayName());
-        if (guiManager.isTeamSelectorButton(clicked) || name.toLowerCase().contains("team selector")) {
-            guiManager.openTeamSelector(player);
-        } else if (guiManager.isSettingsButton(clicked) || name.toLowerCase().contains("settings")) {
-            guiManager.openSettingsMenu(player);
-        } else if (name.toLowerCase().contains("power-ups") || name.toLowerCase().contains("power ups")) {
-            guiManager.openPowerUpsMenu(player);
-        } else if (name.toLowerCase().contains("world border") || clicked.getType() == Material.BARRIER) {
-            // Note: BARRIER also used for back button; back handled earlier.
-            guiManager.openWorldBorderMenu(player);
-        } else if (name.toLowerCase().contains("kits")) {
-            guiManager.openKitsMenu(player);
-        } else if (name.toLowerCase().contains("bounty")) {
-            guiManager.openBountyMenu(player);
-        } else if (name.toLowerCase().contains("last stand")) {
-            guiManager.openLastStandMenu(player);
-        } else if (name.toLowerCase().contains("compass")) {
-            guiManager.openCompassSettingsMenu(player);
-        } else if (name.toLowerCase().contains("sudden death")) {
-            guiManager.openSuddenDeathMenu(player);
-        } else if (name.toLowerCase().contains("statistics")) {
-            guiManager.openStatisticsMenu(player);
-        } else if (name.toLowerCase().contains("status")) {
-            // Show quick status info in chat
-            showStatus(player);
-        } else if (name.equals("§a§lStart Game")) {
-            if (!plugin.getGameManager().isGameRunning()) {
-                if (plugin.getGameManager().startGame()) {
-                    player.sendMessage(Component.text("§aGame started."));
-                } else {
-                    player.sendMessage(Component.text("§cCannot start game. Check teams."));
-                }
-            }
-            guiManager.openMainMenu(player);
-        } else if (name.equals("§e§lPause Game")) {
-            if (plugin.getGameManager().isGameRunning() && !plugin.getGameManager().isGamePaused()) {
-                plugin.getGameManager().pauseGame();
-                player.sendMessage(Component.text("§eGame paused."));
-            }
-            guiManager.openMainMenu(player);
-        } else if (name.equals("§a§lResume Game")) {
-            if (plugin.getGameManager().isGameRunning() && plugin.getGameManager().isGamePaused()) {
-                plugin.getGameManager().resumeGame();
-                player.sendMessage(Component.text("§aGame resumed."));
-            }
-            guiManager.openMainMenu(player);
-        } else if (name.equals("§c§lStop Game")) {
-            if (plugin.getGameManager().isGameRunning()) {
-                plugin.getGameManager().stopGame();
-                player.sendMessage(Component.text("§cGame stopped."));
-            }
-            guiManager.openMainMenu(player);
-        }
+        // No fallback needed - all buttons should have proper IDs
+        // If we reach here, it's an unhandled button
+        plugin.getLogger().warning("Unhandled main menu click: " + 
+            (clicked.hasItemMeta() && clicked.getItemMeta().hasDisplayName() ? 
+                PlainTextComponentSerializer.plainText().serialize(clicked.getItemMeta().displayName()) : 
+                clicked.getType().name()));
     }
 
-    private void showStatus(Player sender) {
-        sender.sendMessage("§6=== SpeedrunnerSwap Status ===");
-        sender.sendMessage("§eGame Running: §f" + plugin.getGameManager().isGameRunning());
-        sender.sendMessage("§eGame Paused: §f" + plugin.getGameManager().isGamePaused());
 
-        if (plugin.getGameManager().isGameRunning()) {
-            org.bukkit.entity.Player activeRunner = plugin.getGameManager().getActiveRunner();
-            sender.sendMessage("§eActive Runner: §f" + (activeRunner != null ? activeRunner.getName() : "None"));
-            sender.sendMessage("§eTime Until Next Swap: §f" + plugin.getGameManager().getTimeUntilNextSwap() + "s");
-
-            java.util.List<org.bukkit.entity.Player> runners = plugin.getGameManager().getRunners();
-            java.util.List<org.bukkit.entity.Player> hunters = plugin.getGameManager().getHunters();
-
-            sender.sendMessage("§eRunners: §f" + runners.stream().map(org.bukkit.entity.Player::getName).collect(java.util.stream.Collectors.joining(", ")));
-            sender.sendMessage("§eHunters: §f" + hunters.stream().map(org.bukkit.entity.Player::getName).collect(java.util.stream.Collectors.joining(", ")));
-        }
-    }
 
     private void handleSettingsClick(InventoryClickEvent event) {
         Player player = (Player) event.getWhoClicked();

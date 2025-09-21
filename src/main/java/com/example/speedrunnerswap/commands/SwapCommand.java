@@ -60,6 +60,8 @@ public class SwapCommand implements CommandExecutor, TabCompleter {
                     return handleClearTeams(sender);
                 case "tasks":
                     return handleTasks(sender, Arrays.copyOfRange(args, 1, args.length));
+                case "complete":
+                    return handleTaskComplete(sender, Arrays.copyOfRange(args, 1, args.length));
                 default:
                     sender.sendMessage("§cUnknown subcommand. Use /swap for help.");
                     return false;
@@ -510,7 +512,7 @@ public class SwapCommand implements CommandExecutor, TabCompleter {
         
         if (args.length == 1) {
             // Subcommands
-            List<String> subCommands = Arrays.asList("start", "stop", "pause", "resume", "status", "creator", "setrunners", "setrunner", "sethunters", "sethunter", "reload", "gui", "mode", "clearteams");
+            List<String> subCommands = Arrays.asList("start", "stop", "pause", "resume", "status", "creator", "setrunners", "setrunner", "sethunters", "sethunter", "reload", "gui", "mode", "clearteams", "tasks", "complete");
             for (String subCommand : subCommands) {
                 if (subCommand.startsWith(args[0].toLowerCase())) {
                     completions.add(subCommand);
@@ -526,6 +528,10 @@ public class SwapCommand implements CommandExecutor, TabCompleter {
                         completions.add(name);
                     }
                 }
+            } else if (args[0].equalsIgnoreCase("complete") && args.length == 2) {
+                if ("confirm".startsWith(args[1].toLowerCase())) {
+                    completions.add("confirm");
+                }
             } else if (args[0].equalsIgnoreCase("mode") && args.length == 2) {
                 for (String opt : new String[]{"dream", "sapnap", "default"}) {
                     if (opt.startsWith(args[1].toLowerCase())) completions.add(opt);
@@ -538,5 +544,69 @@ public class SwapCommand implements CommandExecutor, TabCompleter {
         }
 
         return completions;
+    }
+    
+    private boolean handleTaskComplete(CommandSender sender, String[] rest) {
+        // Allow any player to manually complete their task
+        if (!(sender instanceof Player player)) {
+            sender.sendMessage("§cOnly players can complete tasks.");
+            return false;
+        }
+        
+        if (plugin.getCurrentMode() != com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode.TASK) {
+            sender.sendMessage("§cTask completion is only available in Task Manager mode.");
+            return false;
+        }
+        
+        if (!plugin.getGameManager().isGameRunning()) {
+            sender.sendMessage("§cTasks can only be completed during an active game.");
+            return false;
+        }
+        
+        var taskMode = plugin.getTaskManagerMode();
+        if (taskMode == null) {
+            sender.sendMessage("§cTask Manager not initialized.");
+            return false;
+        }
+        
+        String assignedTask = taskMode.getAssignedTask(player);
+        if (assignedTask == null) {
+            sender.sendMessage("§cYou don't have a task assigned. Join the game as a runner first.");
+            return false;
+        }
+        
+        // Get task description for confirmation
+        var taskDef = taskMode.getTask(assignedTask);
+        String description = taskDef != null ? taskDef.description() : assignedTask;
+        
+        // Check if player wants to see their task or complete it
+        if (rest.length == 0) {
+            // Show current task and instructions
+            player.sendMessage("§6========== §e§lYOUR TASK §6==========");
+            player.sendMessage("§f" + description);
+            player.sendMessage("");
+            player.sendMessage("§a§lTo complete your task:");
+            player.sendMessage("§e/swap complete confirm");
+            player.sendMessage("");
+            player.sendMessage("§7When you use this command, you will win the game!");
+            player.sendMessage("§7Only use it when you have actually finished your task.");
+            player.sendMessage("§6" + "=".repeat(35));
+            return true;
+        }
+        
+        String action = rest[0].toLowerCase();
+        if (!"confirm".equals(action)) {
+            sender.sendMessage("§cUse '/swap complete confirm' to complete your task, or '/swap complete' to see your task.");
+            return false;
+        }
+        
+        // Confirm completion
+        player.sendMessage("§a§lCongratulations! You completed your task:");
+        player.sendMessage("§f" + description);
+        
+        // Complete the task
+        taskMode.complete(player);
+        
+        return true;
     }
 }

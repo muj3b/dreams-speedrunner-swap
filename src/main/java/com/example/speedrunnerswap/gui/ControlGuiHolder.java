@@ -1,7 +1,7 @@
 package com.example.speedrunnerswap.gui;
 
 public class ControlGuiHolder implements org.bukkit.inventory.InventoryHolder {
-    public enum Type { MAIN, RUNNER_SELECTOR, ABOUT }
+    public enum Type { MAIN, RUNNER_SELECTOR, ABOUT, COORDINATION }
     private final Type type;
 
     public ControlGuiHolder(Type type) {

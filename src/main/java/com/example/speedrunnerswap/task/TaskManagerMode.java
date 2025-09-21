@@ -57,15 +57,38 @@ public class TaskManagerMode {
 
     private void announceTask(Player p, TaskDefinition def) {
         if (p == null || def == null) return;
+        
+        // Enhanced title with command information
         Title title = Title.title(
-                Component.text("Your Task:").color(NamedTextColor.GOLD).decorate(TextDecoration.BOLD),
+                Component.text("YOUR SECRET TASK").color(NamedTextColor.GOLD).decorate(TextDecoration.BOLD),
                 Component.text(def.description()).color(NamedTextColor.YELLOW),
-                Title.Times.times(Duration.ofMillis(400), Duration.ofMillis(3000), Duration.ofMillis(600))
+                Title.Times.times(Duration.ofMillis(500), Duration.ofMillis(4000), Duration.ofMillis(800))
         );
         p.showTitle(title);
-        p.sendMessage(Component.text("[Task Manager] Your task:")
+        
+        // Show completion command information with big text
+        Bukkit.getScheduler().runTaskLater(plugin, () -> {
+            Title commandTitle = Title.title(
+                    Component.text("MANUAL COMPLETION").color(NamedTextColor.GREEN).decorate(TextDecoration.BOLD),
+                    Component.text("Use: /swap complete confirm").color(NamedTextColor.AQUA),
+                    Title.Times.times(Duration.ofMillis(300), Duration.ofMillis(2500), Duration.ofMillis(500))
+            );
+            p.showTitle(commandTitle);
+        }, 60L); // Show after 3 seconds
+        
+        // Chat messages with detailed instructions
+        p.sendMessage(Component.text("[Task Manager] Your secret task assigned!")
                 .color(NamedTextColor.GOLD).decorate(TextDecoration.BOLD));
-        p.sendMessage(Component.text(" → "+ def.description()).color(NamedTextColor.YELLOW));
+        p.sendMessage(Component.text(" → " + def.description()).color(NamedTextColor.YELLOW));
+        p.sendMessage(Component.text(""));
+        p.sendMessage(Component.text("§a§lCOMPLETION OPTIONS:").color(NamedTextColor.GREEN));
+        p.sendMessage(Component.text("§7• §fSome tasks complete automatically when detected"));
+        p.sendMessage(Component.text("§7• §fFor manual completion: §e/swap complete confirm"));
+        p.sendMessage(Component.text("§7• §fTo view your task again: §e/swap complete"));
+        p.sendMessage(Component.text(""));
+        p.sendMessage(Component.text("§6⚠ Manual completion will instantly win the game!").color(NamedTextColor.GOLD));
+        p.sendMessage(Component.text("§7Only use it when you have actually completed your task.").color(NamedTextColor.GRAY));
+        p.sendMessage(Component.text("§6" + "=".repeat(45)).color(NamedTextColor.GOLD));
     }
 
     /** Call when a player has completed their task */
@@ -258,26 +281,125 @@ public class TaskManagerMode {
     }
 
     private void registerDefaults() {
-        // 100 unique, balanced tasks inspired by Dream's video - challenging but achievable
+        // 100 CHALLENGING tasks inspired by the user's examples - no easy tasks!
         
-        // === SPECIAL MULTI-STEP TASKS (10) ===
+        // === ULTRA CHALLENGING MULTI-STEP TASKS (15) ===
         register(new TaskDefinition("die_on_bedrock_fall", "Fall from the surface to bedrock and die from fall damage on bedrock", TaskType.DIE_ON_BEDROCK_FALL));
         register(new TaskDefinition("kill_golem_nether_bed", "Kill an iron golem in the Nether using a bed explosion", TaskType.KILL_GOLEM_NETHER_BED));
         register(new TaskDefinition("kill_all_sheep_iron_shovel", "Kill one of every colored sheep with an iron shovel", TaskType.KILL_ALL_SHEEP_IRON_SHOVEL));
         register(new TaskDefinition("sleep_nether_fortress", "Place and sleep in a bed inside a Nether fortress", TaskType.COMPLEX_TASK));
-        register(new TaskDefinition("die_holding_diamonds", "Die while holding exactly 10 diamonds", TaskType.COMPLEX_TASK));
-        register(new TaskDefinition("stack_64_rotten_flesh", "Obtain a full stack (64) of rotten flesh", TaskType.COMPLEX_TASK));
-        register(new TaskDefinition("kill_mob_with_anvil", "Kill any mob by dropping an anvil on it", TaskType.COMPLEX_TASK));
-        register(new TaskDefinition("survive_100_damage", "Take 100 points of cumulative damage without dying", TaskType.COMPLEX_TASK));
-        register(new TaskDefinition("name_5_mobs", "Name 5 different mobs with name tags", TaskType.COMPLEX_TASK));
-        register(new TaskDefinition("collect_all_wood_types", "Collect all 9 types of wood logs", TaskType.COMPLEX_TASK));
+        register(new TaskDefinition("kill_wither_skeleton_wooden_sword", "Kill a wither skeleton using only a wooden sword", TaskType.COMPLEX_TASK));
+        register(new TaskDefinition("survive_creeper_explosion_point_blank", "Survive a creeper explosion at point-blank range", TaskType.COMPLEX_TASK));
+        register(new TaskDefinition("kill_enderman_with_snowballs", "Kill an enderman using only snowballs", TaskType.COMPLEX_TASK));
+        register(new TaskDefinition("die_in_end_void_holding_elytra", "Die in the End void while holding elytra", TaskType.COMPLEX_TASK));
+        register(new TaskDefinition("kill_phantom_melee_only", "Kill a phantom using only melee attacks (no bow/crossbow)", TaskType.COMPLEX_TASK));
+        register(new TaskDefinition("tame_wolf_using_rotten_flesh", "Tame a wolf using only rotten flesh", TaskType.COMPLEX_TASK));
+        register(new TaskDefinition("kill_piglin_brute_leather_armor", "Kill a piglin brute while wearing full leather armor", TaskType.COMPLEX_TASK));
+        register(new TaskDefinition("survive_lava_swim_30_seconds", "Survive swimming in lava for 30 seconds straight", TaskType.COMPLEX_TASK));
+        register(new TaskDefinition("kill_elder_guardian_stone_sword", "Kill an elder guardian using a stone sword", TaskType.COMPLEX_TASK));
+        register(new TaskDefinition("complete_raid_wooden_tools", "Complete a raid using only wooden tools", TaskType.COMPLEX_TASK));
+        register(new TaskDefinition("kill_ender_dragon_punch", "Deal the killing blow to the ender dragon with your fist", TaskType.COMPLEX_TASK));
         
-        // === UNDERGROUND/MINING CHALLENGES (10) ===
-        register(new TaskDefinition("mine_1000_blocks", "Mine 1000 blocks total", TaskType.COMPLEX_TASK));
-        register(new TaskDefinition("find_12_diamonds", "Find and collect 12 diamonds", TaskType.COMPLEX_TASK));
-        register(new TaskDefinition("create_strip_mine", "Create a strip mine at Y=11 that is 100 blocks long", TaskType.COMPLEX_TASK));
-        register(new TaskDefinition("die_in_lava_y5", "Die in lava below Y=5", TaskType.COMPLEX_TASK));
-        register(new TaskDefinition("place_torch_bedrock", "Place a torch directly on bedrock", TaskType.COMPLEX_TASK));
+        // === EXTREME UNDERGROUND CHALLENGES (10) ===
+        register(new TaskDefinition("mine_obsidian_wooden_pickaxe", "Break obsidian using a wooden pickaxe (won't drop, just break it)", TaskType.COMPLEX_TASK));
+        register(new TaskDefinition("find_diamond_y_minus_50", "Find and mine a diamond at Y level -50 or below", TaskType.COMPLEX_TASK));
+        register(new TaskDefinition("die_by_suffocation_gravel", "Die by suffocation from gravel or sand", TaskType.COMPLEX_TASK));
+        register(new TaskDefinition("create_lava_pool_underground", "Create a 3x3 lava pool at Y level 5 or below", TaskType.COMPLEX_TASK));
+        register(new TaskDefinition("find_stronghold_no_eyes", "Find a stronghold without using any Eyes of Ender", TaskType.COMPLEX_TASK));
+        register(new TaskDefinition("mine_50_ancient_debris", "Mine 5 ancient debris blocks", TaskType.COMPLEX_TASK));
+        register(new TaskDefinition("create_beacon_underground", "Activate a beacon below Y level 0", TaskType.COMPLEX_TASK));
+        register(new TaskDefinition("kill_mob_fall_damage_mine", "Kill any mob using fall damage in a mine shaft", TaskType.COMPLEX_TASK));
+        register(new TaskDefinition("place_water_nether", "Place a water bucket in the Nether (it will evaporate)", TaskType.COMPLEX_TASK));
+        register(new TaskDefinition("dig_to_void_pickaxe_only", "Dig from surface to Y=0 using only pickaxes (no TNT/other tools)", TaskType.COMPLEX_TASK));
+        
+        // === DEADLY NETHER CHALLENGES (10) ===
+        register(new TaskDefinition("kill_ghast_melee_attack", "Kill a ghast with a melee attack (not fireball reflection)", TaskType.COMPLEX_TASK));
+        register(new TaskDefinition("swim_lava_ocean_100_blocks", "Swim 100 blocks through a lava ocean in the Nether", TaskType.COMPLEX_TASK));
+        register(new TaskDefinition("kill_hoglin_no_armor", "Kill a hoglin while wearing no armor", TaskType.COMPLEX_TASK));
+        register(new TaskDefinition("collect_soul_sand_magma_cube", "Collect soul sand while a magma cube is attacking you", TaskType.COMPLEX_TASK));
+        register(new TaskDefinition("build_house_basalt_deltas", "Build a 5x5 house in the basalt deltas biome", TaskType.COMPLEX_TASK));
+        register(new TaskDefinition("kill_blaze_water_bucket", "Kill a blaze using a water bucket (splash damage)", TaskType.COMPLEX_TASK));
+        register(new TaskDefinition("collect_crying_obsidian_ruined_portal", "Collect 10 crying obsidian from ruined portals", TaskType.COMPLEX_TASK));
+        register(new TaskDefinition("kill_piglin_their_own_crossbow", "Kill a piglin using their own crossbow", TaskType.COMPLEX_TASK));
+        register(new TaskDefinition("survive_surrounded_by_fire", "Survive being completely surrounded by fire for 10 seconds", TaskType.COMPLEX_TASK));
+        register(new TaskDefinition("die_by_wither_effect_nether", "Die from the wither effect while in the Nether", TaskType.COMPLEX_TASK));
+        
+        // === IMPOSSIBLE END CHALLENGES (10) ===
+        register(new TaskDefinition("kill_enderman_staring_contest", "Kill an enderman after staring at it for 5 seconds", TaskType.COMPLEX_TASK));
+        register(new TaskDefinition("break_end_crystal_fist", "Break an end crystal using your fist", TaskType.COMPLEX_TASK));
+        register(new TaskDefinition("survive_dragon_breath_10_seconds", "Survive standing in dragon's breath for 10 seconds", TaskType.COMPLEX_TASK));
+        register(new TaskDefinition("kill_shulker_their_own_bullet", "Kill a shulker using their own shulker bullet", TaskType.COMPLEX_TASK));
+        register(new TaskDefinition("collect_chorus_fruit_levitation", "Collect chorus fruit while affected by levitation", TaskType.COMPLEX_TASK));
+        register(new TaskDefinition("build_tower_end_spawn", "Build a 20-block tall tower on the End spawn platform", TaskType.COMPLEX_TASK));
+        register(new TaskDefinition("kill_endermite_end_dimension", "Kill an endermite in the End dimension", TaskType.COMPLEX_TASK));
+        register(new TaskDefinition("collect_dragon_egg_no_piston", "Collect the dragon egg without using pistons", TaskType.COMPLEX_TASK));
+        register(new TaskDefinition("survive_void_damage_elytra", "Take void damage and survive using elytra", TaskType.COMPLEX_TASK));
+        register(new TaskDefinition("punch_ender_dragon_100_times", "Punch the ender dragon 20 times with your fist", TaskType.COMPLEX_TASK));
+        
+        // === EXTREME COMBAT CHALLENGES (10) ===
+        register(new TaskDefinition("kill_iron_golem_cactus", "Kill an iron golem using cactus damage", TaskType.COMPLEX_TASK));
+        register(new TaskDefinition("kill_ravager_fishing_rod", "Kill a ravager using only a fishing rod", TaskType.COMPLEX_TASK));
+        register(new TaskDefinition("kill_warden_no_sound", "Kill a warden without making any sound", TaskType.COMPLEX_TASK));
+        register(new TaskDefinition("survive_skeleton_army_10", "Survive being attacked by 10+ skeletons simultaneously", TaskType.COMPLEX_TASK));
+        register(new TaskDefinition("kill_witch_their_own_potion", "Kill a witch using their own splash potion", TaskType.COMPLEX_TASK));
+        register(new TaskDefinition("kill_vindicator_their_axe", "Kill a vindicator using their own axe", TaskType.COMPLEX_TASK));
+        register(new TaskDefinition("survive_creeper_chain_explosion", "Survive a chain explosion of 5+ creepers", TaskType.COMPLEX_TASK));
+        register(new TaskDefinition("kill_zombie_pigman_gold_sword", "Kill a zombified piglin using a golden sword", TaskType.COMPLEX_TASK));
+        register(new TaskDefinition("kill_spider_jockey_separately", "Kill both the spider and skeleton of a spider jockey", TaskType.COMPLEX_TASK));
+        register(new TaskDefinition("survive_wither_boss_melee", "Survive fighting the Wither using only melee attacks", TaskType.COMPLEX_TASK));
+        
+        // === DEADLY BUILDING CHALLENGES (10) ===
+        register(new TaskDefinition("build_bridge_lava_lake", "Build a bridge across a lava lake (minimum 20 blocks)", TaskType.COMPLEX_TASK));
+        register(new TaskDefinition("build_house_monster_spawner", "Build a house with a monster spawner inside it", TaskType.COMPLEX_TASK));
+        register(new TaskDefinition("create_floating_island_void", "Create a floating island above the void in the End", TaskType.COMPLEX_TASK));
+        register(new TaskDefinition("build_tower_lightning_storm", "Build a 50-block tall tower during a thunderstorm", TaskType.COMPLEX_TASK));
+        register(new TaskDefinition("create_pixel_art_nether_roof", "Create pixel art on the Nether roof (10x10 minimum)", TaskType.COMPLEX_TASK));
+        register(new TaskDefinition("build_underwater_base_no_doors", "Build an underwater base without using doors or air pockets", TaskType.COMPLEX_TASK));
+        register(new TaskDefinition("create_redstone_trap_works", "Create a working redstone trap that kills a mob", TaskType.COMPLEX_TASK));
+        register(new TaskDefinition("build_castle_desert_temple", "Build a castle on top of a desert temple", TaskType.COMPLEX_TASK));
+        register(new TaskDefinition("create_farm_end_island", "Create a working farm on an End island", TaskType.COMPLEX_TASK));
+        register(new TaskDefinition("build_house_one_chunk", "Build a house that spans exactly one chunk (16x16)", TaskType.COMPLEX_TASK));
+        
+        // === INSANE SURVIVAL CHALLENGES (10) ===
+        register(new TaskDefinition("survive_day_half_heart", "Survive an entire day cycle with half a heart", TaskType.COMPLEX_TASK));
+        register(new TaskDefinition("survive_drowning_air_pocket", "Survive drowning by finding an air pocket underwater", TaskType.COMPLEX_TASK));
+        register(new TaskDefinition("eat_only_poisonous_food_day", "Eat only poisonous food (spider eyes, etc.) for one day", TaskType.COMPLEX_TASK));
+        register(new TaskDefinition("survive_desert_no_water", "Survive in a desert for 10 minutes without drinking water", TaskType.COMPLEX_TASK));
+        register(new TaskDefinition("survive_cave_no_torches", "Survive in a cave system for 5 minutes without placing torches", TaskType.COMPLEX_TASK));
+        register(new TaskDefinition("survive_blizzard_powder_snow", "Survive being trapped in powder snow for 30 seconds", TaskType.COMPLEX_TASK));
+        register(new TaskDefinition("survive_hunger_games_no_food", "Survive with empty hunger bar for 2 minutes", TaskType.COMPLEX_TASK));
+        register(new TaskDefinition("survive_fall_water_bucket_clutch", "Survive a 50+ block fall using water bucket clutch", TaskType.COMPLEX_TASK));
+        register(new TaskDefinition("survive_mob_spawner_room_1_minute", "Survive in a mob spawner room for 1 minute", TaskType.COMPLEX_TASK));
+        register(new TaskDefinition("survive_on_single_block_void", "Survive on a single block above the void for 2 minutes", TaskType.COMPLEX_TASK));
+        
+        // === EXTREME COLLECTION CHALLENGES (15) ===
+        register(new TaskDefinition("collect_stack_rotten_flesh_zombies", "Collect 64 rotten flesh by killing zombies only", TaskType.COMPLEX_TASK));
+        register(new TaskDefinition("collect_all_armor_trims", "Collect 5 different armor trim templates", TaskType.COMPLEX_TASK));
+        register(new TaskDefinition("collect_every_enchanted_book", "Collect 10 different enchanted books", TaskType.COMPLEX_TASK));
+        register(new TaskDefinition("collect_stack_gunpowder_creepers", "Collect 64 gunpowder by killing creepers only", TaskType.COMPLEX_TASK));
+        register(new TaskDefinition("collect_all_pottery_sherds", "Collect 5 different pottery sherds", TaskType.COMPLEX_TASK));
+        register(new TaskDefinition("collect_stack_bones_skeletons", "Collect 64 bones by killing skeletons only", TaskType.COMPLEX_TASK));
+        register(new TaskDefinition("collect_every_music_disc", "Collect 5 different music discs", TaskType.COMPLEX_TASK));
+        register(new TaskDefinition("collect_stack_string_spiders", "Collect 64 string by killing spiders only", TaskType.COMPLEX_TASK));
+        register(new TaskDefinition("collect_all_banner_patterns", "Collect 5 different banner patterns", TaskType.COMPLEX_TASK));
+        register(new TaskDefinition("collect_stack_slimeballs_slimes", "Collect 64 slimeballs by killing slimes only", TaskType.COMPLEX_TASK));
+        register(new TaskDefinition("collect_every_horse_armor", "Collect leather, iron, gold, and diamond horse armor", TaskType.COMPLEX_TASK));
+        register(new TaskDefinition("collect_stack_blaze_rods_blazes", "Collect 64 blaze rods by killing blazes only", TaskType.COMPLEX_TASK));
+        register(new TaskDefinition("collect_all_smithing_templates", "Collect 3 different smithing templates", TaskType.COMPLEX_TASK));
+        register(new TaskDefinition("collect_stack_ender_pearls_endermen", "Collect 64 ender pearls by killing endermen only", TaskType.COMPLEX_TASK));
+        register(new TaskDefinition("collect_every_suspicious_stew", "Collect 5 different suspicious stews", TaskType.COMPLEX_TASK));
+        
+        // === FINAL IMPOSSIBLE CHALLENGES (10) ===
+        register(new TaskDefinition("kill_every_hostile_mob_type", "Kill one of every hostile mob type in the game", TaskType.COMPLEX_TASK));
+        register(new TaskDefinition("complete_all_advancements_hour", "Complete 20 different advancements", TaskType.COMPLEX_TASK));
+        register(new TaskDefinition("create_max_level_enchant_table", "Create a max-level enchanting table setup (15 bookshelves)", TaskType.COMPLEX_TASK));
+        register(new TaskDefinition("defeat_three_bosses", "Defeat the Ender Dragon, Wither, and Elder Guardian", TaskType.COMPLEX_TASK));
+        register(new TaskDefinition("create_every_potion_type", "Brew 10 different types of potions", TaskType.COMPLEX_TASK));
+        register(new TaskDefinition("max_out_villager_trades", "Max out trades with 5 different villager professions", TaskType.COMPLEX_TASK));
+        register(new TaskDefinition("create_automatic_farm_system", "Create 3 different automatic farms (crop, mob, etc.)", TaskType.COMPLEX_TASK));
+        register(new TaskDefinition("survive_hardcore_week", "Survive for 7 in-game days without dying once", TaskType.COMPLEX_TASK));
+        register(new TaskDefinition("create_nether_highway_1000", "Create a Nether highway spanning 1000 blocks", TaskType.COMPLEX_TASK));
+        register(new TaskDefinition("become_minecraft_god", "Reach maximum level (technically impossible - 30+ levels)", TaskType.COMPLEX_TASK));
         register(new TaskDefinition("fill_chest_ores", "Fill a chest with one of each ore type", TaskType.COMPLEX_TASK));
         register(new TaskDefinition("explode_50_tnt", "Explode 50 TNT blocks", TaskType.COMPLEX_TASK));
         register(new TaskDefinition("dig_to_void", "Dig through bedrock and fall into the void", TaskType.COMPLEX_TASK));
