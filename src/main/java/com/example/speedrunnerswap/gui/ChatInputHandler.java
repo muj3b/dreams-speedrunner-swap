@@ -17,9 +17,10 @@ public class ChatInputHandler implements Listener {
     private final Map<UUID, InputState> activeInputs = new HashMap<>();
     
     private static class InputState {
-        enum Type { TASK_ID, TASK_DESCRIPTION, DONATION_URL }
+        enum Type { TASK_ID, TASK_DESCRIPTION, DONATION_URL, CONFIG_STRING, CONFIG_LIST_ADD }
         final Type type;
         String taskId; // Store task ID when collecting description
+        String configPath; // Path for config edits
         
         InputState(Type type) {
             this.type = type;
@@ -47,6 +48,18 @@ public class ChatInputHandler implements Listener {
     
     public void expectDonationUrl(Player player) {
         activeInputs.put(player.getUniqueId(), new InputState(InputState.Type.DONATION_URL));
+    }
+    
+    public void expectConfigString(Player player, String path) {
+        InputState st = new InputState(InputState.Type.CONFIG_STRING);
+        st.configPath = path;
+        activeInputs.put(player.getUniqueId(), st);
+    }
+    
+    public void expectConfigListAdd(Player player, String path) {
+        InputState st = new InputState(InputState.Type.CONFIG_LIST_ADD);
+        st.configPath = path;
+        activeInputs.put(player.getUniqueId(), st);
     }
     
 @SuppressWarnings("deprecation")
@@ -77,6 +90,12 @@ public void onChat(AsyncPlayerChatEvent event) {
                 break;
             case DONATION_URL:
                 handleDonationUrl(player, input);
+                break;
+            case CONFIG_STRING:
+                handleConfigString(player, state.configPath, input);
+                break;
+            case CONFIG_LIST_ADD:
+                handleConfigListAdd(player, state.configPath, input);
                 break;
         }
     }
@@ -144,6 +163,33 @@ public void onChat(AsyncPlayerChatEvent event) {
             player.sendMessage(Component.text("[Settings] Donation URL updated!").color(NamedTextColor.GREEN));
             plugin.getGuiManager().openSettingsMenu(player);
         });
+    }
+    
+    private void handleConfigString(Player player, String path, String value) {
+        plugin.getServer().getScheduler().runTask(plugin, () -> {
+            plugin.getConfig().set(path, value);
+            plugin.saveConfig();
+            player.sendMessage(Component.text("[Config] Updated " + path).color(NamedTextColor.GREEN));
+            String parent = getParent(path);
+            plugin.getGuiManager().openAdvancedConfigMenu(player, parent, 0);
+        });
+    }
+    
+    private void handleConfigListAdd(Player player, String path, String value) {
+        plugin.getServer().getScheduler().runTask(plugin, () -> {
+            java.util.List<String> list = plugin.getConfig().getStringList(path);
+            list.add(value);
+            plugin.getConfig().set(path, list);
+            plugin.saveConfig();
+            player.sendMessage(Component.text("[Config] Added to " + path).color(NamedTextColor.GREEN));
+            plugin.getGuiManager().openConfigListEditor(player, path, 0);
+        });
+    }
+    
+    private String getParent(String path) {
+        if (path == null || path.isEmpty()) return "";
+        int idx = path.lastIndexOf('.');
+        return idx < 0 ? "" : path.substring(0, idx);
     }
     
     public void clearInput(Player player) {

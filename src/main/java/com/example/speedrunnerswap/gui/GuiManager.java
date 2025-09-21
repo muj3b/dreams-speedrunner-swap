@@ -867,6 +867,15 @@ plugin.getLogger().log(Level.SEVERE, "Error opening Task Manager menu", e);
                 "single_player_sleep_toggle");
         inventory.setItem(23, singlePlayerSleepToggle);
 
+        // Advanced Config Browser entry
+        ItemStack advConfig = createGuiButton(
+                Material.WRITABLE_BOOK,
+                "§6§lAdvanced Settings",
+                List.of("§7Browse and edit ALL config options", "§7Be careful!"),
+                "advanced_config_root");
+        // Place near other admin tools or at a free slot
+        inventory.setItem(32, advConfig);
+
         // Admin tools
         ItemStack adminHeader = createItem(Material.BOOK, "§6§lAdmin Tools", List.of(
             "§7Operator utilities: force actions"
@@ -1534,6 +1543,116 @@ plugin.getLogger().log(Level.SEVERE, "Error opening Task Manager menu", e);
         return lore;
     }
     
+    // Advanced Config Browser
+    public void openAdvancedConfigMenu(Player player, String path, int page) {
+        if (path == null) path = "";
+        org.bukkit.configuration.file.FileConfiguration cfg = plugin.getConfig();
+        org.bukkit.configuration.ConfigurationSection section = path.isEmpty() ? cfg.getConfigurationSection("") : cfg.getConfigurationSection(path);
+        if (section == null) {
+            // If leaf value, bounce to parent
+            String parent = getParentPath(path);
+            section = parent == null ? cfg.getConfigurationSection("") : cfg.getConfigurationSection(parent);
+            path = parent == null ? "" : parent;
+        }
+        java.util.Set<String> keys = section == null ? java.util.Collections.emptySet() : section.getKeys(false);
+
+        int rows = 6;
+        String title = "§6§lAdvanced Config" + (path.isEmpty() ? "" : " §7(" + path + ")");
+        Inventory inv = Bukkit.createInventory(null, rows * 9, Component.text(title));
+        ItemStack filler = createItem(Material.GRAY_STAINED_GLASS_PANE, " ");
+        fillBorder(inv, filler);
+
+        // Back to Settings or parent
+        if (path.isEmpty()) {
+            inv.setItem(0, createGuiButton(Material.ARROW, "§7§lBack", List.of("§7Return to Settings"), "back_settings"));
+        } else {
+            String parent = getParentPath(path);
+            String id = parent == null ? "advanced_config_root" : ("cfg:nav:" + parent);
+            inv.setItem(0, createGuiButton(Material.ARROW, "§7§lUp: §f" + (parent == null ? "root" : parent), List.of("§7Go to parent section"), id));
+        }
+
+        // Pagination
+        java.util.List<String> sorted = new java.util.ArrayList<>(keys);
+        java.util.Collections.sort(sorted);
+        int start = page * 28;
+        int end = Math.min(start + 28, sorted.size());
+        int slot = 10;
+        for (int i = start; i < end; i++) {
+            String key = sorted.get(i);
+            String full = path.isEmpty() ? key : path + "." + key;
+            Object val = cfg.get(full);
+            ItemStack it;
+            if (val instanceof org.bukkit.configuration.ConfigurationSection) {
+                it = createGuiButton(Material.CHEST, "§e§l" + key + "/", List.of("§7Open section", "§8" + full), "cfg:nav:" + full);
+            } else if (val instanceof Boolean) {
+                boolean b = (Boolean) val;
+                it = createGuiButton(b ? Material.LIME_DYE : Material.GRAY_DYE, "§a§l" + key + " = " + (b ? "§atrue" : "§cfalse"), List.of("§7Toggle", "§8" + full), "cfg:bool:" + full);
+            } else if (val instanceof Number) {
+                String display = String.valueOf(val);
+                it = createGuiButton(Material.REPEATER, "§6§l" + key + " = §e" + display, List.of("§7Left/Right: ±1", "§7Shift: ±10", "§8" + full), "cfg:num:" + full);
+            } else if (val instanceof java.util.List) {
+                // assume string list for generic editor
+                it = createGuiButton(Material.PAPER, "§b§l" + key + "[]", List.of("§7Edit list", "§8" + full), "cfg:list:" + full);
+            } else {
+                String s = cfg.getString(full, String.valueOf(val));
+                it = createGuiButton(Material.NAME_TAG, "§d§l" + key + " = §f" + (s == null ? "null" : truncate(s, 20)), List.of("§7Click to edit string", "§8" + full), "cfg:str:" + full);
+            }
+            inv.setItem(slot, it);
+            slot++;
+            if ((slot + 1) % 9 == 0) slot += 2; // skip border columns
+        }
+
+        // Page controls
+        if (page > 0) inv.setItem(45, createGuiButton(Material.ARROW, "§7§lPrev Page", List.of(), "cfg:page:" + path + ":" + (page - 1)));
+        if (end < sorted.size()) inv.setItem(53, createGuiButton(Material.ARROW, "§7§lNext Page", List.of(), "cfg:page:" + path + ":" + (page + 1)));
+
+        Bukkit.getPlayer(player.getUniqueId()).openInventory(inv);
+    }
+
+    public void openConfigListEditor(Player player, String path, int page) {
+        org.bukkit.configuration.file.FileConfiguration cfg = plugin.getConfig();
+        java.util.List<String> list = cfg.getStringList(path);
+        int rows = 6;
+        String title = "§6§lList Editor §7(" + path + ")";
+        Inventory inv = Bukkit.createInventory(null, rows * 9, Component.text(title));
+        ItemStack filler = createItem(Material.GRAY_STAINED_GLASS_PANE, " ");
+        fillBorder(inv, filler);
+
+        // Back
+        inv.setItem(0, createGuiButton(Material.ARROW, "§7§lBack", List.of("§7Return to Advanced Config"), "cfg:nav:" + getParentPath(path)));
+        // Add new
+        inv.setItem(8, createGuiButton(Material.EMERALD, "§a§lAdd Item", List.of("§7Click to add via chat"), "cfg:list_add:" + path));
+
+        // Items
+        int start = page * 28;
+        int end = Math.min(start + 28, list.size());
+        int slot = 10;
+        for (int i = start; i < end; i++) {
+            String item = list.get(i);
+            String id = "cfg:list_del:" + path + ":" + i;
+            inv.setItem(slot, createGuiButton(Material.PAPER, "§f" + truncate(item, 30), List.of("§cClick to remove", "§8index:" + i), id));
+            slot++;
+            if ((slot + 1) % 9 == 0) slot += 2;
+        }
+        // Pages
+        if (page > 0) inv.setItem(45, createGuiButton(Material.ARROW, "§7§lPrev Page", List.of(), "cfg:list_page:" + path + ":" + (page - 1)));
+        if (end < list.size()) inv.setItem(53, createGuiButton(Material.ARROW, "§7§lNext Page", List.of(), "cfg:list_page:" + path + ":" + (page + 1)));
+
+        Bukkit.getPlayer(player.getUniqueId()).openInventory(inv);
+    }
+
+    private String getParentPath(String path) {
+        if (path == null || path.isEmpty()) return null;
+        int idx = path.lastIndexOf('.');
+        if (idx < 0) return null;
+        return path.substring(0, idx);
+    }
+
+    private String truncate(String s, int n) {
+        if (s == null) return "null";
+        if (s.length() <= n) return s;
+        return s.substring(0, n - 1) + "…";
+    }
     
     // Helper methods for menu identification
     private boolean isItem(ItemStack item, Material material, String name) {

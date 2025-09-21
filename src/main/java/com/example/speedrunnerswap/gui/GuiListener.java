@@ -29,21 +29,31 @@ public class GuiListener implements Listener {
     public void onInventoryClick(InventoryClickEvent event) {
         if (!(event.getWhoClicked() instanceof Player)) return;
         Player player = (Player) event.getWhoClicked();
-        ItemStack clickedItem = event.getCurrentItem();
-        
-        if (clickedItem == null || !clickedItem.hasItemMeta()) return;
-
         String title = PlainTextComponentSerializer.plainText().serialize(event.getView().title());
 
-        // Always cancel clicks in our GUIs
+        // Always cancel any click when a plugin GUI is open (regardless of item)
         if (isPluginGui(title)) {
             event.setCancelled(true);
+            // Extra safety: deny result and block risky actions
+            event.setResult(org.bukkit.event.Event.Result.DENY);
+            // Disallow number key hotbar swaps, shift-collect, drops, etc.
+            org.bukkit.event.inventory.InventoryAction action = event.getAction();
+            org.bukkit.event.inventory.ClickType click = event.getClick();
+            if (click.isKeyboardClick() || click.isShiftClick() ||
+                action.name().contains("HOTBAR") || action.name().contains("MOVE_TO_OTHER_INVENTORY") ||
+                action.name().contains("COLLECT") || action.name().contains("DROP")) {
+                return;
+            }
+            ItemStack clickedItem = event.getCurrentItem();
 
             // Admin permission check
             if (!player.hasPermission("speedrunnerswap.admin") && isAdminMenu(title)) {
                 player.sendMessage(Component.text("§cYou do not have permission to use this menu."));
                 return;
             }
+
+            // If there is no clickable item, do nothing further
+            if (clickedItem == null || clickedItem.getType() == Material.AIR) return;
 
             // Route to appropriate handler
             handleGuiClick(event, title);
@@ -71,7 +81,15 @@ public class GuiListener implements Listener {
                title.contains("Sudden Death") ||
                title.contains("Statistics") ||
                title.contains("Dangerous Blocks") ||
-               title.contains("Custom Tasks");
+               title.contains("Custom Tasks") ||
+               // Add explicit mode menus and per-mode settings
+               title.contains("Task Manager") ||
+               title.contains("Task Settings") ||
+               title.contains("Dream Settings") ||
+               title.contains("Advanced Config") ||
+               title.contains("List Editor") ||
+               title.contains("Dream") ||
+               title.contains("Sapnap");
     }
 
     private boolean isAdminMenu(String title) {
@@ -104,6 +122,7 @@ public class GuiListener implements Listener {
                 case "team_selector" -> { guiManager.openTeamSelector(player); return; }
                 case "task_settings" -> { guiManager.openTaskSettingsMenu(player); return; }
                 case "dream_settings" -> { guiManager.openDreamSettingsMenu(player); return; }
+                case "advanced_config_root" -> { guiManager.openAdvancedConfigMenu(player, "", 0); return; }
             }
         }
 
@@ -163,6 +182,10 @@ public class GuiListener implements Listener {
             handleTaskSettingsClick(event);
         } else if (title.contains("Dream Settings")) {
             handleDreamSettingsClick(event);
+        } else if (title.contains("Advanced Config")) {
+            handleAdvancedConfigClick(event);
+        } else if (title.contains("List Editor")) {
+            handleConfigListClick(event);
         }
     }
 
@@ -1306,6 +1329,136 @@ public class GuiListener implements Listener {
             }
             guiManager.openCustomTasksMenu(player);
         }
+    }
+    
+    private void handleAdvancedConfigClick(InventoryClickEvent event) {
+        Player player = (Player) event.getWhoClicked();
+        ItemStack clicked = event.getCurrentItem();
+        if (clicked == null || !clicked.hasItemMeta()) return;
+        String id = getButtonId(clicked);
+        if (id == null) {
+            // Back to settings via back button name
+            String name = PlainTextComponentSerializer.plainText().serialize(clicked.getItemMeta().displayName());
+            if ("§7§lBack".equals(name)) {
+                guiManager.openSettingsMenu(player);
+            }
+            return;
+        }
+        try {
+            if (id.equals("back_settings")) { guiManager.openSettingsMenu(player); return; }
+            if (id.startsWith("cfg:nav:")) {
+                String path = id.substring("cfg:nav:".length());
+                guiManager.openAdvancedConfigMenu(player, path, 0);
+                return;
+            }
+            if (id.startsWith("cfg:page:")) {
+                String rest = id.substring("cfg:page:".length());
+                int idx = rest.lastIndexOf(':');
+                String path = idx >= 0 ? rest.substring(0, idx) : "";
+                int page = idx >= 0 ? Integer.parseInt(rest.substring(idx + 1)) : 0;
+                guiManager.openAdvancedConfigMenu(player, path, page);
+                return;
+            }
+            if (id.startsWith("cfg:bool:")) {
+                String path = id.substring("cfg:bool:".length());
+                boolean cur = plugin.getConfig().getBoolean(path, false);
+                plugin.getConfig().set(path, !cur);
+                plugin.saveConfig();
+                guiManager.openAdvancedConfigMenu(player, getParentPath(path), 0);
+                return;
+            }
+            if (id.startsWith("cfg:num:")) {
+                String path = id.substring("cfg:num:".length());
+                Number n = (Number) plugin.getConfig().get(path);
+                double val = n == null ? 0 : n.doubleValue();
+                double delta = (event.isShiftClick() ? 10 : 1) * (event.isRightClick() ? -1 : 1);
+                double next = val + delta;
+                // Write back preserving type
+                Object toSet;
+                if (n instanceof Integer || n instanceof Long || (n == null && path.toLowerCase().contains("ticks"))) {
+                    toSet = (long) Math.round(next);
+                } else {
+                    toSet = next;
+                }
+                plugin.getConfig().set(path, toSet);
+                plugin.saveConfig();
+                guiManager.openAdvancedConfigMenu(player, getParentPath(path), 0);
+                return;
+            }
+            if (id.startsWith("cfg:str:")) {
+                String path = id.substring("cfg:str:".length());
+                plugin.getChatInputHandler().expectConfigString(player, path);
+                player.closeInventory();
+                player.sendMessage(Component.text("[Config] Enter new value for " + path + " (type 'cancel' to abort)").color(NamedTextColor.YELLOW));
+                return;
+            }
+            if (id.startsWith("cfg:list:")) {
+                String path = id.substring("cfg:list:".length());
+                guiManager.openConfigListEditor(player, path, 0);
+                return;
+            }
+        } catch (Exception ignored) {}
+    }
+    
+    private String getParentPath(String path) {
+        if (path == null || path.isEmpty()) return "";
+        int idx = path.lastIndexOf(':') >= 0 ? path.lastIndexOf(':') : path.lastIndexOf('.');
+        if (idx < 0) return "";
+        return path.substring(0, idx);
+    }
+    
+    private void handleConfigListClick(InventoryClickEvent event) {
+        Player player = (Player) event.getWhoClicked();
+        ItemStack clicked = event.getCurrentItem();
+        if (clicked == null || !clicked.hasItemMeta()) return;
+        String id = getButtonId(clicked);
+        if (id == null) {
+            String name = PlainTextComponentSerializer.plainText().serialize(clicked.getItemMeta().displayName());
+            if ("§7§lBack".equals(name)) {
+                String title = PlainTextComponentSerializer.plainText().serialize(event.getView().title());
+                int l = title.indexOf('(');
+                int r = title.lastIndexOf(')');
+                String path = (l >= 0 && r > l) ? title.substring(l + 1, r) : "";
+                guiManager.openAdvancedConfigMenu(player, getParentPath(path), 0);
+            }
+            return;
+        }
+        try {
+            if (id.startsWith("cfg:nav:")) {
+                String path = id.substring("cfg:nav:".length());
+                guiManager.openAdvancedConfigMenu(player, path, 0);
+                return;
+            }
+            if (id.startsWith("cfg:list_add:")) {
+                String path = id.substring("cfg:list_add:".length());
+                plugin.getChatInputHandler().expectConfigListAdd(player, path);
+                player.closeInventory();
+                player.sendMessage(Component.text("[Config] Enter list item to add to " + path + " (type 'cancel' to abort)").color(NamedTextColor.YELLOW));
+                return;
+            }
+            if (id.startsWith("cfg:list_del:")) {
+                String rest = id.substring("cfg:list_del:".length());
+                int idx = rest.lastIndexOf(':');
+                String path = rest.substring(0, idx);
+                int index = Integer.parseInt(rest.substring(idx + 1));
+                java.util.List<String> list = plugin.getConfig().getStringList(path);
+                if (index >= 0 && index < list.size()) {
+                    list.remove(index);
+                    plugin.getConfig().set(path, list);
+                    plugin.saveConfig();
+                }
+                guiManager.openConfigListEditor(player, path, 0);
+                return;
+            }
+            if (id.startsWith("cfg:list_page:")) {
+                String rest = id.substring("cfg:list_page:".length());
+                int idx = rest.lastIndexOf(':');
+                String path = rest.substring(0, idx);
+                int page = Integer.parseInt(rest.substring(idx + 1));
+                guiManager.openConfigListEditor(player, path, page);
+                return;
+            }
+        } catch (Exception ignored) {}
     }
     
     private void handleTaskSettingsClick(InventoryClickEvent event) {
