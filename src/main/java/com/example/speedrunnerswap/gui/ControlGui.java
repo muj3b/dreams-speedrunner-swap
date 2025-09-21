@@ -21,7 +21,11 @@ public class ControlGui {
     public void openMainMenu(Player player) {
         // Cache frequently accessed data for better performance
         boolean running = plugin.getGameManager().isGameRunning();
-        int runnerCount = plugin.getGameManager().getRunners().size();
+        List<Player> runners = plugin.getGameManager().getRunners();
+        int runnerCount = runners != null ? runners.size() : 0;
+        
+        // Debug logging to help troubleshoot
+        plugin.getLogger().info("Opening GUI for " + player.getName() + ", runners: " + runnerCount);
         
         // Smart adaptive sizing based on team size and features needed
         int baseRows = plugin.getConfigManager().getGuiMainMenuRows();
@@ -260,17 +264,17 @@ public class ControlGui {
                 (singlePlayerSleep ? "§a" : "§c") + "§lSingle Sleep: " + (singlePlayerSleep ? "ON" : "OFF"), sleepLore));
 
         // Enhanced queue insights with upcoming order
-        if (running && runnerCount >= 2) {
+        if (running && runnerCount >= 2 && runners != null && !runners.isEmpty()) {
             List<String> queueLore = new ArrayList<>();
             queueLore.add("§7Upcoming swap order:");
             
-            // Get next 3 runners in queue
-            List<Player> runners = plugin.getGameManager().getRunners();
-            int activeIndex = activeRunner != null ? runners.indexOf(activeRunner) : -1;
+            // Get next 3 runners in queue - use the runners variable from method start
+            int activeIndex = activeRunner != null && runners.contains(activeRunner) ? runners.indexOf(activeRunner) : -1;
             
             for (int i = 1; i <= Math.min(3, runnerCount); i++) {
+                if (activeIndex == -1) break; // Safety check
                 int nextIndex = (activeIndex + i) % runnerCount;
-                if (nextIndex >= 0 && nextIndex < runners.size()) {
+                if (runners != null && nextIndex >= 0 && nextIndex < runners.size() && runners.get(nextIndex) != null) {
                     Player nextPlayer = runners.get(nextIndex);
                     String pos = switch (i) {
                         case 1 -> "§a▶ Next: ";

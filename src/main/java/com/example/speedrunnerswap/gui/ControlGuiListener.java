@@ -46,11 +46,26 @@ public class ControlGuiListener implements Listener {
         if (!(event.getWhoClicked() instanceof Player player)) return;
         Inventory top = event.getView().getTopInventory();
         if (top == null) return;
+        
+        // Check if this is one of our GUI inventories
         if (!isMain(top) && !isRunnerSelector(top) && !isCoordination(top)) return;
+        
+        // ALWAYS cancel the event to prevent item movement
         event.setCancelled(true);
+        
+        // Debug logging
+        plugin.getLogger().info("GUI Click detected - Slot: " + event.getSlot() + ", RawSlot: " + event.getRawSlot());
+        
+        // Prevent any click in player inventory when GUI is open
+        if (event.getRawSlot() >= top.getSize()) {
+            // Click in player inventory - block it completely
+            return;
+        }
 
         ItemStack clicked = event.getCurrentItem();
         if (clicked == null || clicked.getType() == Material.AIR) return;
+        
+        plugin.getLogger().info("Processing click on item: " + clicked.getType());
 
         if (isMain(top)) {
             handleMainClick(player, clicked);
@@ -66,13 +81,24 @@ public class ControlGuiListener implements Listener {
         if (!(event.getWhoClicked() instanceof Player)) return;
         Inventory top = event.getView().getTopInventory();
         if (top == null) return;
+        
+        // Check if this is one of our GUI inventories
         if (!isMain(top) && !isRunnerSelector(top) && !isCoordination(top)) return;
-        // Cancel any drag that touches the top inventory
-        for (int rawSlot : event.getRawSlots()) {
-            if (rawSlot < top.getSize()) {
-                event.setCancelled(true);
-                return;
-            }
+        
+        // ALWAYS cancel drag events in our GUIs
+        event.setCancelled(true);
+        plugin.getLogger().info("Blocked drag attempt in GUI");
+    }
+    
+    @EventHandler(priority = EventPriority.HIGHEST)
+    public void onInventoryMoveItem(org.bukkit.event.inventory.InventoryMoveItemEvent event) {
+        Inventory source = event.getSource();
+        Inventory destination = event.getDestination();
+        
+        // Block any item movement from/to our GUIs
+        if ((source != null && (isMain(source) || isRunnerSelector(source) || isCoordination(source))) ||
+            (destination != null && (isMain(destination) || isRunnerSelector(destination) || isCoordination(destination)))) {
+            event.setCancelled(true);
         }
     }
 
@@ -90,9 +116,13 @@ public class ControlGuiListener implements Listener {
     private void handleMainClick(Player player, ItemStack clicked) {
         Material type = clicked.getType();
         boolean running = plugin.getGameManager().isGameRunning();
-
+        
+        // Debug logging
+        String itemName = com.example.speedrunnerswap.utils.GuiCompat.getDisplayName(clicked.getItemMeta());
+        plugin.getLogger().info("Main GUI click - Material: " + type + ", Display Name: " + itemName);
 
         if (type == Material.LIME_WOOL) {
+            plugin.getLogger().info("Processing LIME_WOOL (Start Game) click");
             if (!running) {
                 // Ensure mode is runner-only
                 plugin.setCurrentMode(SpeedrunnerSwap.SwapMode.SAPNAP);
@@ -101,30 +131,52 @@ public class ControlGuiListener implements Listener {
                 plugin.getConfigManager().setRunnerNames(names);
                 plugin.getGameManager().setRunners(new ArrayList<>(Bukkit.getOnlinePlayers()));
                 plugin.getGameManager().startGame();
+                player.sendMessage("§aGame started!");
+            } else {
+                player.sendMessage("§cGame is already running!");
             }
             new ControlGui(plugin).openMainMenu(player);
             return;
         }
 
         if (type == Material.RED_WOOL) {
-            if (running) plugin.getGameManager().stopGame();
+            plugin.getLogger().info("Processing RED_WOOL (Stop Game) click");
+            if (running) {
+                plugin.getGameManager().stopGame();
+                player.sendMessage("§cGame stopped!");
+            } else {
+                player.sendMessage("§cGame is not running!");
+            }
             new ControlGui(plugin).openMainMenu(player);
             return;
         }
 
         if (type == Material.YELLOW_WOOL) {
-            if (running && !plugin.getGameManager().isGamePaused()) plugin.getGameManager().pauseGame();
+            plugin.getLogger().info("Processing YELLOW_WOOL (Pause Game) click");
+            if (running && !plugin.getGameManager().isGamePaused()) {
+                plugin.getGameManager().pauseGame();
+                player.sendMessage("§eGame paused!");
+            } else {
+                player.sendMessage("§cCannot pause - game not running or already paused!");
+            }
             new ControlGui(plugin).openMainMenu(player);
             return;
         }
 
         if (type == Material.ORANGE_WOOL) {
-            if (running && plugin.getGameManager().isGamePaused()) plugin.getGameManager().resumeGame();
+            plugin.getLogger().info("Processing ORANGE_WOOL (Resume Game) click");
+            if (running && plugin.getGameManager().isGamePaused()) {
+                plugin.getGameManager().resumeGame();
+                player.sendMessage("§aGame resumed!");
+            } else {
+                player.sendMessage("§cCannot resume - game not running or not paused!");
+            }
             new ControlGui(plugin).openMainMenu(player);
             return;
         }
 
         if (type == Material.NETHER_STAR) {
+            plugin.getLogger().info("Processing NETHER_STAR (Shuffle Queue) click");
             if (plugin.getGameManager().shuffleQueue()) {
                 player.sendMessage("§aShuffled runner queue successfully.");
             } else {
@@ -371,6 +423,7 @@ public class ControlGuiListener implements Listener {
 
         if (type == Material.PAPER) {
             String name = com.example.speedrunnerswap.utils.GuiCompat.getDisplayName(clicked.getItemMeta());
+            plugin.getLogger().info("Processing PAPER click with name: " + name);
             if ("Status".equals(name)) {
                 // Print status
                 player.sendMessage("§6=== Runner-Only Status ===");
@@ -387,6 +440,10 @@ public class ControlGuiListener implements Listener {
                 return;
             }
         }
+        
+        // Catch-all for unhandled clicks - helps debug GUI issues
+        plugin.getLogger().warning("Unhandled GUI click - Material: " + type + ", Display Name: " + itemName);
+        player.sendMessage("§eClick detected but not handled. Material: " + type + ". Check console for details.");
     }
 
     private void handleRunnerSelectorClick(Player player, ItemStack clicked, int rawSlot, int size) {

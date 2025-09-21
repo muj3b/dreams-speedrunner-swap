@@ -1067,6 +1067,28 @@ public class GuiManager {
             inventory.setItem(49, createGuiButton(Material.MAGMA_BLOCK, "§6§lDangerous Blocks",
                 List.of("§7Edit list of avoided blocks"), "dangerous_blocks"));
         }
+        
+        // === ADVANCED CONFIG SECTIONS (Row 6) ===
+        // Broadcast Settings
+        inventory.setItem(50, createGuiButton(Material.BELL, "§e§lBroadcast Settings",
+            List.of("§7Configure game event announcements",
+                    "§7Swap events, team changes, etc."), "broadcast_settings"));
+        
+        // Limbo Configuration (if freeze mode is LIMBO)
+        if ("LIMBO".equalsIgnoreCase(freezeMode)) {
+            inventory.setItem(51, createGuiButton(Material.ENDER_PEARL, "§6§lLimbo Settings",
+                List.of("§7Configure limbo world and coordinates"), "limbo_settings"));
+        }
+        
+        // UI Performance Settings
+        inventory.setItem(52, createGuiButton(Material.COMPARATOR, "§d§lUI Performance",
+            List.of("§7Update frequencies for timers",
+                    "§7Actionbar and title refresh rates"), "ui_performance"));
+        
+        // Full Config Browser
+        inventory.setItem(53, createGuiButton(Material.WRITABLE_BOOK, "§c§lAdvanced Config Browser",
+            List.of("§7Direct access to all config values",
+                    "§7Edit any setting not in main GUI"), "advanced_config_root"));
 
         // Reset to Defaults
         inventory.setItem(53, createGuiButton(Material.BARRIER, "§c§lReset All Settings",
@@ -1809,6 +1831,105 @@ public class GuiManager {
             List.of("§7Any damage kills instantly"),
             "sudden_death_one_hit");
         inventory.setItem(17, oneHitToggle);
+        
+        player.openInventory(inventory);
+    }
+    
+    public void openBroadcastSettingsMenu(Player player) {
+        Inventory inventory = Bukkit.createInventory(null, 27, Component.text("§e§lBroadcast Settings"));
+        ItemStack filler = createItem(Material.YELLOW_STAINED_GLASS_PANE, " ");
+        fillBorder(inventory, filler);
+        
+        // Back button
+        inventory.setItem(0, createGuiButton(Material.ARROW, "§7§lBack",
+            List.of("§7Return to Advanced Settings"), "back_settings"));
+        
+        // Broadcast toggles
+        boolean broadcastEnabled = plugin.getConfig().getBoolean("broadcasts.enabled", true);
+        inventory.setItem(10, createGuiButton(
+            broadcastEnabled ? Material.BELL : Material.GRAY_DYE,
+            "§e§lBroadcast Events: " + (broadcastEnabled ? "§aON" : "§cOFF"),
+            List.of("§7Toggle all broadcast messages"), "toggle_broadcasts"));
+        
+        boolean gameEvents = plugin.getConfig().getBoolean("broadcasts.game_events", true);
+        inventory.setItem(12, createGuiButton(
+            gameEvents ? Material.EMERALD : Material.GRAY_DYE,
+            "§e§lGame Events: " + (gameEvents ? "§aON" : "§cOFF"),
+            List.of("§7Broadcast start/stop/pause events"), "toggle_game_events"));
+        
+        boolean teamChanges = plugin.getConfig().getBoolean("broadcasts.team_changes", true);
+        inventory.setItem(14, createGuiButton(
+            teamChanges ? Material.PLAYER_HEAD : Material.GRAY_DYE,
+            "§e§lTeam Changes: " + (teamChanges ? "§aON" : "§cOFF"),
+            List.of("§7Broadcast team assignment changes"), "toggle_team_changes"));
+        
+        player.openInventory(inventory);
+    }
+    
+    public void openLimboSettingsMenu(Player player) {
+        Inventory inventory = Bukkit.createInventory(null, 27, Component.text("§6§lLimbo Configuration"));
+        ItemStack filler = createItem(Material.PURPLE_STAINED_GLASS_PANE, " ");
+        fillBorder(inventory, filler);
+        
+        // Back button
+        inventory.setItem(0, createGuiButton(Material.ARROW, "§7§lBack",
+            List.of("§7Return to Advanced Settings"), "back_settings"));
+        
+        // Current limbo settings
+        String limboWorld = plugin.getConfig().getString("limbo.world", "world");
+        double limboX = plugin.getConfig().getDouble("limbo.x", 0.5);
+        double limboY = plugin.getConfig().getDouble("limbo.y", 200.0);
+        double limboZ = plugin.getConfig().getDouble("limbo.z", 0.5);
+        
+        inventory.setItem(10, createGuiButton(Material.GRASS_BLOCK, "§e§lLimbo World",
+            List.of("§7Current: §f" + limboWorld,
+                    "§7Click to change world"), "limbo_world"));
+        
+        inventory.setItem(12, createGuiButton(Material.COMPASS, "§e§lLimbo Coordinates",
+            List.of("§7X: §f" + limboX,
+                    "§7Y: §f" + limboY,
+                    "§7Z: §f" + limboZ,
+                    "§7Click to edit coordinates"), "limbo_coords"));
+        
+        inventory.setItem(14, createGuiButton(Material.ENDER_PEARL, "§a§lSet to Current Location",
+            List.of("§7Set limbo to your current position"), "limbo_set_current"));
+        
+        player.openInventory(inventory);
+    }
+    
+    public void openUIPerformanceMenu(Player player) {
+        Inventory inventory = Bukkit.createInventory(null, 27, Component.text("§d§lUI Performance Settings"));
+        ItemStack filler = createItem(Material.MAGENTA_STAINED_GLASS_PANE, " ");
+        fillBorder(inventory, filler);
+        
+        // Back button
+        inventory.setItem(0, createGuiButton(Material.ARROW, "§7§lBack",
+            List.of("§7Return to Advanced Settings"), "back_settings"));
+        
+        // Update frequency settings
+        int actionbarTicks = plugin.getConfig().getInt("ui.update_ticks.actionbar", 20);
+        int titleTicks = plugin.getConfig().getInt("ui.update_ticks.title", 10);
+        int trackerTicks = plugin.getConfig().getInt("tracker.update_ticks", 20);
+        
+        inventory.setItem(10, createGuiButton(Material.CLOCK, "§e§lActionbar Update Rate",
+            List.of("§7Current: §f" + actionbarTicks + " ticks (" + (actionbarTicks/20.0) + "s)",
+                    "§7How often timer actionbars update",
+                    "§7Left/Right: ±5 ticks"), "actionbar_rate"));
+        
+        inventory.setItem(12, createGuiButton(Material.EXPERIENCE_BOTTLE, "§e§lTitle Update Rate",
+            List.of("§7Current: §f" + titleTicks + " ticks (" + (titleTicks/20.0) + "s)",
+                    "§7How often waiting runner titles update",
+                    "§7Left/Right: ±5 ticks"), "title_rate"));
+        
+        inventory.setItem(14, createGuiButton(Material.COMPASS, "§e§lTracker Update Rate",
+            List.of("§7Current: §f" + trackerTicks + " ticks (" + (trackerTicks/20.0) + "s)",
+                    "§7How often hunter compasses update",
+                    "§7Left/Right: ±5 ticks"), "tracker_rate"));
+        
+        inventory.setItem(16, createGuiButton(Material.REDSTONE, "§c§lPerformance Tips",
+            List.of("§7Lower values = more responsive UI",
+                    "§7Higher values = better server performance",
+                    "§7Recommended: 10-20 ticks"), "performance_info"));
         
         player.openInventory(inventory);
     }

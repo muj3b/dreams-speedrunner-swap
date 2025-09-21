@@ -159,6 +159,12 @@ public class GuiListener implements Listener {
             handleCompassSettingsClick(event);
         } else if (title.contains("Sudden Death")) {
             handleSuddenDeathClick(event);
+        } else if (title.contains("Broadcast Settings")) {
+            handleBroadcastSettingsClick(event);
+        } else if (title.contains("Limbo Configuration")) {
+            handleLimboSettingsClick(event);
+        } else if (title.contains("UI Performance")) {
+            handleUIPerformanceClick(event);
         } else if (title.contains("Settings")) {
             // Only the main settings menu should land here; specific menus are handled above
             handleSettingsClick(event);
@@ -665,6 +671,26 @@ public class GuiListener implements Listener {
                 }
                 case "dream_settings": {
                     guiManager.openDreamSettingsMenu(player);
+                    return;
+                }
+                case "dangerous_blocks": {
+                    guiManager.openDangerousBlocksMenu(player);
+                    return;
+                }
+                case "broadcast_settings": {
+                    guiManager.openBroadcastSettingsMenu(player);
+                    return;
+                }
+                case "limbo_settings": {
+                    guiManager.openLimboSettingsMenu(player);
+                    return;
+                }
+                case "ui_performance": {
+                    guiManager.openUIPerformanceMenu(player);
+                    return;
+                }
+                case "advanced_config_root": {
+                    guiManager.openAdvancedConfigMenu(player, "", 0);
                     return;
                 }
             }
@@ -1646,5 +1672,122 @@ public class GuiListener implements Listener {
 
         // Refresh menu
         if (positive) guiManager.openPositiveEffectsMenu(player); else guiManager.openNegativeEffectsMenu(player);
+    }
+    
+    private void handleBroadcastSettingsClick(InventoryClickEvent event) {
+        Player player = (Player) event.getWhoClicked();
+        ItemStack clicked = event.getCurrentItem();
+        if (clicked == null || !clicked.hasItemMeta()) return;
+        
+        String id = getButtonId(clicked);
+        if (id != null) {
+            switch (id) {
+                case "back_settings" -> {
+                    guiManager.openSettingsMenu(player);
+                    return;
+                }
+                case "toggle_broadcasts" -> {
+                    boolean current = plugin.getConfig().getBoolean("broadcasts.enabled", true);
+                    plugin.getConfig().set("broadcasts.enabled", !current);
+                    plugin.saveConfig();
+                }
+                case "toggle_game_events" -> {
+                    boolean current = plugin.getConfig().getBoolean("broadcasts.game_events", true);
+                    plugin.getConfig().set("broadcasts.game_events", !current);
+                    plugin.saveConfig();
+                }
+                case "toggle_team_changes" -> {
+                    boolean current = plugin.getConfig().getBoolean("broadcasts.team_changes", true);
+                    plugin.getConfig().set("broadcasts.team_changes", !current);
+                    plugin.saveConfig();
+                }
+            }
+        }
+        guiManager.openBroadcastSettingsMenu(player);
+    }
+    
+    private void handleLimboSettingsClick(InventoryClickEvent event) {
+        Player player = (Player) event.getWhoClicked();
+        ItemStack clicked = event.getCurrentItem();
+        if (clicked == null || !clicked.hasItemMeta()) return;
+        
+        String id = getButtonId(clicked);
+        if (id != null) {
+            switch (id) {
+                case "back_settings" -> {
+                    guiManager.openSettingsMenu(player);
+                    return;
+                }
+                case "limbo_world" -> {
+                    plugin.getChatInputHandler().expectConfigString(player, "limbo.world");
+                    player.closeInventory();
+                    player.sendMessage(Component.text("[Config] Enter world name for limbo (type 'cancel' to abort)").color(NamedTextColor.YELLOW));
+                    return;
+                }
+                case "limbo_coords" -> {
+                    plugin.getChatInputHandler().expectConfigString(player, "limbo.coords");
+                    player.closeInventory();
+                    player.sendMessage(Component.text("[Config] Enter coordinates as 'x,y,z' (type 'cancel' to abort)").color(NamedTextColor.YELLOW));
+                    return;
+                }
+                case "limbo_set_current" -> {
+                    plugin.getConfig().set("limbo.world", player.getWorld().getName());
+                    plugin.getConfig().set("limbo.x", player.getLocation().getX());
+                    plugin.getConfig().set("limbo.y", player.getLocation().getY());
+                    plugin.getConfig().set("limbo.z", player.getLocation().getZ());
+                    plugin.saveConfig();
+                    player.sendMessage(Component.text("§aLimbo location set to your current position!").color(NamedTextColor.GREEN));
+                }
+            }
+        }
+        guiManager.openLimboSettingsMenu(player);
+    }
+    
+    private void handleUIPerformanceClick(InventoryClickEvent event) {
+        Player player = (Player) event.getWhoClicked();
+        ItemStack clicked = event.getCurrentItem();
+        if (clicked == null || !clicked.hasItemMeta()) return;
+        
+        String id = getButtonId(clicked);
+        if (id != null) {
+            switch (id) {
+                case "back_settings" -> {
+                    guiManager.openSettingsMenu(player);
+                    return;
+                }
+                case "actionbar_rate" -> {
+                    int current = plugin.getConfig().getInt("ui.update_ticks.actionbar", 20);
+                    if (event.isLeftClick()) current += 5;
+                    if (event.isRightClick()) current -= 5;
+                    current = Math.max(1, Math.min(200, current));
+                    plugin.getConfig().set("ui.update_ticks.actionbar", current);
+                    plugin.saveConfig();
+                }
+                case "title_rate" -> {
+                    int current = plugin.getConfig().getInt("ui.update_ticks.title", 10);
+                    if (event.isLeftClick()) current += 5;
+                    if (event.isRightClick()) current -= 5;
+                    current = Math.max(1, Math.min(200, current));
+                    plugin.getConfig().set("ui.update_ticks.title", current);
+                    plugin.saveConfig();
+                }
+                case "tracker_rate" -> {
+                    int current = plugin.getConfig().getInt("tracker.update_ticks", 20);
+                    if (event.isLeftClick()) current += 5;
+                    if (event.isRightClick()) current -= 5;
+                    current = Math.max(1, Math.min(200, current));
+                    plugin.getConfig().set("tracker.update_ticks", current);
+                    plugin.saveConfig();
+                }
+                case "performance_info" -> {
+                    player.sendMessage(Component.text("§6=== UI Performance Tips ==="));
+                    player.sendMessage(Component.text("§7Lower tick values = more responsive UI but higher CPU usage"));
+                    player.sendMessage(Component.text("§7Higher tick values = less responsive UI but better performance"));
+                    player.sendMessage(Component.text("§7Recommended range: 10-20 ticks (0.5-1 second)"));
+                    return;
+                }
+            }
+        }
+        guiManager.openUIPerformanceMenu(player);
     }
 }
