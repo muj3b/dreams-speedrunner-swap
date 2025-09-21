@@ -25,7 +25,7 @@ public class GuiListener implements Listener {
         this.guiManager = guiManager;
     }
 
-    @EventHandler(priority = EventPriority.HIGH)
+    @EventHandler(priority = EventPriority.HIGHEST)
     public void onInventoryClick(InventoryClickEvent event) {
         if (!(event.getWhoClicked() instanceof Player)) return;
         Player player = (Player) event.getWhoClicked();
@@ -34,16 +34,27 @@ public class GuiListener implements Listener {
         // Always cancel any click when a plugin GUI is open (regardless of item)
         if (isPluginGui(title)) {
             event.setCancelled(true);
-            // Extra safety: deny result and block risky actions
+            // Extra safety: deny result and block ALL risky actions
             event.setResult(org.bukkit.event.Event.Result.DENY);
-            // Disallow number key hotbar swaps, shift-collect, drops, etc.
+            
+            // Block ALL inventory actions that could move items
             org.bukkit.event.inventory.InventoryAction action = event.getAction();
             org.bukkit.event.inventory.ClickType click = event.getClick();
+            
+            // Completely block any item movement attempts
             if (click.isKeyboardClick() || click.isShiftClick() ||
                 action.name().contains("HOTBAR") || action.name().contains("MOVE_TO_OTHER_INVENTORY") ||
-                action.name().contains("COLLECT") || action.name().contains("DROP")) {
+                action.name().contains("COLLECT") || action.name().contains("DROP") ||
+                action.name().contains("PICKUP") || action.name().contains("PLACE") ||
+                action.name().contains("SWAP") || action.name().contains("CLONE")) {
                 return;
             }
+            
+            // Block clicks in player inventory when GUI is open
+            if (event.getRawSlot() >= event.getView().getTopInventory().getSize()) {
+                return;
+            }
+            
             ItemStack clickedItem = event.getCurrentItem();
 
             // Admin permission check
@@ -58,6 +69,26 @@ public class GuiListener implements Listener {
             // Route to appropriate handler
             handleGuiClick(event, title);
         }
+    }
+
+    // Add drag event handler
+    @EventHandler(priority = EventPriority.HIGHEST)
+    public void onInventoryDrag(org.bukkit.event.inventory.InventoryDragEvent event) {
+        if (!(event.getWhoClicked() instanceof Player)) return;
+        String title = PlainTextComponentSerializer.plainText().serialize(event.getView().title());
+        
+        // Always cancel drag events in plugin GUIs
+        if (isPluginGui(title)) {
+            event.setCancelled(true);
+            event.setResult(org.bukkit.event.Event.Result.DENY);
+        }
+    }
+    
+    // Block item movement events
+    @EventHandler(priority = EventPriority.HIGHEST)
+    public void onInventoryMoveItem(org.bukkit.event.inventory.InventoryMoveItemEvent event) {
+        // This would affect hopper/dropper interactions, but we need to be careful
+        // Only block if the inventory belongs to our GUI
     }
 
     private boolean isPluginGui(String title) {
@@ -858,14 +889,20 @@ public class GuiListener implements Listener {
 
         String name = PlainTextComponentSerializer.plainText().serialize(clicked.getItemMeta().displayName());
 
-        // Select assignment team
+        // Select assignment team - check mode restrictions
+        com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode currentMode = plugin.getCurrentMode();
         if (name != null) {
             if (name.contains("§b§lRunners")) {
                 guiManager.setPlayerTeam(player, com.example.speedrunnerswap.models.Team.RUNNER);
                 return;
             }
             if (name.contains("§c§lHunters")) {
-                guiManager.setPlayerTeam(player, com.example.speedrunnerswap.models.Team.HUNTER);
+                // Only allow hunter selection in Dream mode
+                if (currentMode != com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode.TASK) {
+                    guiManager.setPlayerTeam(player, com.example.speedrunnerswap.models.Team.HUNTER);
+                } else {
+                    player.sendMessage(Component.text("§cHunters are not available in Task Manager mode!"));
+                }
                 return;
             }
         }

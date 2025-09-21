@@ -28,6 +28,19 @@ public class ControlGuiListener implements Listener {
     public ControlGuiListener(SpeedrunnerSwap plugin) {
         this.plugin = plugin;
     }
+    
+    // Helper method to get button ID from persistent data
+    private String getButtonId(ItemStack item) {
+        if (item == null || !item.hasItemMeta()) return null;
+        
+        org.bukkit.persistence.PersistentDataContainer container = item.getItemMeta().getPersistentDataContainer();
+        org.bukkit.NamespacedKey key = new org.bukkit.NamespacedKey(plugin, "ssw_button_id");
+        
+        if (container.has(key, org.bukkit.persistence.PersistentDataType.STRING)) {
+            return container.get(key, org.bukkit.persistence.PersistentDataType.STRING);
+        }
+        return null;
+    }
 
     private boolean isMain(Inventory inv) {
         return inv != null && inv.getHolder() instanceof ControlGuiHolder holder && holder.getType() == ControlGuiHolder.Type.MAIN;
@@ -120,6 +133,22 @@ public class ControlGuiListener implements Listener {
         // Debug logging
         String itemName = com.example.speedrunnerswap.utils.GuiCompat.getDisplayName(clicked.getItemMeta());
         plugin.getLogger().info("Main GUI click - Material: " + type + ", Display Name: " + itemName);
+        
+        // Check for button ID first (more reliable than material type)
+        String buttonId = getButtonId(clicked);
+        if (buttonId != null) {
+            plugin.getLogger().info("Found button ID: " + buttonId);
+            switch (buttonId) {
+                case "manage_runners" -> {
+                    plugin.getLogger().info("Processing manage_runners button");
+                    // Initialize pending selection with current config
+                    Set<String> initial = new HashSet<>(plugin.getConfigManager().getRunnerNames());
+                    pendingRunnerSelections.put(player.getUniqueId(), initial);
+                    new ControlGui(plugin).openRunnerSelector(player);
+                    return;
+                }
+            }
+        }
 
         if (type == Material.LIME_WOOL) {
             plugin.getLogger().info("Processing LIME_WOOL (Start Game) click");
@@ -186,15 +215,22 @@ public class ControlGuiListener implements Listener {
             return;
         }
 
-        if (type == Material.BOOK) {
+        if (type == Material.PLAYER_HEAD) {
             String name = com.example.speedrunnerswap.utils.GuiCompat.getDisplayName(clicked.getItemMeta());
+            plugin.getLogger().info("Processing PLAYER_HEAD click with name: " + name);
             if (name != null && name.contains("Manage Runners")) {
+                plugin.getLogger().info("Opening runner selector");
                 // Initialize pending selection with current config
                 Set<String> initial = new HashSet<>(plugin.getConfigManager().getRunnerNames());
                 pendingRunnerSelections.put(player.getUniqueId(), initial);
                 new ControlGui(plugin).openRunnerSelector(player);
                 return;
-            } else if (name != null && name.contains("Cooperation Tips")) {
+            }
+        }
+
+        if (type == Material.BOOK) {
+            String name = com.example.speedrunnerswap.utils.GuiCompat.getDisplayName(clicked.getItemMeta());
+            if (name != null && name.contains("Cooperation Tips")) {
                 // Show extended cooperation tips in chat
                 player.sendMessage("§6=== §e§lSapnap Mode Cooperation Tips §6===");
                 player.sendMessage("§b1. Communication is Key!§7 Use voice chat or text to coordinate");

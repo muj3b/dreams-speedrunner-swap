@@ -878,40 +878,69 @@ public class GuiManager {
         ), "clear_teams");
         inventory.setItem(8, clearTeams);
         
-        // Runner team button with enhanced information
-        List<String> runnerLore = new ArrayList<>();
-        runnerLore.add("§7Click to select players as runners");
-        runnerLore.add("");
-        runnerLore.add("§7Current Runners: §b" + plugin.getGameManager().getRunners().size());
-        runnerLore.add("§7Role:");
-        runnerLore.add("§7• Complete objectives");
-        runnerLore.add("§7• Avoid hunters");
-        runnerLore.add("§7• Swap between players");
-        ItemStack runnerTeam = createItem(Material.DIAMOND_BOOTS, "§b§lRunners", runnerLore);
-        inventory.setItem(2, plugin.getGameManager().getPlayerState(player).getSelectedTeam() == Team.RUNNER ? 
-            createGlowingItem(runnerTeam) : createNormalItem(runnerTeam));
+        // Check current mode and adjust UI accordingly
+        com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode currentMode = plugin.getCurrentMode();
         
-        // Hunter team button with enhanced information
-        List<String> hunterLore = new ArrayList<>();
-        hunterLore.add("§7Click to select players as hunters");
-        hunterLore.add("");
-        hunterLore.add("§7Current Hunters: §c" + plugin.getGameManager().getHunters().size());
-        hunterLore.add("§7Role:");
-        hunterLore.add("§7• Track runners");
-        hunterLore.add("§7• Eliminate runners");
-        hunterLore.add("§7• Prevent objectives");
-        ItemStack hunterTeam = createItem(Material.IRON_SWORD, "§c§lHunters", hunterLore);
-        inventory.setItem(6, plugin.getGameManager().getPlayerState(player).getSelectedTeam() == Team.HUNTER ? 
-            createGlowingItem(hunterTeam) : createNormalItem(hunterTeam));
-        
-        // Team selection instructions
-        List<String> instructionsLore = new ArrayList<>();
-        instructionsLore.add("§7How to assign teams:");
-        instructionsLore.add("§71. Select a team above");
-        instructionsLore.add("§72. Click player heads below");
-        instructionsLore.add("§73. Confirm your selections");
-        ItemStack instructions = createItem(Material.BOOK, "§e§lInstructions", instructionsLore);
-        inventory.setItem(4, instructions);
+        if (currentMode == com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode.TASK) {
+            // Task Manager mode - ONLY show runners
+            List<String> runnerLore = new ArrayList<>();
+            runnerLore.add("§7Click to select players as runners");
+            runnerLore.add("");
+            runnerLore.add("§7Current Runners: §b" + plugin.getGameManager().getRunners().size());
+            runnerLore.add("§7Role:");
+            runnerLore.add("§7• Complete secret tasks");
+            runnerLore.add("§7• Compete to finish first");
+            runnerLore.add("§7• Swap between players");
+            ItemStack runnerTeam = createItem(Material.DIAMOND_BOOTS, "§b§lRunners", runnerLore);
+            inventory.setItem(4, plugin.getGameManager().getPlayerState(player).getSelectedTeam() == Team.RUNNER ? 
+                createGlowingItem(runnerTeam) : createNormalItem(runnerTeam));
+            
+            // Task mode instructions
+            List<String> instructionsLore = new ArrayList<>();
+            instructionsLore.add("§6§lTask Manager Mode:");
+            instructionsLore.add("§71. Select runners for competition");
+            instructionsLore.add("§72. Each gets a secret task");
+            instructionsLore.add("§73. First to complete wins");
+            instructionsLore.add("§c§lNo hunters in Task Manager mode!");
+            ItemStack instructions = createItem(Material.TARGET, "§e§lTask Competition", instructionsLore);
+            inventory.setItem(2, instructions);
+            inventory.setItem(6, instructions); // Fill both sides for symmetry
+        } else {
+            // Dream mode - show both runners and hunters
+            List<String> runnerLore = new ArrayList<>();
+            runnerLore.add("§7Click to select players as runners");
+            runnerLore.add("");
+            runnerLore.add("§7Current Runners: §b" + plugin.getGameManager().getRunners().size());
+            runnerLore.add("§7Role:");
+            runnerLore.add("§7• Complete objectives");
+            runnerLore.add("§7• Avoid hunters");
+            runnerLore.add("§7• Swap between players");
+            ItemStack runnerTeam = createItem(Material.DIAMOND_BOOTS, "§b§lRunners", runnerLore);
+            inventory.setItem(2, plugin.getGameManager().getPlayerState(player).getSelectedTeam() == Team.RUNNER ? 
+                createGlowingItem(runnerTeam) : createNormalItem(runnerTeam));
+            
+            // Hunter team button with enhanced information
+            List<String> hunterLore = new ArrayList<>();
+            hunterLore.add("§7Click to select players as hunters");
+            hunterLore.add("");
+            hunterLore.add("§7Current Hunters: §c" + plugin.getGameManager().getHunters().size());
+            hunterLore.add("§7Role:");
+            hunterLore.add("§7• Track runners");
+            hunterLore.add("§7• Eliminate runners");
+            hunterLore.add("§7• Prevent objectives");
+            ItemStack hunterTeam = createItem(Material.IRON_SWORD, "§c§lHunters", hunterLore);
+            inventory.setItem(6, plugin.getGameManager().getPlayerState(player).getSelectedTeam() == Team.HUNTER ? 
+                createGlowingItem(hunterTeam) : createNormalItem(hunterTeam));
+            
+            // Team selection instructions
+            List<String> instructionsLore = new ArrayList<>();
+            instructionsLore.add("§7How to assign teams:");
+            instructionsLore.add("§71. Select a team above");
+            instructionsLore.add("§72. Click player heads below");
+            instructionsLore.add("§73. Confirm your selections");
+            ItemStack instructions = createItem(Material.BOOK, "§e§lInstructions", instructionsLore);
+            inventory.setItem(4, instructions);
+        }
         
         // Player heads with enhanced information
         int slot = 18;

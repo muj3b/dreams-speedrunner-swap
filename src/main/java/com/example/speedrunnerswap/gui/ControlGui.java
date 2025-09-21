@@ -149,8 +149,8 @@ public class ControlGui {
             inv.setItem(controlStart + (controlSpacing * 2), named(Material.NETHER_STAR, "§d§lShuffle Queue", shuffleLore));
         }
 
-        // Adaptive runner management positioning
-        inv.setItem(controlStart + (controlSpacing * 3), named(Material.PLAYER_HEAD, "§b§lManage Runners", runnerLore));
+        // Adaptive runner management positioning with proper button ID
+        inv.setItem(controlStart + (controlSpacing * 3), namedWithId(Material.PLAYER_HEAD, "§b§lManage Runners", runnerLore, "manage_runners"));
 
         // Enhanced randomize toggle with more info
         boolean randomize = plugin.getConfigManager().isSwapRandomized();
@@ -574,6 +574,25 @@ public class ControlGui {
         if (loreText != null && !loreText.isEmpty()) {
             com.example.speedrunnerswap.utils.GuiCompat.setLore(im, loreText);
         }
+        it.setItemMeta(im);
+        return it;
+    }
+    
+    // Enhanced method with button ID support for better click handling
+    private ItemStack namedWithId(Material mat, String name, List<String> loreText, String buttonId) {
+        ItemStack it = new ItemStack(mat);
+        ItemMeta im = it.getItemMeta();
+        com.example.speedrunnerswap.utils.GuiCompat.setDisplayName(im, name);
+        if (loreText != null && !loreText.isEmpty()) {
+            com.example.speedrunnerswap.utils.GuiCompat.setLore(im, loreText);
+        }
+        
+        // Add button ID for better click handling
+        if (buttonId != null && !buttonId.isEmpty()) {
+            org.bukkit.NamespacedKey key = new org.bukkit.NamespacedKey(plugin, "ssw_button_id");
+            im.getPersistentDataContainer().set(key, org.bukkit.persistence.PersistentDataType.STRING, buttonId);
+        }
+        
         it.setItemMeta(im);
         return it;
     }
