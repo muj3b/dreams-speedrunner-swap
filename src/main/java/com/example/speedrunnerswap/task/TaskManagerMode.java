@@ -1,14 +1,10 @@
 package com.example.speedrunnerswap.task;
 
 import com.example.speedrunnerswap.SpeedrunnerSwap;
-import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.format.NamedTextColor;
-import net.kyori.adventure.text.format.TextDecoration;
-import net.kyori.adventure.title.Title;
+import com.example.speedrunnerswap.utils.BukkitCompat;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 
-import java.time.Duration;
 import java.util.*;
 
 /**
@@ -58,37 +54,26 @@ public class TaskManagerMode {
     private void announceTask(Player p, TaskDefinition def) {
         if (p == null || def == null) return;
         
-        // Enhanced title with command information
-        Title title = Title.title(
-                Component.text("YOUR SECRET TASK").color(NamedTextColor.GOLD).decorate(TextDecoration.BOLD),
-                Component.text(def.description()).color(NamedTextColor.YELLOW),
-                Title.Times.times(Duration.ofMillis(500), Duration.ofMillis(4000), Duration.ofMillis(800))
-        );
-        p.showTitle(title);
-        
-        // Show completion command information with big text
+        // Cross-platform title with fade timings in ticks
+        BukkitCompat.showTitle(p, "§6§lYOUR SECRET TASK", "§e" + def.description(), 10, 80, 16);
+
+        // Show completion command information shortly after
         Bukkit.getScheduler().runTaskLater(plugin, () -> {
-            Title commandTitle = Title.title(
-                    Component.text("MANUAL COMPLETION").color(NamedTextColor.GREEN).decorate(TextDecoration.BOLD),
-                    Component.text("Use: /swap complete confirm").color(NamedTextColor.AQUA),
-                    Title.Times.times(Duration.ofMillis(300), Duration.ofMillis(2500), Duration.ofMillis(500))
-            );
-            p.showTitle(commandTitle);
-        }, 60L); // Show after 3 seconds
-        
+            BukkitCompat.showTitle(p, "§a§lMANUAL COMPLETION", "§bUse: /swap complete confirm", 6, 50, 10);
+        }, 60L); // Show after ~3 seconds
+
         // Chat messages with detailed instructions
-        p.sendMessage(Component.text("[Task Manager] Your secret task assigned!")
-                .color(NamedTextColor.GOLD).decorate(TextDecoration.BOLD));
-        p.sendMessage(Component.text(" → " + def.description()).color(NamedTextColor.YELLOW));
-        p.sendMessage(Component.text(""));
-        p.sendMessage(Component.text("§a§lCOMPLETION OPTIONS:").color(NamedTextColor.GREEN));
-        p.sendMessage(Component.text("§7• §fSome tasks complete automatically when detected"));
-        p.sendMessage(Component.text("§7• §fFor manual completion: §e/swap complete confirm"));
-        p.sendMessage(Component.text("§7• §fTo view your task again: §e/swap complete"));
-        p.sendMessage(Component.text(""));
-        p.sendMessage(Component.text("§6⚠ Manual completion will instantly win the game!").color(NamedTextColor.GOLD));
-        p.sendMessage(Component.text("§7Only use it when you have actually completed your task.").color(NamedTextColor.GRAY));
-        p.sendMessage(Component.text("§6" + "=".repeat(45)).color(NamedTextColor.GOLD));
+        p.sendMessage("§6§l[Task Manager] Your secret task assigned!");
+        p.sendMessage("§e → " + def.description());
+        p.sendMessage("");
+        p.sendMessage("§a§lCOMPLETION OPTIONS:");
+        p.sendMessage("§7• §fSome tasks complete automatically when detected");
+        p.sendMessage("§7• §fFor manual completion: §e/swap complete confirm");
+        p.sendMessage("§7• §fTo view your task again: §e/swap complete");
+        p.sendMessage("");
+        p.sendMessage("§6⚠ Manual completion will instantly win the game!");
+        p.sendMessage("§7Only use it when you have actually completed your task.");
+        p.sendMessage("§6" + "=".repeat(45));
     }
 
     /** Call when a player has completed their task */
@@ -99,14 +84,9 @@ public class TaskManagerMode {
         // Announce winner and stop the game
         Bukkit.getScheduler().runTask(plugin, () -> {
             for (Player pl : Bukkit.getOnlinePlayers()) {
-                Title t = Title.title(
-                        Component.text(p.getName()+" completed their task!").color(NamedTextColor.GREEN).decorate(TextDecoration.BOLD),
-                        Component.text("Task: "+registry.get(taskId).description()).color(NamedTextColor.YELLOW),
-                        Title.Times.times(Duration.ofMillis(500), Duration.ofMillis(4000), Duration.ofMillis(800))
-                );
-                pl.showTitle(t);
+                BukkitCompat.showTitle(pl, "§a§lTASK COMPLETE!", "§e" + p.getName() + " §7completed: §f" + registry.get(taskId).description(), 10, 80, 16);
+                pl.sendMessage("§a[Task Manager] Winner: §f" + p.getName());
             }
-            Bukkit.broadcast(Component.text("[Task Manager] Winner: "+p.getName()).color(NamedTextColor.GREEN));
             try { plugin.getGameManager().stopGame(); } catch (Throwable ignored) {}
         });
     }

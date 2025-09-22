@@ -152,26 +152,10 @@ public class SwapCommand implements CommandExecutor, TabCompleter {
                 "https://donate.stripe.com/8x29AT0H58K03judnR0Ba01"
         );
 
-        net.kyori.adventure.text.Component header = net.kyori.adventure.text.Component.text("Speedrunner Swap")
-                .color(net.kyori.adventure.text.format.NamedTextColor.GOLD)
-                .decorate(net.kyori.adventure.text.format.TextDecoration.BOLD);
-        net.kyori.adventure.text.Component author = net.kyori.adventure.text.Component.text("Created by muj3b")
-                .color(net.kyori.adventure.text.format.NamedTextColor.YELLOW);
-        net.kyori.adventure.text.Component donate = net.kyori.adventure.text.Component.text("❤ Donate to support development")
-                .color(net.kyori.adventure.text.format.NamedTextColor.LIGHT_PURPLE)
-                .decorate(net.kyori.adventure.text.format.TextDecoration.BOLD)
-                .hoverEvent(net.kyori.adventure.text.event.HoverEvent.showText(
-                        net.kyori.adventure.text.Component.text("Open donation page", net.kyori.adventure.text.format.NamedTextColor.GOLD)))
-                .clickEvent(net.kyori.adventure.text.event.ClickEvent.openUrl(donateUrl));
-
-        if (sender instanceof org.bukkit.entity.Player p) {
-            p.sendMessage(header);
-            p.sendMessage(author);
-            p.sendMessage(donate);
-        } else {
-            sender.sendMessage("Speedrunner Swap — Created by muj3b");
-            sender.sendMessage("Donate: " + donateUrl);
-        }
+        sender.sendMessage("§6§lSpeedrunner Swap");
+        sender.sendMessage("§eCreated by §f m u j 3 b");
+        sender.sendMessage("§d❤ Donate to support development");
+        sender.sendMessage("§b" + donateUrl);
         return true;
     }
 

@@ -1,8 +1,6 @@
 package com.example.speedrunnerswap.gui;
 
 import com.example.speedrunnerswap.SpeedrunnerSwap;
-import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
@@ -75,7 +73,7 @@ public void onChat(AsyncPlayerChatEvent event) {
         String input = event.getMessage().trim();
         
         if (input.equalsIgnoreCase("cancel")) {
-            player.sendMessage(Component.text("[Task Manager] Input cancelled.").color(NamedTextColor.RED));
+            player.sendMessage("§c[Task Manager] Input cancelled.");
             plugin.getServer().getScheduler().runTask(plugin, () -> 
                 plugin.getGuiManager().openCustomTasksMenu(player));
             return;
@@ -103,7 +101,7 @@ public void onChat(AsyncPlayerChatEvent event) {
     private void handleTaskId(Player player, String taskId) {
         // Validate task ID
         if (taskId.isEmpty() || taskId.contains(" ")) {
-            player.sendMessage(Component.text("[Task Manager] Invalid task ID! Use underscores instead of spaces.").color(NamedTextColor.RED));
+            player.sendMessage("§c[Task Manager] Invalid task ID! Use underscores instead of spaces.");
             plugin.getServer().getScheduler().runTask(plugin, () -> 
                 plugin.getGuiManager().openCustomTasksMenu(player));
             return;
@@ -112,7 +110,7 @@ public void onChat(AsyncPlayerChatEvent event) {
         // Check if ID already exists
         var taskMode = plugin.getTaskManagerMode();
         if (taskMode != null && taskMode.getTask(taskId) != null) {
-            player.sendMessage(Component.text("[Task Manager] Task ID already exists!").color(NamedTextColor.RED));
+            player.sendMessage("§c[Task Manager] Task ID already exists!");
             plugin.getServer().getScheduler().runTask(plugin, () -> 
                 plugin.getGuiManager().openCustomTasksMenu(player));
             return;
@@ -123,21 +121,21 @@ public void onChat(AsyncPlayerChatEvent event) {
         newState.taskId = taskId;
         activeInputs.put(player.getUniqueId(), newState);
         
-        player.sendMessage(Component.text("[Task Manager] Task ID: " + taskId).color(NamedTextColor.GREEN));
-        player.sendMessage(Component.text("[Task Manager] Now enter the task description:").color(NamedTextColor.YELLOW));
-        player.sendMessage(Component.text("Type 'cancel' to abort").color(NamedTextColor.GRAY));
+        player.sendMessage("§a[Task Manager] Task ID: " + taskId);
+        player.sendMessage("§e[Task Manager] Now enter the task description:");
+        player.sendMessage("§7Type 'cancel' to abort");
     }
     
     private void handleTaskDescription(Player player, String taskId, String description) {
         if (taskId == null || taskId.isEmpty()) {
-            player.sendMessage(Component.text("[Task Manager] Error: No task ID found!").color(NamedTextColor.RED));
+            player.sendMessage("§c[Task Manager] Error: No task ID found!");
             plugin.getServer().getScheduler().runTask(plugin, () -> 
                 plugin.getGuiManager().openCustomTasksMenu(player));
             return;
         }
         
         if (description.isEmpty()) {
-            player.sendMessage(Component.text("[Task Manager] Description cannot be empty!").color(NamedTextColor.RED));
+            player.sendMessage("§c[Task Manager] Description cannot be empty!");
             plugin.getServer().getScheduler().runTask(plugin, () -> 
                 plugin.getGuiManager().openCustomTasksMenu(player));
             return;
@@ -148,8 +146,8 @@ public void onChat(AsyncPlayerChatEvent event) {
             var taskMode = plugin.getTaskManagerMode();
             if (taskMode != null) {
                 taskMode.addCustomTask(taskId, description);
-                player.sendMessage(Component.text("[Task Manager] Custom task added successfully!").color(NamedTextColor.GREEN));
-                player.sendMessage(Component.text("Task: " + taskId + " - " + description).color(NamedTextColor.GRAY));
+                player.sendMessage("§a[Task Manager] Custom task added successfully!");
+                player.sendMessage("§7Task: " + taskId + " - " + description);
             }
             plugin.getGuiManager().openCustomTasksMenu(player);
         });
@@ -160,7 +158,7 @@ public void onChat(AsyncPlayerChatEvent event) {
         plugin.getServer().getScheduler().runTask(plugin, () -> {
             plugin.getConfig().set("donation.url", url);
             plugin.saveConfig();
-            player.sendMessage(Component.text("[Settings] Donation URL updated!").color(NamedTextColor.GREEN));
+            player.sendMessage("§a[Settings] Donation URL updated!");
             plugin.getGuiManager().openSettingsMenu(player);
         });
     }
@@ -169,7 +167,7 @@ public void onChat(AsyncPlayerChatEvent event) {
         plugin.getServer().getScheduler().runTask(plugin, () -> {
             plugin.getConfig().set(path, value);
             plugin.saveConfig();
-            player.sendMessage(Component.text("[Config] Updated " + path).color(NamedTextColor.GREEN));
+            player.sendMessage("§a[Config] Updated " + path);
             String parent = getParent(path);
             plugin.getGuiManager().openAdvancedConfigMenu(player, parent, 0);
         });
@@ -181,7 +179,7 @@ public void onChat(AsyncPlayerChatEvent event) {
             list.add(value);
             plugin.getConfig().set(path, list);
             plugin.saveConfig();
-            player.sendMessage(Component.text("[Config] Added to " + path).color(NamedTextColor.GREEN));
+            player.sendMessage("§a[Config] Added to " + path);
             plugin.getGuiManager().openConfigListEditor(player, path, 0);
         });
     }

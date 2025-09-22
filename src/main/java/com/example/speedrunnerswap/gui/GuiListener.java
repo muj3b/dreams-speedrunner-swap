@@ -1,8 +1,6 @@
 package com.example.speedrunnerswap.gui;
 
 import com.example.speedrunnerswap.SpeedrunnerSwap;
-import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.Bukkit;
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 import org.bukkit.Material;
@@ -29,7 +27,13 @@ public class GuiListener implements Listener {
     public void onInventoryClick(InventoryClickEvent event) {
         if (!(event.getWhoClicked() instanceof Player)) return;
         Player player = (Player) event.getWhoClicked();
-        String title = PlainTextComponentSerializer.plainText().serialize(event.getView().title());
+        // If this is a ControlGui inventory (Sapnap mode), let ControlGuiListener handle it exclusively
+        org.bukkit.inventory.Inventory top = event.getView().getTopInventory();
+        if (top != null && top.getHolder() instanceof ControlGuiHolder) {
+            return;
+        }
+
+        String title = getPlainTitle(event.getView());
 
         // Always cancel any click when a plugin GUI is open (regardless of item)
         if (isPluginGui(title)) {
@@ -59,7 +63,7 @@ public class GuiListener implements Listener {
 
             // Admin permission check
             if (!player.hasPermission("speedrunnerswap.admin") && isAdminMenu(title)) {
-                player.sendMessage(Component.text("§cYou do not have permission to use this menu."));
+                player.sendMessage("§cYou do not have permission to use this menu.");
                 return;
             }
 
@@ -75,13 +79,33 @@ public class GuiListener implements Listener {
     @EventHandler(priority = EventPriority.HIGHEST)
     public void onInventoryDrag(org.bukkit.event.inventory.InventoryDragEvent event) {
         if (!(event.getWhoClicked() instanceof Player)) return;
-        String title = PlainTextComponentSerializer.plainText().serialize(event.getView().title());
+        // Skip ControlGui inventories
+        org.bukkit.inventory.Inventory top = event.getView().getTopInventory();
+        if (top != null && top.getHolder() instanceof ControlGuiHolder) return;
+        String title = getPlainTitle(event.getView());
         
         // Always cancel drag events in plugin GUIs
         if (isPluginGui(title)) {
             event.setCancelled(true);
             event.setResult(org.bukkit.event.Event.Result.DENY);
         }
+    }
+
+    // Cross-version safe title extractor (Paper Component or Spigot String)
+    private String getPlainTitle(org.bukkit.inventory.InventoryView view) {
+        if (view == null) return "";
+        try {
+            // Paper: Component title()
+            net.kyori.adventure.text.Component comp = view.title();
+            return comp != null ? PlainTextComponentSerializer.plainText().serialize(comp) : "";
+        } catch (Throwable ignored) {}
+        try {
+            // Spigot: String getTitle()
+            java.lang.reflect.Method m = view.getClass().getMethod("getTitle");
+            Object s = m.invoke(view);
+            return s != null ? String.valueOf(s) : "";
+        } catch (Throwable ignored) {}
+        return "";
     }
     
     // Block item movement events
@@ -205,7 +229,7 @@ public class GuiListener implements Listener {
         if (title.contains("Main Menu") || title.contains("SpeedrunnerSwap")) {
             // If someone opened this while in Sapnap mode, redirect
             if (plugin.getCurrentMode() == com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode.SAPNAP && plugin.getGameManager().isGameRunning()) {
-                ((Player) event.getWhoClicked()).sendMessage(Component.text("§cYou're in Sapnap mode. Stop the game to switch."));
+                ((Player) event.getWhoClicked()).sendMessage("§cYou're in Sapnap mode. Stop the game to switch.");
                 event.setCancelled(true);
                 return;
             }
@@ -289,7 +313,7 @@ public class GuiListener implements Listener {
         if ("mode_dream".equals(id)) {
             if (plugin.getGameManager().isGameRunning()) {
                 if (!player.hasPermission("speedrunnerswap.admin")) {
-                    player.sendMessage(Component.text("§cStop the current game before switching modes."));
+                    player.sendMessage("§cStop the current game before switching modes.");
                     return;
                 }
                 guiManager.openForceConfirm(player, com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode.DREAM);
@@ -303,7 +327,7 @@ public class GuiListener implements Listener {
         if ("mode_task".equals(id)) {
             if (plugin.getGameManager().isGameRunning()) {
                 if (!player.hasPermission("speedrunnerswap.admin")) {
-                    player.sendMessage(Component.text("§cStop the current game before switching modes."));
+                    player.sendMessage("§cStop the current game before switching modes.");
                     return;
                 }
                 guiManager.openForceConfirm(player, com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode.TASK);
@@ -317,7 +341,7 @@ public class GuiListener implements Listener {
         if ("mode_sapnap".equals(id)) {
             if (plugin.getGameManager().isGameRunning()) {
                 if (!player.hasPermission("speedrunnerswap.admin")) {
-                    player.sendMessage(Component.text("§cStop the current game before switching modes."));
+                    player.sendMessage("§cStop the current game before switching modes.");
                     return;
                 }
                 guiManager.openForceConfirm(player, com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode.SAPNAP);
@@ -334,12 +358,12 @@ public class GuiListener implements Listener {
         
         if ("admin_force_stop".equals(id)) {
             if (!player.hasPermission("speedrunnerswap.admin")) {
-                player.sendMessage(Component.text("§cYou don't have permission for admin actions."));
+                player.sendMessage("§cYou don't have permission for admin actions.");
                 return;
             }
             if (plugin.getGameManager().isGameRunning()) {
                 plugin.getGameManager().stopGame();
-                player.sendMessage(Component.text("§aGame force-stopped. You can now switch modes."));
+                player.sendMessage("§aGame force-stopped. You can now switch modes.");
             }
             guiManager.openModeSelector(player);
             return;
@@ -393,9 +417,9 @@ public class GuiListener implements Listener {
                 case "start_game" -> {
                     if (!plugin.getGameManager().isGameRunning()) {
                         if (plugin.getGameManager().startGame()) {
-                            player.sendMessage(Component.text("§aGame started successfully!"));
+                            player.sendMessage("§aGame started successfully!");
                         } else {
-                            player.sendMessage(Component.text("§cFailed to start game. Check team assignments."));
+                            player.sendMessage("§cFailed to start game. Check team assignments.");
                         }
                     }
                     guiManager.openMainMenu(player);
@@ -403,21 +427,21 @@ public class GuiListener implements Listener {
                 case "stop_game" -> {
                     if (plugin.getGameManager().isGameRunning()) {
                         plugin.getGameManager().stopGame();
-                        player.sendMessage(Component.text("§cGame stopped."));
+                        player.sendMessage("§cGame stopped.");
                     }
                     guiManager.openMainMenu(player);
                 }
                 case "pause_game" -> {
                     if (plugin.getGameManager().isGameRunning() && !plugin.getGameManager().isGamePaused()) {
                         plugin.getGameManager().pauseGame();
-                        player.sendMessage(Component.text("§eGame paused."));
+                        player.sendMessage("§eGame paused.");
                     }
                     guiManager.openMainMenu(player);
                 }
                 case "resume_game" -> {
                     if (plugin.getGameManager().isGameRunning() && plugin.getGameManager().isGamePaused()) {
                         plugin.getGameManager().resumeGame();
-                        player.sendMessage(Component.text("§aGame resumed."));
+                        player.sendMessage("§aGame resumed.");
                     }
                     guiManager.openMainMenu(player);
                 }
@@ -468,7 +492,7 @@ public class GuiListener implements Listener {
         // If we reach here, it's an unhandled button
         plugin.getLogger().warning("Unhandled main menu click: " + 
             (clicked.hasItemMeta() && clicked.getItemMeta().hasDisplayName() ? 
-                PlainTextComponentSerializer.plainText().serialize(clicked.getItemMeta().displayName()) : 
+                com.example.speedrunnerswap.utils.GuiCompat.getDisplayName(clicked.getItemMeta()) : 
                 clicked.getType().name()));
     }
 
@@ -781,27 +805,18 @@ public class GuiListener implements Listener {
             }
         } else {
             // Handle timer visibility clocks and ±5s arrows (created without explicit IDs)
-            String name = PlainTextComponentSerializer.plainText().serialize(clicked.getItemMeta().displayName());
+            String name = com.example.speedrunnerswap.utils.GuiCompat.getDisplayName(clicked.getItemMeta());
             if (name.equals("§e§lActive Runner Timer")) {
                 cycleRunnerTimer(player);
             } else if (name.equals("§e§lWaiting Runner Timer")) {
                 cycleWaitingTimer(player);
-            } else if (name.equals("§e§lHunter Timer")) {
-                cycleHunterTimer(player);
-            } else if ("-5s".equals(name)) {
+            } else if ("-5s".equals(name) || "+5s".equals(name)) {
                 int current = plugin.getConfigManager().getSwapInterval();
                 boolean beta = plugin.getConfigManager().isBetaIntervalEnabled();
                 int min = beta ? 10 : plugin.getConfigManager().getMinSwapInterval();
                 int max = plugin.getConfigManager().getSwapIntervalMax();
-                int val = current - 5;
-                val = beta ? Math.max(min, val) : Math.max(min, Math.min(max, val));
-                plugin.getConfigManager().setSwapInterval(val);
-            } else if ("+5s".equals(name)) {
-                int current = plugin.getConfigManager().getSwapInterval();
-                boolean beta = plugin.getConfigManager().isBetaIntervalEnabled();
-                int min = beta ? 10 : plugin.getConfigManager().getMinSwapInterval();
-                int max = plugin.getConfigManager().getSwapIntervalMax();
-                int val = current + 5;
+                int delta = "+5s".equals(name) ? 5 : -5;
+                int val = current + delta;
                 val = beta ? Math.max(min, val) : Math.max(min, Math.min(max, val));
                 plugin.getConfigManager().setSwapInterval(val);
             }
@@ -827,12 +842,6 @@ public class GuiListener implements Listener {
         plugin.getConfigManager().setWaitingTimerVisibility(next);
     }
 
-    private void cycleHunterTimer(Player player) {
-        String current = plugin.getConfigManager().getHunterTimerVisibility();
-        String next = guiManager.getNextVisibility(current);
-        plugin.getConfigManager().setHunterTimerVisibility(next);
-    }
-
     private String getButtonId(ItemStack item) {
         if (item == null || !item.hasItemMeta()) return null;
 
@@ -852,8 +861,8 @@ public class GuiListener implements Listener {
 
     private boolean isBackButton(ItemStack item) {
         if (item == null || !item.hasItemMeta()) return false;
-        if (item.getItemMeta().displayName() == null) return false;
-        String text = PlainTextComponentSerializer.plainText().serialize(item.getItemMeta().displayName());
+        String text = com.example.speedrunnerswap.utils.GuiCompat.getDisplayName(item.getItemMeta());
+        if (text == null) return false;
         boolean looksLikeBack = text != null && text.toLowerCase().contains("back");
         // Support both older barrier-style and newer arrow-style back buttons
         return looksLikeBack && (item.getType() == Material.BARRIER || item.getType() == Material.ARROW);
@@ -882,7 +891,7 @@ public class GuiListener implements Listener {
         if ("clear_teams".equals(id)) {
             plugin.getGameManager().setRunners(new java.util.ArrayList<>());
             plugin.getGameManager().setHunters(new java.util.ArrayList<>());
-            player.sendMessage(Component.text("§aCleared all teams."));
+            player.sendMessage("§aCleared all teams.");
             guiManager.openTeamSelector(player);
             return;
         }
@@ -901,26 +910,26 @@ public class GuiListener implements Listener {
                 if (currentMode != com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode.TASK) {
                     guiManager.setPlayerTeam(player, com.example.speedrunnerswap.models.Team.HUNTER);
                 } else {
-                    player.sendMessage(Component.text("§cHunters are not available in Task Manager mode!"));
+                    player.sendMessage("§cHunters are not available in Task Manager mode!");
                 }
                 return;
             }
         }
 
         // Assign a player by clicking their head, using current selected team
-        if (clicked.getType() == Material.PLAYER_HEAD && clicked.getItemMeta().displayName() != null) {
-            String targetName = PlainTextComponentSerializer.plainText().serialize(clicked.getItemMeta().displayName());
+        if (clicked.getType() == Material.PLAYER_HEAD && clicked.getItemMeta() != null) {
+            String targetName = com.example.speedrunnerswap.utils.GuiCompat.getDisplayName(clicked.getItemMeta());
             // displayName might be colored; strip any color prefixes/suffixes
             targetName = targetName.replace("§b", "").replace("§c", "").replace("§f", "").replace("§r", "");
             Player target = Bukkit.getPlayerExact(targetName);
             if (target == null) {
-                player.sendMessage(Component.text("§cPlayer not found or offline: " + targetName));
+                player.sendMessage("§cPlayer not found or offline: " + targetName);
                 return;
             }
 
             com.example.speedrunnerswap.models.Team selected = guiManager.getSelectedTeam(player);
             if (selected == com.example.speedrunnerswap.models.Team.NONE) {
-                player.sendMessage(Component.text("§eSelect a team (Runners/Hunters) first."));
+                player.sendMessage("§eSelect a team (Runners/Hunters) first.");
                 return;
             }
 
@@ -1342,12 +1351,12 @@ public class GuiListener implements Listener {
             }
             case "§e§lSet End Portal Hint (this world)" -> {
                 plugin.getConfigManager().setEndPortalHint(player.getWorld(), player.getLocation());
-                player.sendMessage(Component.text("§aSet End Portal hint for world §f" + player.getWorld().getName()));
+                player.sendMessage("§aSet End Portal hint for world §f" + player.getWorld().getName());
                 guiManager.openCompassSettingsMenu(player);
             }
             case "§c§lClear End Portal Hint (this world)" -> {
                 plugin.getConfigManager().clearEndPortalHint(player.getWorld());
-                player.sendMessage(Component.text("§eCleared End Portal hint for world §f" + player.getWorld().getName()));
+                player.sendMessage("§eCleared End Portal hint for world §f" + player.getWorld().getName());
                 guiManager.openCompassSettingsMenu(player);
             }
             case "§6§lJam Max Distance (blocks)" -> {
@@ -1476,7 +1485,7 @@ public class GuiListener implements Listener {
 
         // Persist to kits.yml via KitConfigManager
         plugin.getKitConfigManager().saveKit(kitType, contents, armor);
-        player.sendMessage(Component.text("§aSaved " + kitType + " kit."));
+        player.sendMessage("§aSaved " + kitType + " kit.");
 
         // Return to kits menu
         guiManager.openKitsMenu(player);
@@ -1505,7 +1514,7 @@ public class GuiListener implements Listener {
             var taskMode = plugin.getTaskManagerMode();
             if (taskMode != null) {
                 taskMode.reloadTasks();
-                player.sendMessage(Component.text("[Task Manager] Tasks reloaded from config!").color(NamedTextColor.GREEN));
+                player.sendMessage("§a[Task Manager] Tasks reloaded from config!");
             }
             guiManager.openCustomTasksMenu(player);
         } else if (name.startsWith("§e")) {
@@ -1513,7 +1522,7 @@ public class GuiListener implements Listener {
             String taskId = name.substring(2); // Remove color code
             var taskMode = plugin.getTaskManagerMode();
             if (taskMode != null && taskMode.removeCustomTask(taskId)) {
-                player.sendMessage(Component.text("[Task Manager] Removed task: " + taskId).color(NamedTextColor.YELLOW));
+                player.sendMessage("§e[Task Manager] Removed task: " + taskId);
             }
             guiManager.openCustomTasksMenu(player);
         }
@@ -1577,7 +1586,7 @@ public class GuiListener implements Listener {
                 String path = id.substring("cfg:str:".length());
                 plugin.getChatInputHandler().expectConfigString(player, path);
                 player.closeInventory();
-                player.sendMessage(Component.text("[Config] Enter new value for " + path + " (type 'cancel' to abort)").color(NamedTextColor.YELLOW));
+                player.sendMessage("§e[Config] Enter new value for " + path + " §7(type 'cancel' to abort)");
                 return;
             }
             if (id.startsWith("cfg:list:")) {
@@ -1621,7 +1630,7 @@ public class GuiListener implements Listener {
                 String path = id.substring("cfg:list_add:".length());
                 plugin.getChatInputHandler().expectConfigListAdd(player, path);
                 player.closeInventory();
-                player.sendMessage(Component.text("[Config] Enter list item to add to " + path + " (type 'cancel' to abort)").color(NamedTextColor.YELLOW));
+                player.sendMessage("§e[Config] Enter list item to add to " + path + " §7(type 'cancel' to abort)");
                 return;
             }
             if (id.startsWith("cfg:list_del:")) {
@@ -1660,16 +1669,16 @@ public class GuiListener implements Listener {
             switch (buttonId) {
                 case "reroll_tasks" -> {
                     if (plugin.getGameManager().isGameRunning()) {
-                        player.sendMessage(Component.text("§cYou can only reroll before the game starts.").color(NamedTextColor.RED));
+                        player.sendMessage("§cYou can only reroll before the game starts.");
                         return;
                     }
                     if (plugin.getCurrentMode() != com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode.TASK) {
-                        player.sendMessage(Component.text("§cSwitch to Task Manager mode first: /swap mode task").color(NamedTextColor.RED));
+                        player.sendMessage("§cSwitch to Task Manager mode first: /swap mode task");
                         return;
                     }
                     var tmm = plugin.getTaskManagerMode();
                     if (tmm == null) {
-                        player.sendMessage(Component.text("§cTask Manager not initialized.").color(NamedTextColor.RED));
+                        player.sendMessage("§cTask Manager not initialized.");
                         return;
                     }
                     java.util.List<org.bukkit.entity.Player> selectedRunners = new java.util.ArrayList<>();
@@ -1678,11 +1687,11 @@ public class GuiListener implements Listener {
                         if (st != null && st.getSelectedTeam() == com.example.speedrunnerswap.models.Team.RUNNER) selectedRunners.add(p);
                     }
                     if (selectedRunners.isEmpty()) {
-                        player.sendMessage(Component.text("§cNo selected runners found. Use the Team Selector first.").color(NamedTextColor.RED));
+                        player.sendMessage("§cNo selected runners found. Use the Team Selector first.");
                         return;
                     }
                     tmm.assignAndAnnounceTasks(selectedRunners);
-                    player.sendMessage(Component.text("§aRerolled tasks for §f" + selectedRunners.size() + "§a selected runners.").color(NamedTextColor.GREEN));
+                    player.sendMessage("§aRerolled tasks for §f" + selectedRunners.size() + "§a selected runners.");
                     // Refresh the menu to reflect disabled/enabled state
                     guiManager.openTaskSettingsMenu(player);
                     return;
@@ -1690,15 +1699,15 @@ public class GuiListener implements Listener {
                 case "show_assignments" -> {
                     var tmm = plugin.getTaskManagerMode();
                     if (tmm == null) {
-                        player.sendMessage(Component.text("§cTask Manager not initialized.").color(NamedTextColor.RED));
+                        player.sendMessage("§cTask Manager not initialized.");
                         return;
                     }
                     var map = tmm.getAssignments();
                     if (map.isEmpty()) {
-                        player.sendMessage(Component.text("§7No task assignments.").color(NamedTextColor.GRAY));
+                        player.sendMessage("§7No task assignments.");
                         return;
                     }
-                    player.sendMessage(Component.text("§6Task Assignments:").color(NamedTextColor.GOLD));
+                    player.sendMessage("§6Task Assignments:");
                     for (var e : map.entrySet()) {
                         java.util.UUID uuid = e.getKey();
                         String taskId = e.getValue();
@@ -1706,7 +1715,7 @@ public class GuiListener implements Listener {
                         if (pname == null) pname = uuid.toString().substring(0, 8);
                         var def = tmm.getTask(taskId);
                         String desc = def != null ? def.description() : taskId;
-                        player.sendMessage(Component.text("§e" + pname + "§7: §f" + desc + " (§8" + taskId + "§7)"));
+                        player.sendMessage("§e" + pname + "§7: §f" + desc + " (§8" + taskId + "§7)");
                     }
                     return;
                 }
@@ -1750,7 +1759,7 @@ public class GuiListener implements Listener {
             case "§6§lReload Tasks" -> {
                 var tmm = plugin.getTaskManagerMode();
                 if (tmm != null) tmm.reloadTasks();
-                player.sendMessage(Component.text("[Task Manager] Reloaded tasks.").color(NamedTextColor.GREEN));
+                player.sendMessage("[Task Manager] Reloaded tasks.");
             }
             default -> {}
         }
@@ -1903,13 +1912,13 @@ public class GuiListener implements Listener {
                 case "limbo_world" -> {
                     plugin.getChatInputHandler().expectConfigString(player, "limbo.world");
                     player.closeInventory();
-                    player.sendMessage(Component.text("[Config] Enter world name for limbo (type 'cancel' to abort)").color(NamedTextColor.YELLOW));
+                    player.sendMessage("§e[Config] Enter world name for limbo §7(type 'cancel' to abort)");
                     return;
                 }
                 case "limbo_coords" -> {
                     plugin.getChatInputHandler().expectConfigString(player, "limbo.coords");
                     player.closeInventory();
-                    player.sendMessage(Component.text("[Config] Enter coordinates as 'x,y,z' (type 'cancel' to abort)").color(NamedTextColor.YELLOW));
+                    player.sendMessage("§e[Config] Enter coordinates as 'x,y,z' §7(type 'cancel' to abort)");
                     return;
                 }
                 case "limbo_set_current" -> {
@@ -1918,7 +1927,7 @@ public class GuiListener implements Listener {
                     plugin.getConfig().set("limbo.y", player.getLocation().getY());
                     plugin.getConfig().set("limbo.z", player.getLocation().getZ());
                     plugin.saveConfig();
-                    player.sendMessage(Component.text("§aLimbo location set to your current position!").color(NamedTextColor.GREEN));
+                    player.sendMessage("§aLimbo location set to your current position!");
                 }
             }
         }
@@ -1962,10 +1971,10 @@ public class GuiListener implements Listener {
                     plugin.saveConfig();
                 }
                 case "performance_info" -> {
-                    player.sendMessage(Component.text("§6=== UI Performance Tips ==="));
-                    player.sendMessage(Component.text("§7Lower tick values = more responsive UI but higher CPU usage"));
-                    player.sendMessage(Component.text("§7Higher tick values = less responsive UI but better performance"));
-                    player.sendMessage(Component.text("§7Recommended range: 10-20 ticks (0.5-1 second)"));
+                    player.sendMessage("§6=== UI Performance Tips ===");
+                    player.sendMessage("§7Lower tick values = more responsive UI but higher CPU usage");
+                    player.sendMessage("§7Higher tick values = less responsive UI but better performance");
+                    player.sendMessage("§7Recommended range: 10-20 ticks (0.5-1 second)");
                     return;
                 }
             }

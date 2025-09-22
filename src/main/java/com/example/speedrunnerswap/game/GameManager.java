@@ -5,12 +5,6 @@ import com.example.speedrunnerswap.models.PlayerState;
 import com.example.speedrunnerswap.models.Team;
 import com.example.speedrunnerswap.utils.PlayerStateUtil;
 import com.example.speedrunnerswap.utils.SafeLocationFinder;
-import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.format.NamedTextColor;
-import net.kyori.adventure.text.format.TextDecoration;
-import net.kyori.adventure.text.event.ClickEvent;
-import net.kyori.adventure.text.event.HoverEvent;
-import net.kyori.adventure.title.Title;
 import org.bukkit.Location;
 import org.bukkit.*;
 import org.bukkit.entity.Entity;
@@ -20,11 +14,10 @@ import org.bukkit.potion.PotionEffectType;
 import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.scheduler.BukkitTask;
 
-import com.example.speedrunnerswap.utils.BukkitCompat;
 import com.example.speedrunnerswap.utils.Msg;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.GameMode;
-import java.time.Duration;
+import com.example.speedrunnerswap.utils.BukkitCompat;
 
 import java.util.*;
 import java.util.concurrent.ThreadLocalRandom;
@@ -83,14 +76,8 @@ public class GameManager {
             @Override
             public void run() {
                 if (count > 0) {
-                    Title title = Title.title(
-                        Component.text("Starting in " + count).color(NamedTextColor.GREEN).decorate(TextDecoration.BOLD),
-                        Component.text("Made by muj3b").color(NamedTextColor.GRAY),
-                        Title.Times.times(Duration.ofMillis(500), Duration.ofMillis(3500), Duration.ofMillis(500))
-                    );
-                    
                     for (Player player : Bukkit.getOnlinePlayers()) {
-                        player.showTitle(title);
+                        BukkitCompat.showTitle(player, "§a§lStarting in " + count, "§7Made by muj3b", 10, 70, 10);
                     }
                     count--;
                 } else {
@@ -155,38 +142,27 @@ public class GameManager {
             return;
         }
 
-        Component titleText;
+        String titleStr;
         String runnerSubtitle = "";
         String hunterSubtitle = "";
 
         if (winner == Team.RUNNER) {
-            titleText = Component.text("RUNNERS WIN!", NamedTextColor.GREEN, TextDecoration.BOLD);
-            runnerSubtitle = "bro y'all are locked in, good stuff";
-            hunterSubtitle = "bro y'all are locked in, good stuff";
+            titleStr = "§a§lRUNNERS WIN!";
+            runnerSubtitle = "§eBro y'all are locked in, good stuff";
+            hunterSubtitle = "§eBro y'all are locked in, good stuff";
         } else if (winner == Team.HUNTER) {
-            titleText = Component.text("HUNTERS WIN!", NamedTextColor.RED, TextDecoration.BOLD);
-            runnerSubtitle = "you ain't the main character unc";
-            hunterSubtitle = "bro those speedrunners are trash asf";
+            titleStr = "§c§lHUNTERS WIN!";
+            runnerSubtitle = "§eYou ain't the main character, unc";
+            hunterSubtitle = "§eBro those speedrunners are trash";
         } else {
-            titleText = Component.text("GAME OVER", NamedTextColor.RED, TextDecoration.BOLD);
-            runnerSubtitle = "No winner declared.";
-            hunterSubtitle = "No winner declared.";
+            titleStr = "§c§lGAME OVER";
+            runnerSubtitle = "§eNo winner declared.";
+            hunterSubtitle = "§eNo winner declared.";
         }
 
         for (Player player : Bukkit.getOnlinePlayers()) {
-            Component subtitleText;
-            if (isRunner(player)) {
-                subtitleText = Component.text(runnerSubtitle, NamedTextColor.YELLOW);
-            } else {
-                subtitleText = Component.text(hunterSubtitle, NamedTextColor.YELLOW);
-            }
-
-            Title endTitle = Title.title(
-                titleText,
-                subtitleText,
-                Title.Times.times(Duration.ofMillis(500), Duration.ofMillis(5000), Duration.ofMillis(500))
-            );
-            player.showTitle(endTitle);
+            String sub = isRunner(player) ? runnerSubtitle : hunterSubtitle;
+            BukkitCompat.showTitle(player, titleStr, sub, 10, 100, 10);
         }
 
         if (swapTask != null) swapTask.cancel();
@@ -239,24 +215,13 @@ public class GameManager {
             "https://donate.stripe.com/8x29AT0H58K03judnR0Ba01"
         );
 
-        Component spacer = Component.text("");
-        Component header = Component.text("=== Support the Creator ===")
-            .color(NamedTextColor.GOLD)
-            .decorate(TextDecoration.BOLD);
-        Component desc = Component.text("Enjoyed the game? Help keep updates coming!")
-            .color(NamedTextColor.YELLOW);
-        Component donate = Component.text("❤ Click to Donate")
-            .color(NamedTextColor.LIGHT_PURPLE)
-            .decorate(TextDecoration.BOLD)
-            .hoverEvent(HoverEvent.showText(Component.text("Open donation page", NamedTextColor.GOLD)))
-            .clickEvent(ClickEvent.openUrl(donateUrl));
-
         for (Player player : Bukkit.getOnlinePlayers()) {
-            player.sendMessage(spacer);
-            player.sendMessage(header);
-            player.sendMessage(desc);
-            player.sendMessage(donate);
-            player.sendMessage(spacer);
+            player.sendMessage("");
+            player.sendMessage("§6§l=== Support the Creator ===");
+            player.sendMessage("§eEnjoyed the game? Help keep updates coming!");
+            player.sendMessage("§d❤ Donate to support development");
+            player.sendMessage("§b" + donateUrl);
+            player.sendMessage("");
         }
     }
     /** Stop the game without declaring a winner */
@@ -454,8 +419,8 @@ public class GameManager {
                 // Remind their task
                 var def = tmm.getTask(tmm.getAssignedTask(player));
                 if (def != null) {
-                    player.sendMessage(Component.text("[Task Manager] Your task:").color(NamedTextColor.GOLD));
-                    player.sendMessage(Component.text(" → " + def.description()).color(NamedTextColor.YELLOW));
+                    player.sendMessage("§6[Task Manager] Your task:");
+                    player.sendMessage("§e → " + def.description());
                 }
             } else if (plugin.getConfig().getBoolean("task_manager.allow_late_joiners", false)) {
                 // Late joiner allowed: add as runner and optionally assign a task if pool available
@@ -1262,21 +1227,9 @@ public class GameManager {
             
             // For caged players, show large aesthetic title
             if (isCaged && !isActive) {
-                net.kyori.adventure.text.Component titleText = net.kyori.adventure.text.Component.text(
-                        String.format("Swap in: %ds", Math.max(0, timeLeft)))
-                        .color(NamedTextColor.GOLD)
-                        .decorate(TextDecoration.BOLD);
-
-                net.kyori.adventure.text.Component sub = net.kyori.adventure.text.Component.text(
-                        String.format("Sneaking: %s  |  Running: %s", isSneak ? "Yes" : "No", isSprint ? "Yes" : "No"))
-                        .color(NamedTextColor.YELLOW);
-
-                Title title = Title.title(
-                        titleText,
-                        sub,
-                        Title.Times.times(Duration.ZERO, Duration.ofMillis(1000), Duration.ZERO)
-                );
-                p.showTitle(title);
+                String t = String.format("§6§lSwap in: %ds", Math.max(0, timeLeft));
+                String sub = String.format("§eSneaking: %s  §7|  §eRunning: %s", isSneak ? "Yes" : "No", isSprint ? "Yes" : "No");
+                BukkitCompat.showTitle(p, t, sub, 0, 20, 0);
                 continue;
             }
             
@@ -1284,21 +1237,9 @@ public class GameManager {
             boolean shouldShow = !isActive && !isCaged && (waitingAlways || (waitingLast10 && timeLeft <= 10));
             if (!shouldShow) continue;
 
-            net.kyori.adventure.text.Component titleText = net.kyori.adventure.text.Component.text(
-                    String.format("Swap in: %ds", Math.max(0, timeLeft)))
-                    .color(NamedTextColor.GOLD)
-                    .decorate(TextDecoration.BOLD);
-
-            net.kyori.adventure.text.Component sub = net.kyori.adventure.text.Component.text(
-                    String.format("Sneaking: %s  |  Running: %s", isSneak ? "Yes" : "No", isSprint ? "Yes" : "No"))
-                    .color(NamedTextColor.YELLOW);
-
-            Title title = Title.title(
-                    titleText,
-                    sub,
-                    Title.Times.times(Duration.ZERO, Duration.ofMillis(600), Duration.ZERO)
-            );
-            p.showTitle(title);
+            String t = String.format("§6§lSwap in: %ds", Math.max(0, timeLeft));
+            String sub = String.format("§eSneaking: %s  §7|  §eRunning: %s", isSneak ? "Yes" : "No", isSprint ? "Yes" : "No");
+            BukkitCompat.showTitle(p, t, sub, 0, 12, 0);
         }
     }
 

@@ -1,6 +1,7 @@
 package com.example.speedrunnerswap.gui;
 
 import com.example.speedrunnerswap.SpeedrunnerSwap;
+import com.example.speedrunnerswap.utils.BukkitCompat;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
@@ -484,10 +485,7 @@ public class ControlGuiListener implements Listener {
 
     private void handleRunnerSelectorClick(Player player, ItemStack clicked, int rawSlot, int size) {
         // In Sapnap mode, all players are runners, so return to main menu
-        if (plugin.getCurrentMode() == SpeedrunnerSwap.SwapMode.SAPNAP) {
-            new ControlGui(plugin).openMainMenu(player);
-            return;
-        }
+        // In Sapnap mode, runner selection is allowed (no hunters). Do not early-return here.
 
         Material type = clicked.getType();
         // Bottom row buttons
@@ -669,17 +667,13 @@ public class ControlGuiListener implements Listener {
                         for (Player runner : runners) {
                             if (runner != null && runner.isOnline()) {
                                 runner.sendMessage(pauseMsg);
-                                // Create title with modern API
-                                net.kyori.adventure.title.Title title = net.kyori.adventure.title.Title.title(
-                                    net.kyori.adventure.text.Component.text("§c§lEMERGENCY PAUSE"),
-                                    net.kyori.adventure.text.Component.text("§6Requested by " + player.getName()),
-                                    net.kyori.adventure.title.Title.Times.times(
-                                        java.time.Duration.ofMillis(500),
-                                        java.time.Duration.ofMillis(2000),
-                                        java.time.Duration.ofMillis(500)
-                                    )
+                                // Cross-platform title display
+                                BukkitCompat.showTitle(
+                                    runner,
+                                    "§c§lEMERGENCY PAUSE",
+                                    "§6Requested by " + player.getName(),
+                                    10, 40, 10
                                 );
-                                runner.showTitle(title);
                             }
                         }
                     }
@@ -758,16 +752,12 @@ public class ControlGuiListener implements Listener {
             // Send title notification to active runner if different
             Player activeRunner = plugin.getGameManager().getActiveRunner();
             if (activeRunner != null && !activeRunner.equals(player) && activeRunner.isOnline()) {
-                net.kyori.adventure.title.Title title = net.kyori.adventure.title.Title.title(
-                    net.kyori.adventure.text.Component.text("§e§lTEAM UPDATE"),
-                    net.kyori.adventure.text.Component.text("§b" + player.getName() + "§7 shared location"),
-                    net.kyori.adventure.title.Title.Times.times(
-                        java.time.Duration.ofMillis(250),
-                        java.time.Duration.ofMillis(1500),
-                        java.time.Duration.ofMillis(250)
-                    )
+                BukkitCompat.showTitle(
+                    activeRunner,
+                    "§e§lTEAM UPDATE",
+                    "§b" + player.getName() + "§7 shared location",
+                    5, 30, 5
                 );
-                activeRunner.showTitle(title);
             }
         } catch (Exception e) {
             player.sendMessage("§cError sending quick update. Please try again.");
@@ -795,173 +785,93 @@ public class ControlGuiListener implements Listener {
         player.sendMessage("§7  Next Swap: §e" + timeLeft + "s");
         player.sendMessage("§7  Game Paused: §f" + plugin.getGameManager().isGamePaused());
         
-        // Performance metrics
-        player.sendMessage("");
-        player.sendMessage("§e§lPerformance Metrics:");
-        
-        try {
-            double tps = Bukkit.getTPS()[0];
-            String tpsStatus = tps >= 18.0 ? "§aExcellent" : tps >= 15.0 ? "§eGood" : "§cPoor";
-            player.sendMessage("§7  Server TPS: §f" + String.format("%.2f", tps) + " (" + tpsStatus + "§7)");
-        } catch (Exception e) {
-            player.sendMessage("§7  Server TPS: §7Unavailable");
-        }
-        
-        Runtime runtime = Runtime.getRuntime();
-        long maxMemory = runtime.maxMemory() / 1024 / 1024;
-        long usedMemory = (runtime.totalMemory() - runtime.freeMemory()) / 1024 / 1024;
-        int memoryPercent = (int) ((usedMemory * 100) / maxMemory);
-        String memStatus = memoryPercent < 70 ? "§aGood" : memoryPercent < 85 ? "§eModerate" : "§cHigh";
-        
-        player.sendMessage("§7  Memory Usage: §f" + usedMemory + "/" + maxMemory + "MB (" + memoryPercent + "% - " + memStatus + "§7)");
-        
-        // Team coordination insights
-        player.sendMessage("");
-        player.sendMessage("§e§lTeam Insights:");
-        
-        int runnerCount = runners != null ? runners.size() : 0;
-        if (runnerCount <= 2) {
-            player.sendMessage("§7  Team Size: §eSmall - Focus on efficiency");
-        } else if (runnerCount >= 5) {
-            player.sendMessage("§7  Team Size: §cLarge - Monitor coordination");
-        } else {
-            player.sendMessage("§7  Team Size: §aOptimal for cooperation");
-        }
-        
-        // Recommendations
-        player.sendMessage("");
-        player.sendMessage("§e§lSmart Recommendations:");
-        
         if (timeLeft <= 15) {
-            player.sendMessage("§7  ➤ §cPrepare for imminent swap!");
-        } else if (timeLeft >= 60) {
-            player.sendMessage("§7  ➤ §bGood time for strategic planning");
+            player.sendMessage("§c§lSwap Imminent - Immediate Actions:");
+            player.sendMessage("§7  ⚡ Finish current objective quickly!");
+            player.sendMessage("§7  ⚡ Move to safe location if possible");
+            player.sendMessage("§7  ⚡ Communicate handoff plans");
+            player.sendMessage("§7  ⚡ Prepare next runner via voice chat");
+            player.sendMessage("§7  ⚡ Use emergency pause if in danger");
+        } else {
+            player.sendMessage("§a§lGame Active - Cooperation Tips:");
+            player.sendMessage("§7  ✓ Use Quick Actions for instant communication");
+            player.sendMessage("§7  ✓ Monitor Live Analytics for performance");
+            player.sendMessage("§7  ✓ Share locations and inventory status");
+            player.sendMessage("§7  ✓ Mark waypoints for important locations");
+            player.sendMessage("§7  ✓ Active runner should narrate actions");
+            player.sendMessage("§7  ✓ Waiting runners should plan ahead");
         }
-        
-        if (memoryPercent > 80) {
-            player.sendMessage("§7  ➤ §cConsider reducing view distance");
-        }
-        
-        if (runnerCount >= 4 && plugin.getConfigManager().getSwapInterval() > 60) {
-            player.sendMessage("§7  ➤ §eLarge team: Consider shorter intervals");
-        }
-        
-        player.sendMessage("§6" + "=".repeat(45));
     }
-    
-    // Smart Help System - Context-aware guidance
+
+    // Smart context-aware help
     private void showSmartHelp(Player player) {
         boolean running = plugin.getGameManager().isGameRunning();
         boolean paused = plugin.getGameManager().isGamePaused();
-        
-        player.sendMessage("§6========== §e§lSMART HELP SYSTEM §6==========");
-        player.sendMessage("§e§lContext-Aware Guidance for Sapnap Mode");
-        player.sendMessage("");
-        
+        int timeLeft = plugin.getGameManager().getTimeUntilNextSwap();
+
+        player.sendMessage("§6========== §e§lSMART HELP §6==========");
         if (!running) {
-            player.sendMessage("§b§lGetting Started:");
-            player.sendMessage("§7  1. ➤ Select your team of runners");
-            player.sendMessage("§7  2. ➤ Configure swap interval (30-120s recommended)");
-            player.sendMessage("§7  3. ➤ Choose freeze mode for inactive players");
-            player.sendMessage("§7  4. ➤ Set up voice communication (Discord/TeamSpeak)");
-            player.sendMessage("§7  5. ➤ Click 'Start Game' to begin cooperation!");
-            player.sendMessage("");
-            player.sendMessage("§e§lRecommended Settings:");
-            player.sendMessage("§7  • Team Size: 2-4 players (optimal)");
-            player.sendMessage("§7  • Swap Interval: 45-60s (balanced)");
-            player.sendMessage("§7  • Freeze Mode: SPECTATOR (most flexible)");
-            player.sendMessage("§7  • Safe Swaps: ON (prevents danger)");
+            player.sendMessage("§aGetting Started:");
+            player.sendMessage("§7  ✓ Select runners via Manage Runners");
+            player.sendMessage("§7  ✓ Adjust interval with ±5s arrows");
+            player.sendMessage("§7  ✓ Configure freeze mode and safe swaps");
+            player.sendMessage("§7  ✓ Click §aStart Game§7 when ready");
         } else if (paused) {
-            player.sendMessage("§c§lGame Paused - Strategic Opportunities:");
-            player.sendMessage("§7  ➤ Perfect time for team discussion");
-            player.sendMessage("§7  ➤ Plan your next objectives");
-            player.sendMessage("§7  ➤ Share inventory and resource status");
-            player.sendMessage("§7  ➤ Coordinate meeting points");
-            player.sendMessage("§7  ➤ Use Team Coordination tools");
-            player.sendMessage("§7  ➤ Click 'Resume' when ready to continue");
+            player.sendMessage("§eGame Paused:");
+            player.sendMessage("§7  ✓ Discuss next objectives");
+            player.sendMessage("§7  ✓ Use coordination hub to share info");
+            player.sendMessage("§7  ✓ Click §aResume§7 when ready");
         } else {
-            int timeLeft = plugin.getGameManager().getTimeUntilNextSwap();
             if (timeLeft <= 15) {
-                player.sendMessage("§c§lSwap Imminent - Immediate Actions:");
-                player.sendMessage("§7  ⚡ Finish current objective quickly!");
-                player.sendMessage("§7  ⚡ Move to safe location if possible");
-                player.sendMessage("§7  ⚡ Communicate handoff plans");
-                player.sendMessage("§7  ⚡ Prepare next runner via voice chat");
-                player.sendMessage("§7  ⚡ Use emergency pause if in danger");
+                player.sendMessage("§cSwap Imminent:");
+                player.sendMessage("§7  ⚡ Prepare handoff and move to safety");
             } else {
-                player.sendMessage("§a§lGame Active - Cooperation Tips:");
-                player.sendMessage("§7  ✓ Use Quick Actions for instant communication");
-                player.sendMessage("§7  ✓ Monitor Live Analytics for performance");
-                player.sendMessage("§7  ✓ Share locations and inventory status");
-                player.sendMessage("§7  ✓ Mark waypoints for important locations");
-                player.sendMessage("§7  ✓ Active runner should narrate actions");
-                player.sendMessage("§7  ✓ Waiting runners should plan ahead");
+                player.sendMessage("§aActive Play Tips:");
+                player.sendMessage("§7  ✓ Use Quick Actions for instant updates");
+                player.sendMessage("§7  ✓ Monitor Live Analytics and Performance Alerts");
+                player.sendMessage("§7  ✓ Use coordination tools for teamwork");
             }
         }
-        
-        player.sendMessage("");
-        player.sendMessage("§d§lAdvanced Features Available:");
-        player.sendMessage("§7  ➤ Team Coordination Hub - Full communication suite");
-        player.sendMessage("§7  ➤ Quick Actions - Lightning-fast team updates");
-        player.sendMessage("§7  ➤ Live Analytics - Real-time performance monitoring");
-        player.sendMessage("§7  ➤ Smart Help - Context-aware guidance (this!)");
-        player.sendMessage("§7  ➤ Performance Alerts - Optimization recommendations");
-        
-        player.sendMessage("§6" + "=".repeat(50));
+        player.sendMessage("§6================================");
     }
-    
-    // Performance Optimization Tips
+
+    // Optimization tips with TPS/memory awareness
     private void showOptimizationTips(Player player) {
-        player.sendMessage("§c========== §c§lPERFORMANCE OPTIMIZATION §c==========");
-        player.sendMessage("§c§lServer Performance Issues Detected!");
-        player.sendMessage("");
-        
+        player.sendMessage("§6========== §c§lOPTIMIZATION TIPS §6==========");
         try {
-            double tps = Bukkit.getTPS()[0];
+            Double tps = BukkitCompat.getServerTPS();
             Runtime runtime = Runtime.getRuntime();
             long maxMemory = runtime.maxMemory() / 1024 / 1024;
             long usedMemory = (runtime.totalMemory() - runtime.freeMemory()) / 1024 / 1024;
             int memoryPercent = (int) ((usedMemory * 100) / maxMemory);
-            
-            player.sendMessage("§e§lCurrent Status:");
-            player.sendMessage("§7  Server TPS: §f" + String.format("%.2f", tps) + (tps < 15.0 ? " §c(LOW)" : " §a(OK)"));
-            player.sendMessage("§7  Memory Usage: §f" + memoryPercent + "% " + (memoryPercent > 85 ? "§c(HIGH)" : "§a(OK)"));
-            
-            player.sendMessage("");
-            player.sendMessage("§c§lImmediate Actions:");
-            
-            if (tps < 15.0) {
+
+            player.sendMessage("§7Current Performance:");
+            player.sendMessage("§7  TPS: §f" + (tps != null ? String.format("%.2f", tps) : "N/A"));
+            player.sendMessage("§7  Memory: §f" + usedMemory + "/" + maxMemory + "MB (" + memoryPercent + "%)");
+
+            if (tps != null && tps < 18.0) {
+                player.sendMessage("§eServer TPS low:");
                 player.sendMessage("§7  ⚠ §cReduce team size (remove 1-2 runners)");
                 player.sendMessage("§7  ⚠ §cIncrease swap interval (60s+ recommended)");
                 player.sendMessage("§7  ⚠ §cConsider pausing temporarily");
             }
-            
             if (memoryPercent > 85) {
+                player.sendMessage("§eHigh memory usage:");
                 player.sendMessage("§7  ⚠ §cReduce render distance (8-12 chunks)");
                 player.sendMessage("§7  ⚠ §cClose unnecessary applications");
                 player.sendMessage("§7  ⚠ §cRestart server if possible");
             }
-            
         } catch (Exception e) {
             player.sendMessage("§7  Performance metrics unavailable");
         }
-        
+
         player.sendMessage("");
-        player.sendMessage("§e§lGeneral Optimization Tips:");
+        player.sendMessage("§eGeneral Recommendations:");
         player.sendMessage("§7  1. Keep team size between 2-4 players");
         player.sendMessage("§7  2. Use 45-60s swap intervals for stability");
         player.sendMessage("§7  3. Enable Safe Swaps to prevent lag spikes");
-        player.sendMessage("§7  4. Monitor Live Analytics regularly");
-        player.sendMessage("§7  5. Use SPECTATOR freeze mode (least resource intensive)");
-        player.sendMessage("§7  6. Restart the game session if problems persist");
-        
-        player.sendMessage("");
-        player.sendMessage("§b§lPro Tips:");
-        player.sendMessage("§7  • Large teams (5+) work best on dedicated servers");
-        player.sendMessage("§7  • Random timing adds excitement but uses more resources");
-        player.sendMessage("§7  • Voice chat reduces need for in-game communication");
-        player.sendMessage("§7  • Regular breaks help maintain server performance");
-        
-        player.sendMessage("§c" + "=".repeat(55));
+        player.sendMessage("§7  4. Prefer SPECTATOR freeze mode for performance");
+        player.sendMessage("§7  5. Restart sessions if problems persist");
+        player.sendMessage("§6" + "=".repeat(44));
     }
 }

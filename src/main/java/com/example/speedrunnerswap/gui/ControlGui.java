@@ -47,7 +47,7 @@ public class ControlGui {
             title += paused ? "§e §l[PAUSED]" : "§a §l[LIVE]";
         }
 
-        Inventory inv = Bukkit.createInventory(new ControlGuiHolder(ControlGuiHolder.Type.MAIN), size, net.kyori.adventure.text.Component.text(title));
+        Inventory inv = com.example.speedrunnerswap.utils.GuiCompat.createInventory(new ControlGuiHolder(ControlGuiHolder.Type.MAIN), size, title);
 
         // Smart filler with adaptive theming
         Material fillerMaterial = running ? 
@@ -69,19 +69,8 @@ public class ControlGui {
         int midRow = Math.max(1, size / 18); // Middle row
         int bottomRow = (size / 9) - 1; // Last row
         
-        // Auto-refresh indicator (adaptive top-row positioning)
-        if (running) {
-            List<String> refreshLore = new ArrayList<>();
-            refreshLore.add("§7§oLive updating every 5 seconds");
-            refreshLore.add("§7§oClose and reopen to force refresh");
-            refreshLore.add("");
-            refreshLore.add("§a✓ §fReal-time coordination data");
-            refreshLore.add("§a✓ §fLive performance metrics");
-            refreshLore.add("§a✓ §fInstant team updates");
-            inv.setItem((topRow * 9) + 8, named(Material.CLOCK, "§a§lLive Dashboard", refreshLore));
-        } else {
-            inv.setItem((topRow * 9) + 8, named(Material.GRAY_DYE, "§7Static View", List.of("§7Start game for live updates")));
-        }
+        // Header corner placeholder
+        inv.setItem((topRow * 9) + 8, named(Material.GRAY_DYE, "§7Menu", List.of("§7Configure Sapnap mode")));
         
         // Back to Mode Selector (consistent top-left position)
         inv.setItem(topRow * 9, named(Material.ARROW, "§7§lBack", List.of("§7Return to mode selector")));
@@ -128,12 +117,9 @@ public class ControlGui {
             inv.setItem(controlStart + controlSpacing, named(Material.GRAY_WOOL, "Pause", List.of("§7Game not running")));
         }
 
-        // Enhanced shuffle with more info
+        // Shuffle queue
         List<String> shuffleLore = new ArrayList<>();
         shuffleLore.add("§7Randomize runner queue order");
-        if (running && activeRunner != null) {
-            shuffleLore.add("§7" + activeRunner.getName() + " stays active");
-        }
         
         // Always show runner management for Sapnap mode
         List<String> runnerLore = new ArrayList<>();
@@ -152,7 +138,7 @@ public class ControlGui {
         // Adaptive runner management positioning with proper button ID
         inv.setItem(controlStart + (controlSpacing * 3), namedWithId(Material.PLAYER_HEAD, "§b§lManage Runners", runnerLore, "manage_runners"));
 
-        // Enhanced randomize toggle with more info
+        // Random/fixed timing toggle
         boolean randomize = plugin.getConfigManager().isSwapRandomized();
         List<String> randomizeLore = new ArrayList<>();
         randomizeLore.add("§7Current: " + (randomize ? "§aRandom timing" : "§bFixed timing"));
@@ -164,7 +150,7 @@ public class ControlGui {
         }
         inv.setItem(22, named(Material.COMPARATOR, (randomize ? "§a" : "§b") + "§lTiming: " + (randomize ? "Random" : "Fixed"), randomizeLore));
 
-        // Runner timer visibility (cycle FULL/LAST 10s/HIDDEN)
+        // Runner timer visibility (FULL/LAST 10s/HIDDEN)
         String runnerVis = plugin.getConfigManager().getRunnerTimerVisibility();
         String runnerLabel = switch (runnerVis.toLowerCase()) {
             case "always" -> "FULL";
@@ -177,7 +163,7 @@ public class ControlGui {
                 List.of("Cycle active runner timer visibility",
                         "FULL / LAST 10s / HIDDEN")));
 
-        // Waiting timer visibility (cycle FULL/LAST 10s/HIDDEN)
+        // Waiting timer visibility (FULL/LAST 10s/HIDDEN)
         String waitingVis = plugin.getConfigManager().getWaitingTimerVisibility();
         String waitingLabel = switch (waitingVis.toLowerCase()) {
             case "last_10" -> "LAST 10s";
@@ -190,7 +176,7 @@ public class ControlGui {
                 List.of("Cycle waiting runner timer visibility",
                         "FULL / LAST 10s / HIDDEN")));
 
-        // Interval display and adjusters (±5s quick buttons). These support a beta mode to go below 30s
+        // Interval display and adjusters (±5s)
         int interval = plugin.getConfigManager().getSwapInterval();
         boolean isBeta = plugin.getConfigManager().isBetaIntervalEnabled();
         List<String> intervalLore = new java.util.ArrayList<>();
@@ -206,7 +192,7 @@ public class ControlGui {
         inv.setItem(18, named(Material.ARROW, "-5s", List.of("Decrease interval (±5s)")));
         inv.setItem(26, named(Material.ARROW, "+5s", List.of("Increase interval (±5s)")));
 
-        // Experimental intervals toggle (runner-only control GUI)
+        // Experimental intervals toggle
         boolean betaToggle = plugin.getConfigManager().isBetaIntervalEnabled();
         inv.setItem(25, named(
                 betaToggle ? Material.REDSTONE_TORCH : Material.LEVER,
@@ -214,7 +200,7 @@ public class ControlGui {
                 List.of("Allow <30s and >max intervals", "Shows red warnings in UI")
         ));
 
-        // Enhanced freeze mode with better descriptions
+        // Freeze mode cycle
         String freeze = plugin.getConfigManager().getFreezeMode();
         List<String> freezeLore = new ArrayList<>();
         freezeLore.add("§7How inactive runners are handled:");
@@ -233,7 +219,7 @@ public class ControlGui {
         };
         inv.setItem(19, named(freezeIcon, "§6§lInactive State: §a" + freeze, freezeLore));
 
-        // Enhanced Safe Swap with more details
+        // Safe Swap toggle
         boolean safeSwap = plugin.getConfigManager().isSafeSwapEnabled();
         List<String> safeLore = new ArrayList<>();
         safeLore.add("§7Prevents dangerous swap locations");
@@ -248,7 +234,7 @@ public class ControlGui {
         inv.setItem(6, named(safeSwap ? Material.SLIME_BLOCK : Material.MAGMA_BLOCK,
                 (safeSwap ? "§a" : "§c") + "§lSafe Swaps: " + (safeSwap ? "ON" : "OFF"), safeLore));
 
-        // Enhanced Single Player Sleep with cooperation context
+        // Single Player Sleep toggle
         boolean singlePlayerSleep = plugin.getConfigManager().isSinglePlayerSleepEnabled();
         List<String> sleepLore = new ArrayList<>();
         sleepLore.add("§7Night-time cooperation mechanic");
@@ -263,243 +249,31 @@ public class ControlGui {
         inv.setItem(8, named(singlePlayerSleep ? Material.WHITE_BED : Material.RED_BED,
                 (singlePlayerSleep ? "§a" : "§c") + "§lSingle Sleep: " + (singlePlayerSleep ? "ON" : "OFF"), sleepLore));
 
-        // Enhanced queue insights with upcoming order
-        if (running && runnerCount >= 2 && runners != null && !runners.isEmpty()) {
-            List<String> queueLore = new ArrayList<>();
-            queueLore.add("§7Upcoming swap order:");
-            
-            // Get next 3 runners in queue - use the runners variable from method start
-            int activeIndex = activeRunner != null && runners.contains(activeRunner) ? runners.indexOf(activeRunner) : -1;
-            
-            for (int i = 1; i <= Math.min(3, runnerCount); i++) {
-                if (activeIndex == -1) break; // Safety check
-                int nextIndex = (activeIndex + i) % runnerCount;
-                if (runners != null && nextIndex >= 0 && nextIndex < runners.size() && runners.get(nextIndex) != null) {
-                    Player nextPlayer = runners.get(nextIndex);
-                    String pos = switch (i) {
-                        case 1 -> "§a▶ Next: ";
-                        case 2 -> "§e▶ Then: ";
-                        default -> "§7▶ After: ";
-                    };
-                    queueLore.add(pos + "§f" + nextPlayer.getName());
-                }
-            }
-            
-            if (runnerCount > 3) {
-                queueLore.add("§7... and " + (runnerCount - 3) + " more");
-            }
-            
-            inv.setItem(5, named(Material.ENDER_PEARL, "§d§lQueue Preview", queueLore));
-        } else {
-            inv.setItem(5, named(Material.GRAY_DYE, "§7Queue Preview", List.of("§7Game not running or insufficient runners")));
-        }
+        // Remove queue preview to keep UI focused on config
+        inv.setItem(5, named(Material.GRAY_DYE, "§7Queue", List.of("§7Configure settings above")));
         
-        // Real-time swap prediction with detailed timing
-        if (running && !paused) {
-            int timeLeft = plugin.getGameManager().getTimeUntilNextSwap();
-            List<String> predictionLore = new ArrayList<>();
-            
-            if (timeLeft > 60) {
-                predictionLore.add("§7Next swap in: §e" + (timeLeft / 60) + "m " + (timeLeft % 60) + "s");
-            } else {
-                predictionLore.add("§7Next swap in: §e" + timeLeft + "s");
-            }
-            
-            // Color code urgency
-            Material clockMaterial;
-            String urgency;
-            if (timeLeft <= 10) {
-                clockMaterial = Material.REDSTONE;
-                urgency = "§c§lIMMINENT!";
-                predictionLore.add(urgency);
-            } else if (timeLeft <= 30) {
-                clockMaterial = Material.GOLD_INGOT;
-                urgency = "§6Soon";
-            } else {
-                clockMaterial = Material.EMERALD;
-                urgency = "§aLater";
-            }
-            
-            if (plugin.getConfigManager().isSwapRandomized()) {
-                predictionLore.add("§7Random timing active");
-                predictionLore.add("§7Range: " + plugin.getConfigManager().getMinSwapInterval() + "-" + plugin.getConfigManager().getMaxSwapInterval() + "s");
-            }
-            
-            inv.setItem(1, named(clockMaterial, "§6§lSwap Prediction", predictionLore));
-        } else {
-            inv.setItem(1, named(Material.BARRIER, "§7Swap Prediction", List.of("§7Game not running or paused")));
-        }
+        // Remove swap prediction to keep UI simple
+        inv.setItem(1, named(Material.GRAY_DYE, "§7Info", List.of("§7Game status shown above")));
         
-        // Enhanced session statistics with achievements and smart monitoring
-        if (running) {
-            List<String> statsLore = new ArrayList<>();
-            
-            // Session achievements and milestones
-            statsLore.add("§b§lLive Session Metrics:");
-            statsLore.add("§7Current Session: §aActive");
-            statsLore.add("§7Active Runner: §b" + (activeRunner != null ? activeRunner.getName() : "None"));
-            statsLore.add("§7Runners Count: §e" + runnerCount);
-            
-            // Smart performance monitoring with alerts
-            try {
-                double tps = Bukkit.getTPS()[0];
-                String tpsColor = tps >= 18.0 ? "§a" : tps >= 15.0 ? "§e" : "§c";
-                statsLore.add("§7Server TPS: " + tpsColor + String.format("%.1f", tps));
-                
-                if (tps < 15.0) {
-                    statsLore.add("§c⚠ Performance Alert: Reduce players!");
-                } else if (tps >= 19.5) {
-                    statsLore.add("§a✓ Excellent performance!");
-                }
-            } catch (Exception e) {
-                statsLore.add("§7Performance: §7Monitoring unavailable");
-            }
-            
-            // Enhanced memory monitoring with recommendations
-            Runtime runtime = Runtime.getRuntime();
-            long maxMemory = runtime.maxMemory() / 1024 / 1024;
-            long usedMemory = (runtime.totalMemory() - runtime.freeMemory()) / 1024 / 1024;
-            int memoryPercent = (int) ((usedMemory * 100) / maxMemory);
-            String memColor = memoryPercent < 70 ? "§a" : memoryPercent < 85 ? "§e" : "§c";
-            statsLore.add("§7Memory: " + memColor + memoryPercent + "% §7(" + usedMemory + "/" + maxMemory + "MB)");
-            
-            if (memoryPercent > 85) {
-                statsLore.add("§c⚠ High memory usage detected!");
-            }
-            
-            // Session achievements
-            statsLore.add("");
-            statsLore.add("§6§lSession Achievements:");
-            
-            // Calculate time-based achievements
-            int timeLeft = plugin.getGameManager().getTimeUntilNextSwap();
-            boolean isRandomized = plugin.getConfigManager().isSwapRandomized();
-            
-            if (runnerCount >= 4) {
-                statsLore.add("§a✓ Multi-Team Coordination");
-            }
-            if (isRandomized) {
-                statsLore.add("§a✓ Unpredictability Master");
-            }
-            if (timeLeft <= 30 && timeLeft > 0) {
-                statsLore.add("§e⚡ Imminent Swap Alert");
-            }
-            
-            // Add tip based on current state
-            statsLore.add("");
-            if (timeLeft <= 15) {
-                statsLore.add("§e§lTip: §7Prepare for swap transition!");
-            } else if (memoryPercent > 80) {
-                statsLore.add("§c§lTip: §7Consider reducing view distance");
-            } else {
-                statsLore.add("§b§lTip: §7Communication is key to success!");
-            }
-            
-            inv.setItem(2, named(Material.ENCHANTED_BOOK, "§b§lLive Analytics", statsLore));
-        } else {
-            List<String> offlineStats = new ArrayList<>();
-            offlineStats.add("§7Session not active");
-            offlineStats.add("§7Start a game to see:");
-            offlineStats.add("§a• §fReal-time performance metrics");
-            offlineStats.add("§a• §fAchievement tracking");
-            offlineStats.add("§a• §fSmart recommendations");
-            offlineStats.add("§a• §fLive coordination alerts");
-            inv.setItem(2, named(Material.GRAY_DYE, "§7Live Analytics", offlineStats));
-        }
+        // Remove analytics panel to keep UI focused
+        inv.setItem(2, named(Material.GRAY_DYE, "§7Analytics", List.of("§7Not shown")));
         
-        // Advanced coordination features with live updates
-        List<String> coordLore = new ArrayList<>();
-        coordLore.add("§7Advanced cooperation dashboard:");
-        coordLore.add("§a• §fReal-time team communication");
-        coordLore.add("§a• §fSmart inventory sharing alerts");
-        coordLore.add("§a• §fCoordinated pause system");
-        coordLore.add("§a• §fTeam waypoint management");
-        coordLore.add("§a• §fPerformance monitoring");
-        coordLore.add("");
-        coordLore.add("§eClick for full coordination suite");
-        inv.setItem(3, named(Material.COMPASS, "§e§lTeam Coordination", coordLore));
+        // Remove team coordination hub link
+        inv.setItem(3, named(Material.GRAY_DYE, "§7Coordination", List.of("§7Not shown")));
         
-        // Quick Actions Toolbar - New Feature!
-        if (running) {
-            List<String> quickLore = new ArrayList<>();
-            quickLore.add("§7Lightning-fast actions:");
-            quickLore.add("§f➤ §aInstant location share");
-            quickLore.add("§f➤ §cEmergency stop");
-            quickLore.add("§f➤ §eQuick pause/resume");
-            quickLore.add("§f➤ §bTeam status broadcast");
-            quickLore.add("");
-            quickLore.add("§7Right-click for instant actions!");
-            inv.setItem(9, named(Material.GOLDEN_SWORD, "§6§lQuick Actions", quickLore));
-        } else {
-            inv.setItem(9, named(Material.GRAY_DYE, "§7Quick Actions", List.of("§7Available during active games")));
-        }
+        // Remove quick actions toolbar
+        inv.setItem(9, named(Material.GRAY_DYE, "§7Quick Actions", List.of("§7Not shown")));
 
-        // Advanced settings with smart bottom-row positioning
+        // Bottom-right placeholder
         int advancedSlot = (bottomRow * 9) + 8; // Bottom-right corner
-        inv.setItem(advancedSlot, named(Material.REDSTONE, "§6§lAdvanced Settings", 
-                List.of("§7Access all configuration options", "§7Fine-tune your cooperation experience")));
+        inv.setItem(advancedSlot, named(Material.GRAY_DYE, "§7Settings", List.of("§7Open Advanced Settings from Main Menu")));
 
-        // Context-sensitive help system (adaptive positioning)
-        List<String> helpLore = new ArrayList<>();
-        helpLore.add("§6§lSmart Help System:");
-        helpLore.add("");
-        if (!running) {
-            helpLore.add("§e➤ Start by selecting runners");
-            helpLore.add("§e➤ Adjust swap interval if needed");
-            helpLore.add("§e➤ Configure freeze mode for inactive players");
-            helpLore.add("§e➤ Click 'Start Game' when ready");
-        } else if (paused) {
-            helpLore.add("§c➤ Game is paused - click Resume");
-            helpLore.add("§c➤ Good time for strategy discussion");
-            helpLore.add("§c➤ Check team coordination tools");
-        } else {
-            int timeLeft = plugin.getGameManager().getTimeUntilNextSwap();
-            if (timeLeft <= 15) {
-                helpLore.add("§c➤ Swap imminent! Prepare for transition");
-                helpLore.add("§c➤ Finish current objectives quickly");
-                helpLore.add("§c➤ Move to safe location if possible");
-            } else {
-                helpLore.add("§a➤ Game running smoothly");
-                helpLore.add("§a➤ Use coordination tools for teamwork");
-                helpLore.add("§a➤ Monitor performance metrics");
-                helpLore.add("§a➤ Communicate with your team");
-            }
-        }
-        helpLore.add("");
-        helpLore.add("§7Click for detailed guidance");
+        // Remove smart help panel
+        int helpSlot = (bottomRow * 9);
+        inv.setItem(helpSlot, named(Material.GRAY_DYE, "§7Help", List.of("§7Not shown")));
         
-        int helpSlot = (bottomRow * 9); // Bottom-left corner
-        inv.setItem(helpSlot, named(Material.ENCHANTED_BOOK, "§e§lSmart Help", helpLore));
-        
-        // Performance warning indicator (adaptive positioning if needed)
-        try {
-            double tps = Bukkit.getTPS()[0];
-            Runtime runtime = Runtime.getRuntime();
-            long maxMemory = runtime.maxMemory() / 1024 / 1024;
-            long usedMemory = (runtime.totalMemory() - runtime.freeMemory()) / 1024 / 1024;
-            int memoryPercent = (int) ((usedMemory * 100) / maxMemory);
-            
-            if (running && (tps < 15.0 || memoryPercent > 85)) {
-                List<String> warningLore = new ArrayList<>();
-                warningLore.add("§c§lPerformance Warning!");
-                warningLore.add("");
-                if (tps < 15.0) {
-                    warningLore.add("§c• Low TPS detected: " + String.format("%.1f", tps));
-                    warningLore.add("§e• Consider reducing team size");
-                }
-                if (memoryPercent > 85) {
-                    warningLore.add("§c• High memory usage: " + memoryPercent + "%");
-                    warningLore.add("§e• Consider reducing view distance");
-                }
-                warningLore.add("");
-                warningLore.add("§7Click for optimization tips");
-                
-                int warningSlot = (bottomRow * 9) + 1; // Bottom row, second position
-                inv.setItem(warningSlot, named(Material.BARRIER, "§c§lPerformance Alert", warningLore));
-            }
-        } catch (Exception e) {
-            // TPS not available, skip warning
-        }
+        // Remove performance warning indicator
+        inv.setItem((bottomRow * 9) + 1, named(Material.GRAY_DYE, "§7Performance", List.of("§7Not shown")));
 
         // Reset interval to current mode default (replaces Status)
         int modeDefault = plugin.getConfigManager().getModeDefaultInterval(plugin.getCurrentMode());
@@ -523,7 +297,7 @@ public class ControlGui {
         int rows = Math.max(2, plugin.getConfigManager().getGuiTeamSelectorRows());
         int size = rows * 9;
         String title = plugin.getConfigManager().getGuiTeamSelectorTitle();
-        Inventory inv = Bukkit.createInventory(new ControlGuiHolder(ControlGuiHolder.Type.RUNNER_SELECTOR), size, net.kyori.adventure.text.Component.text(title));
+        Inventory inv = com.example.speedrunnerswap.utils.GuiCompat.createInventory(new ControlGuiHolder(ControlGuiHolder.Type.RUNNER_SELECTOR), size, title);
 
         // Filler
         ItemStack filler = new ItemStack(Material.BLACK_STAINED_GLASS_PANE);
@@ -599,7 +373,7 @@ public class ControlGui {
     
     // Team Coordination Menu - New feature for enhanced cooperation
     public void openTeamCoordinationMenu(Player player) {
-        Inventory inv = Bukkit.createInventory(new ControlGuiHolder(ControlGuiHolder.Type.COORDINATION), 45, net.kyori.adventure.text.Component.text("§e§lTeam Coordination Hub"));
+        Inventory inv = com.example.speedrunnerswap.utils.GuiCompat.createInventory(new ControlGuiHolder(ControlGuiHolder.Type.COORDINATION), 45, "§e§lTeam Coordination Hub");
         
         // Filler
         ItemStack filler = new ItemStack(Material.YELLOW_STAINED_GLASS_PANE);

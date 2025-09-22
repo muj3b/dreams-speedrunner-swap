@@ -1,8 +1,6 @@
 package com.example.speedrunnerswap.gui;
 
 import com.example.speedrunnerswap.SpeedrunnerSwap;
-import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
@@ -29,12 +27,10 @@ public class GuiManager {
     // New direct gamemode selector - opens each gamemode's actual main menu
     public void openDirectGamemodeSelector(Player player) {
         int rows = 3;
-        org.bukkit.inventory.Inventory inv = org.bukkit.Bukkit.createInventory(null, rows * 9, net.kyori.adventure.text.Component.text("§6§lSpeedrunner Swap - Choose Gamemode"));
+        org.bukkit.inventory.Inventory inv = com.example.speedrunnerswap.utils.GuiCompat.createInventory(null, rows * 9, "§6§lSpeedrunner Swap - Choose Gamemode");
 
         ItemStack filler = createItem(Material.BLACK_STAINED_GLASS_PANE, " ");
         fillBorder(inv, filler);
-
-        boolean gameRunning = plugin.getGameManager().isGameRunning();
         String currentMode = plugin.getCurrentMode().name();
 
         // Dream's Speedrunners vs Hunters mode - opens Dream's main menu directly
@@ -94,7 +90,7 @@ public class GuiManager {
     // Keep the old mode selector for backward compatibility if needed
     public void openModeSelector(Player player) {
         int rows = 3;
-        org.bukkit.inventory.Inventory inv = org.bukkit.Bukkit.createInventory(null, rows * 9, net.kyori.adventure.text.Component.text("§6§lSpeedrunner Swap - Mode Selection"));
+        org.bukkit.inventory.Inventory inv = com.example.speedrunnerswap.utils.GuiCompat.createInventory(null, rows * 9, "§6§lSpeedrunner Swap - Mode Selection");
 
         ItemStack filler = createItem(Material.BLACK_STAINED_GLASS_PANE, " ");
         fillBorder(inv, filler);
@@ -164,7 +160,7 @@ public class GuiManager {
 
     public void openForceConfirm(Player player, com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode target) {
         String name = target == com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode.SAPNAP ? "Sapnap" : "Dream";
-        org.bukkit.inventory.Inventory inv = org.bukkit.Bukkit.createInventory(null, 9, net.kyori.adventure.text.Component.text("§4§lConfirm Mode Switch"));
+        org.bukkit.inventory.Inventory inv = com.example.speedrunnerswap.utils.GuiCompat.createInventory(null, 9, "§4§lConfirm Mode Switch");
         ItemStack filler = createItem(Material.BLACK_STAINED_GLASS_PANE, " ");
         for (int i = 0; i < inv.getSize(); i++) inv.setItem(i, filler);
 
@@ -196,7 +192,7 @@ public class GuiManager {
     
     // Dangerous Blocks editor
     public void openDangerousBlocksMenu(Player player) {
-        Inventory inv = Bukkit.createInventory(null, 54, Component.text("§6§lDangerous Blocks"));
+        Inventory inv = com.example.speedrunnerswap.utils.GuiCompat.createInventory(null, 54, "§6§lDangerous Blocks");
         ItemStack filler = createItem(Material.BLACK_STAINED_GLASS_PANE, " ");
         fillBorder(inv, filler);
         inv.setItem(0, createItem(Material.ARROW, "§7§lBack", List.of("§7Return to settings")));
@@ -214,7 +210,7 @@ public class GuiManager {
     }
     
     public void openPositiveEffectsMenu(Player player) {
-        Inventory inventory = Bukkit.createInventory(null, 36, Component.text("§a§lPositive Effects"));
+        Inventory inventory = com.example.speedrunnerswap.utils.GuiCompat.createInventory(null, 36, "§a§lPositive Effects");
         
         // Border-only filler for cleaner look
         ItemStack filler = createItem(Material.BLACK_STAINED_GLASS_PANE, " ");
@@ -242,7 +238,7 @@ public class GuiManager {
     }
 
     public void openNegativeEffectsMenu(Player player) {
-        Inventory inventory = Bukkit.createInventory(null, 36, Component.text("§c§lNegative Effects"));
+        Inventory inventory = com.example.speedrunnerswap.utils.GuiCompat.createInventory(null, 36, "§c§lNegative Effects");
         
         // Border-only filler for cleaner look
         ItemStack filler = createItem(Material.BLACK_STAINED_GLASS_PANE, " ");
@@ -281,7 +277,7 @@ public class GuiManager {
     }
 
     public void openPowerUpsMenu(Player player) {
-        Inventory inventory = Bukkit.createInventory(null, 36, Component.text("§e§lPower-ups Menu"));
+        Inventory inventory = com.example.speedrunnerswap.utils.GuiCompat.createInventory(null, 36, "§e§lPower-ups Menu");
         
         // Border-only filler for cleaner look
         ItemStack filler = createItem(Material.BLACK_STAINED_GLASS_PANE, " ");
@@ -341,7 +337,7 @@ public class GuiManager {
     }
 
     public void openPowerUpDurationsMenu(Player player) {
-        Inventory inv = Bukkit.createInventory(null, 27, Component.text("§6§lPower-up Durations"));
+        Inventory inv = com.example.speedrunnerswap.utils.GuiCompat.createInventory(null, 27, "§6§lPower-up Durations");
         ItemStack filler = createItem(Material.GRAY_STAINED_GLASS_PANE, " ");
         fillBorder(inv, filler);
 
@@ -367,7 +363,7 @@ public class GuiManager {
     }
 
     public void openWorldBorderMenu(Player player) {
-        Inventory inventory = Bukkit.createInventory(null, 27, Component.text("§c§lWorld Border Settings"));
+        Inventory inventory = com.example.speedrunnerswap.utils.GuiCompat.createInventory(null, 27, "§c§lWorld Border Settings");
         
         // Border-only filler for cleaner look
         ItemStack filler = createItem(Material.BLACK_STAINED_GLASS_PANE, " ");
@@ -460,7 +456,7 @@ public class GuiManager {
             String title = "§a§lDream: Speedrunners vs Hunters";
             int rows = 6;
 
-            Inventory inventory = Bukkit.createInventory(null, rows * 9, Component.text(title));
+            Inventory inventory = com.example.speedrunnerswap.utils.GuiCompat.createInventory(null, rows * 9, title);
 
             // Use green glass pane for Dream mode theme
             ItemStack filler = createItem(Material.GREEN_STAINED_GLASS_PANE, " ");
@@ -607,7 +603,7 @@ public class GuiManager {
         try {
             String title = "§6§lTask Manager: Secret Missions";
             int rows = 6;
-            Inventory inventory = Bukkit.createInventory(null, rows * 9, Component.text(title));
+            Inventory inventory = com.example.speedrunnerswap.utils.GuiCompat.createInventory(null, rows * 9, title);
             
             // Use orange glass pane for Task Manager theme
             ItemStack filler = createItem(Material.ORANGE_STAINED_GLASS_PANE, " ");
@@ -750,9 +746,10 @@ public class GuiManager {
     }
 
     public void openTaskSettingsMenu(Player player) {
-        Inventory inv = Bukkit.createInventory(null, 54, Component.text("§6§lTask Settings"));
+        Inventory inv = com.example.speedrunnerswap.utils.GuiCompat.createInventory(null, 54, "§6§lTask Settings");
         ItemStack filler = createItem(Material.BLACK_STAINED_GLASS_PANE, " ");
         fillBorder(inv, filler);
+        addGameControlsHeader(inv);
 
         // Back
         inv.setItem(0, createItem(Material.ARROW, "§7§lBack", List.of("§7Return to Task Manager")));
@@ -831,10 +828,11 @@ public class GuiManager {
     }
 
     public void openDreamSettingsMenu(Player player) {
-        Inventory inv = Bukkit.createInventory(null, 27, Component.text("§a§lDream Settings"));
+        Inventory inv = com.example.speedrunnerswap.utils.GuiCompat.createInventory(null, 27, "§a§lDream Settings");
         ItemStack filler = createItem(Material.BLACK_STAINED_GLASS_PANE, " ");
         fillBorder(inv, filler);
         inv.setItem(0, createItem(Material.ARROW, "§7§lBack", List.of("§7Return to Dream menu")));
+        addGameControlsHeader(inv);
 
         boolean tracker = plugin.getConfigManager().isTrackerEnabled();
         ItemStack trackerToggle = createGuiButton(tracker ? Material.COMPASS : Material.GRAY_DYE,
@@ -859,7 +857,7 @@ public class GuiManager {
         rows = Math.max(rows, 4); // ensure space for selector + player heads row
         rows = clampRows(rows);
         
-        Inventory inventory = Bukkit.createInventory(null, rows * 9, Component.text(title));
+        Inventory inventory = com.example.speedrunnerswap.utils.GuiCompat.createInventory(null, rows * 9, title);
         
         // Border-only filler for better visual organization
         ItemStack filler = createItem(Material.BLACK_STAINED_GLASS_PANE, " ");
@@ -950,16 +948,16 @@ public class GuiManager {
             ItemStack playerHead = new ItemStack(Material.PLAYER_HEAD);
             SkullMeta meta = (SkullMeta) playerHead.getItemMeta();
             meta.setOwningPlayer(onlinePlayer);
-            
+
             Team currentTeam = plugin.getGameManager().getPlayerState(onlinePlayer).getSelectedTeam();
-            // Apply team color to player name
-            net.kyori.adventure.text.format.TextColor nameColor = currentTeam == Team.RUNNER ?
-                net.kyori.adventure.text.format.NamedTextColor.AQUA :
-                currentTeam == Team.HUNTER ?
-                net.kyori.adventure.text.format.NamedTextColor.RED :
-                net.kyori.adventure.text.format.NamedTextColor.WHITE;
-            meta.displayName(net.kyori.adventure.text.Component.text(onlinePlayer.getName()).color(nameColor));
-            
+            // Apply team color to player name using legacy codes via GuiCompat
+            String coloredName = switch (currentTeam) {
+                case RUNNER -> "§b" + onlinePlayer.getName();
+                case HUNTER -> "§c" + onlinePlayer.getName();
+                default -> "§f" + onlinePlayer.getName();
+            };
+            com.example.speedrunnerswap.utils.GuiCompat.setDisplayName(meta, coloredName);
+
             List<String> lore = new ArrayList<>();
             if (plugin.getGameManager().isRunner(onlinePlayer)) {
                 lore.add("§bCurrently a Runner");
@@ -979,11 +977,7 @@ public class GuiManager {
             lore.add("");
             lore.add(onlinePlayer.isOnline() ? "§a✔ Online" : "§c✘ Offline");
             
-            List<net.kyori.adventure.text.Component> componentLore = new ArrayList<>();
-            for (String line : lore) {
-                componentLore.add(net.kyori.adventure.text.Component.text(line));
-            }
-            meta.lore(componentLore);
+            com.example.speedrunnerswap.utils.GuiCompat.setLore(meta, lore);
             playerHead.setItemMeta(meta);
             
             // Add glow effect for current team members
@@ -1002,7 +996,7 @@ public class GuiManager {
         int rows = 6;
         rows = clampRows(rows);
         
-        Inventory inventory = Bukkit.createInventory(null, rows * 9, Component.text(title));
+        Inventory inventory = com.example.speedrunnerswap.utils.GuiCompat.createInventory(null, rows * 9, title);
         
         // Use redstone glass pane for advanced settings theme
         ItemStack filler = createItem(Material.RED_STAINED_GLASS_PANE, " ");
@@ -1011,6 +1005,9 @@ public class GuiManager {
         // Back button with enhanced tooltip
         inventory.setItem(0, createGuiButton(Material.ARROW, "§7§lBack", 
             List.of("§7Return to main menu"), "back_main"));
+
+        // Always show basic game controls in header
+        addGameControlsHeader(inventory);
 
         // === SWAP MECHANICS SECTION (Row 1) ===
         // Swap Type Toggle
@@ -1234,9 +1231,10 @@ public class GuiManager {
 
     
     public void openCustomTasksMenu(Player player) {
-        Inventory inv = Bukkit.createInventory(null, 54, Component.text("§d§lCustom Tasks Manager"));
+        Inventory inv = com.example.speedrunnerswap.utils.GuiCompat.createInventory(null, 54, "§d§lCustom Tasks Manager");
         ItemStack filler = createItem(Material.BLACK_STAINED_GLASS_PANE, " ");
         fillBorder(inv, filler);
+        addGameControlsHeader(inv);
         
         ItemStack back = createItem(Material.ARROW, "§7§lBack", List.of("§7Return to Settings"));
         inv.setItem(0, back);
@@ -1292,13 +1290,13 @@ public class GuiManager {
     public void promptTaskInput(Player player, String type) {
         player.closeInventory();
         if (type.equals("id")) {
-            player.sendMessage(Component.text("[Task Manager] Enter a unique task ID (e.g., 'build_nether_house'):").color(NamedTextColor.YELLOW));
-            player.sendMessage(Component.text("Type 'cancel' to abort").color(NamedTextColor.GRAY));
+            player.sendMessage("§e[Task Manager] Enter a unique task ID (e.g., 'build_nether_house'):");
+            player.sendMessage("§7Type 'cancel' to abort");
             // Store state for chat listener
             plugin.getChatInputHandler().expectTaskId(player);
         } else if (type.equals("description")) {
-            player.sendMessage(Component.text("[Task Manager] Enter the task description:").color(NamedTextColor.YELLOW));
-            player.sendMessage(Component.text("Type 'cancel' to abort").color(NamedTextColor.GRAY));
+            player.sendMessage("§e[Task Manager] Enter the task description:");
+            player.sendMessage("§7Type 'cancel' to abort");
             // Store state for chat listener
             plugin.getChatInputHandler().expectTaskDescription(player);
         }
@@ -1313,16 +1311,12 @@ public class GuiManager {
     public ItemStack createItem(Material material, String name, String... lore) {
         ItemStack item = new ItemStack(material);
         ItemMeta meta = item.getItemMeta();
-        meta.displayName(Component.text(name));
-
+        com.example.speedrunnerswap.utils.GuiCompat.setDisplayName(meta, name);
         if (lore.length > 0) {
-            List<Component> loreList = new ArrayList<>();
-            for (String line : lore) {
-                loreList.add(Component.text(line));
-            }
-            meta.lore(loreList);
+            List<String> loreList = new ArrayList<>();
+            java.util.Collections.addAll(loreList, lore);
+            com.example.speedrunnerswap.utils.GuiCompat.setLore(meta, loreList);
         }
-
         item.setItemMeta(meta);
         return item;
     }
@@ -1348,18 +1342,76 @@ public class GuiManager {
     public ItemStack createItem(Material material, String name, List<String> lore) {
         ItemStack item = new ItemStack(material);
         ItemMeta meta = item.getItemMeta();
-        meta.displayName(Component.text(name));
-        
+        com.example.speedrunnerswap.utils.GuiCompat.setDisplayName(meta, name);
         if (lore != null && !lore.isEmpty()) {
-            List<Component> componentLore = new ArrayList<>();
-            for (String line : lore) {
-                componentLore.add(Component.text(line));
-            }
-            meta.lore(componentLore);
+            com.example.speedrunnerswap.utils.GuiCompat.setLore(meta, lore);
         }
-        
         item.setItemMeta(meta);
         return item;
+    }
+
+    // Insert consistent game controls in slots 10/11/13 of any menu (start/stop, pause/resume, status)
+    private void addGameControlsHeader(Inventory inventory) {
+        boolean running = plugin.getGameManager().isGameRunning();
+        boolean paused = plugin.getGameManager().isGamePaused();
+        int runnerCount = plugin.getGameManager().getRunners().size();
+        int hunterCount = 0;
+        try { hunterCount = plugin.getGameManager().getHunters().size(); } catch (Throwable ignored) {}
+
+        // Start / Stop
+        if (!running) {
+            List<String> startLore = new ArrayList<>();
+            if (plugin.getCurrentMode() == com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode.DREAM) {
+                if (runnerCount == 0 || hunterCount == 0) {
+                    startLore.add("§cNeed both runners and hunters!");
+                    startLore.add("§cRunners: " + runnerCount + ", Hunters: " + hunterCount);
+                    inventory.setItem(10, createItem(Material.GRAY_CONCRETE, "§c§lCannot Start", startLore));
+                } else {
+                    startLore.add("§7Ready: §b" + runnerCount + " runners§7, §c" + hunterCount + " hunters");
+                    startLore.add("§7Swap interval: §e" + plugin.getConfigManager().getSwapInterval() + "s");
+                    inventory.setItem(10, createGuiButton(Material.LIME_CONCRETE, "§a§lStart Game", startLore, "start_game"));
+                }
+            } else {
+                if (runnerCount < 1) {
+                    startLore.add("§cNeed at least 1 runner!");
+                    inventory.setItem(10, createItem(Material.GRAY_CONCRETE, "§c§lCannot Start", startLore));
+                } else {
+                    startLore.add("§7Ready: §b" + runnerCount + " runners");
+                    startLore.add("§7Swap interval: §e" + plugin.getConfigManager().getSwapInterval() + "s");
+                    inventory.setItem(10, createGuiButton(Material.LIME_CONCRETE, "§a§lStart Game", startLore, "start_game"));
+                }
+            }
+        } else {
+            List<String> stopLore = new ArrayList<>();
+            stopLore.add("§7End the current game");
+            stopLore.add("§7Status: " + (paused ? "§ePaused" : "§aRunning"));
+            inventory.setItem(10, createGuiButton(Material.RED_CONCRETE, "§c§lStop Game", stopLore, "stop_game"));
+        }
+
+        // Pause / Resume
+        if (running && !paused) {
+            inventory.setItem(11, createGuiButton(Material.YELLOW_CONCRETE, "§e§lPause", List.of("§7Temporarily pause the game"), "pause_game"));
+        } else if (running) {
+            inventory.setItem(11, createGuiButton(Material.ORANGE_CONCRETE, "§a§lResume", List.of("§7Resume the game"), "resume_game"));
+        } else {
+            inventory.setItem(11, createItem(Material.GRAY_CONCRETE, "§7Pause", List.of("§7Game not running")));
+        }
+
+        // Status
+        List<String> status = new ArrayList<>();
+        status.add("§7Running: " + (running ? "§aYes" : "§cNo"));
+        status.add("§7Runners: §b" + runnerCount);
+        if (plugin.getCurrentMode() == com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode.DREAM) {
+            status.add("§7Hunters: §c" + hunterCount);
+        }
+        if (running) {
+            try {
+                Player active = plugin.getGameManager().getActiveRunner();
+                status.add("§7Active: §f" + (active != null ? active.getName() : "None"));
+                status.add("§7Next Swap: §e" + plugin.getGameManager().getTimeUntilNextSwap() + "s");
+            } catch (Throwable ignored) {}
+        }
+        inventory.setItem(13, createItem(Material.CLOCK, "§6§lGame Status", status));
     }
 
     // Visual utility: fill only the outer border of an inventory with a filler item
@@ -1423,9 +1475,10 @@ public class GuiManager {
 
         int rows = 6;
         String title = "§6§lAdvanced Config" + (path.isEmpty() ? "" : " §7(" + path + ")");
-        Inventory inv = Bukkit.createInventory(null, rows * 9, Component.text(title));
+        Inventory inv = com.example.speedrunnerswap.utils.GuiCompat.createInventory(null, rows * 9, title);
         ItemStack filler = createItem(Material.GRAY_STAINED_GLASS_PANE, " ");
         fillBorder(inv, filler);
+        addGameControlsHeader(inv);
 
         // Back to Settings or parent
         if (path.isEmpty()) {
@@ -1479,9 +1532,10 @@ public class GuiManager {
         java.util.List<String> list = cfg.getStringList(path);
         int rows = 6;
         String title = "§6§lList Editor §7(" + path + ")";
-        Inventory inv = Bukkit.createInventory(null, rows * 9, Component.text(title));
+        Inventory inv = com.example.speedrunnerswap.utils.GuiCompat.createInventory(null, rows * 9, title);
         ItemStack filler = createItem(Material.GRAY_STAINED_GLASS_PANE, " ");
         fillBorder(inv, filler);
+        addGameControlsHeader(inv);
 
         // Back
         inv.setItem(0, createGuiButton(Material.ARROW, "§7§lBack", List.of("§7Return to Advanced Config"), "cfg:nav:" + getParentPath(path)));
@@ -1524,7 +1578,7 @@ public class GuiManager {
         if (item == null || item.getType() != material || !item.hasItemMeta()) {
             return false;
         }
-        String displayName = net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer.plainText().serialize(item.getItemMeta().displayName());
+        String displayName = com.example.speedrunnerswap.utils.GuiCompat.getDisplayName(item.getItemMeta());
         return name.equals(displayName);
     }
     
@@ -1714,9 +1768,10 @@ public class GuiManager {
     
     // Statistics Menu
     public void openStatisticsMenu(Player player) {
-        Inventory inventory = Bukkit.createInventory(null, 54, Component.text("§b§lStatistics & Tracking"));
+        Inventory inventory = com.example.speedrunnerswap.utils.GuiCompat.createInventory(null, 54, "§b§lStatistics & Tracking");
         ItemStack filler = createItem(Material.BLACK_STAINED_GLASS_PANE, " ");
         fillBorder(inventory, filler);
+        addGameControlsHeader(inventory);
         
         // Back button
         inventory.setItem(0, createGuiButton(Material.ARROW, "§7§lBack", 
@@ -1751,9 +1806,10 @@ public class GuiManager {
     
     // Kits Menu
     public void openKitsMenu(Player player) {
-        Inventory inventory = Bukkit.createInventory(null, 54, Component.text("§6§lKit Management"));
+        Inventory inventory = com.example.speedrunnerswap.utils.GuiCompat.createInventory(null, 54, "§6§lKit Management");
         ItemStack filler = createItem(Material.BLACK_STAINED_GLASS_PANE, " ");
         fillBorder(inventory, filler);
+        addGameControlsHeader(inventory);
         
         // Back button
         inventory.setItem(0, createGuiButton(Material.ARROW, "§7§lBack", 
@@ -1783,7 +1839,7 @@ public class GuiManager {
     // Kit Editor
     public void openKitEditor(Player player, String kitType) {
         String title = kitType.equals("runner") ? "§a§lRunner Kit Editor" : "§c§lHunter Kit Editor";
-        Inventory inventory = Bukkit.createInventory(null, 54, Component.text(title));
+        Inventory inventory = com.example.speedrunnerswap.utils.GuiCompat.createInventory(null, 54, title);
         
         // Instructions
         ItemStack instructions = createItem(Material.PAPER, "§e§lInstructions",
@@ -1805,9 +1861,10 @@ public class GuiManager {
     
     // Bounty Menu
     public void openBountyMenu(Player player) {
-        Inventory inventory = Bukkit.createInventory(null, 54, Component.text("§6§lBounty System"));
+        Inventory inventory = com.example.speedrunnerswap.utils.GuiCompat.createInventory(null, 54, "§6§lBounty System");
         ItemStack filler = createItem(Material.BLACK_STAINED_GLASS_PANE, " ");
         fillBorder(inventory, filler);
+        addGameControlsHeader(inventory);
         
         // Back button
         inventory.setItem(0, createGuiButton(Material.ARROW, "§7§lBack", 
@@ -1846,9 +1903,10 @@ public class GuiManager {
     
     // Last Stand Menu
     public void openLastStandMenu(Player player) {
-        Inventory inventory = Bukkit.createInventory(null, 54, Component.text("§c§lLast Stand Mode"));
+        Inventory inventory = com.example.speedrunnerswap.utils.GuiCompat.createInventory(null, 54, "§c§lLast Stand Mode");
         ItemStack filler = createItem(Material.BLACK_STAINED_GLASS_PANE, " ");
         fillBorder(inventory, filler);
+        addGameControlsHeader(inventory);
         
         // Back button
         inventory.setItem(0, createGuiButton(Material.ARROW, "§7§lBack", 
@@ -1900,9 +1958,10 @@ public class GuiManager {
     
     // Compass Settings Menu
     public void openCompassSettingsMenu(Player player) {
-        Inventory inventory = Bukkit.createInventory(null, 54, Component.text("§b§lCompass Settings"));
+        Inventory inventory = com.example.speedrunnerswap.utils.GuiCompat.createInventory(null, 54, "§b§lCompass Settings");
         ItemStack filler = createItem(Material.BLACK_STAINED_GLASS_PANE, " ");
         fillBorder(inventory, filler);
+        addGameControlsHeader(inventory);
         
         // Back button
         inventory.setItem(0, createGuiButton(Material.ARROW, "§7§lBack", 
@@ -1943,9 +2002,10 @@ public class GuiManager {
     
     // Sudden Death Menu
     public void openSuddenDeathMenu(Player player) {
-        Inventory inventory = Bukkit.createInventory(null, 54, Component.text("§4§lSudden Death Mode"));
+        Inventory inventory = com.example.speedrunnerswap.utils.GuiCompat.createInventory(null, 54, "§4§lSudden Death Mode");
         ItemStack filler = createItem(Material.BLACK_STAINED_GLASS_PANE, " ");
         fillBorder(inventory, filler);
+        addGameControlsHeader(inventory);
         
         // Back button
         inventory.setItem(0, createGuiButton(Material.ARROW, "§7§lBack", 
@@ -2016,9 +2076,10 @@ public class GuiManager {
     }
     
     public void openBroadcastSettingsMenu(Player player) {
-        Inventory inventory = Bukkit.createInventory(null, 27, Component.text("§e§lBroadcast Settings"));
+        Inventory inventory = com.example.speedrunnerswap.utils.GuiCompat.createInventory(null, 27, "§e§lBroadcast Settings");
         ItemStack filler = createItem(Material.YELLOW_STAINED_GLASS_PANE, " ");
         fillBorder(inventory, filler);
+        addGameControlsHeader(inventory);
         
         // Back button
         inventory.setItem(0, createGuiButton(Material.ARROW, "§7§lBack",
@@ -2047,9 +2108,10 @@ public class GuiManager {
     }
     
     public void openLimboSettingsMenu(Player player) {
-        Inventory inventory = Bukkit.createInventory(null, 27, Component.text("§6§lLimbo Configuration"));
+        Inventory inventory = com.example.speedrunnerswap.utils.GuiCompat.createInventory(null, 27, "§6§lLimbo Configuration");
         ItemStack filler = createItem(Material.PURPLE_STAINED_GLASS_PANE, " ");
         fillBorder(inventory, filler);
+        addGameControlsHeader(inventory);
         
         // Back button
         inventory.setItem(0, createGuiButton(Material.ARROW, "§7§lBack",
@@ -2078,9 +2140,11 @@ public class GuiManager {
     }
     
     public void openUIPerformanceMenu(Player player) {
-        Inventory inventory = Bukkit.createInventory(null, 27, Component.text("§d§lUI Performance Settings"));
+        Inventory inventory = com.example.speedrunnerswap.utils.GuiCompat.createInventory(null, 27, "§d§lUI Performance Settings");
         ItemStack filler = createItem(Material.MAGENTA_STAINED_GLASS_PANE, " ");
         fillBorder(inventory, filler);
+        addGameControlsHeader(inventory);
+
         
         // Back button
         inventory.setItem(0, createGuiButton(Material.ARROW, "§7§lBack",
