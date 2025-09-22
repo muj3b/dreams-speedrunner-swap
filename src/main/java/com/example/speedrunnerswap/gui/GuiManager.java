@@ -87,6 +87,18 @@ public class GuiManager {
         player.openInventory(inv);
     }
 
+    public void openResetConfirmMenu(Player player) {
+        org.bukkit.inventory.Inventory inv = com.example.speedrunnerswap.utils.GuiCompat.createInventory(null, 9, "§4§lConfirm Reset All Settings");
+        ItemStack filler = createItem(Material.BLACK_STAINED_GLASS_PANE, " ");
+        for (int i = 0; i < inv.getSize(); i++) inv.setItem(i, filler);
+
+        inv.setItem(0, createGuiButton(Material.ARROW, "§7§lBack", java.util.List.of("§7Return"), "reset_confirm_no"));
+        inv.setItem(3, createGuiButton(Material.EMERALD_BLOCK, "§a§lCancel", java.util.List.of("§7Do nothing"), "reset_confirm_no"));
+        inv.setItem(5, createGuiButton(Material.REDSTONE_BLOCK, "§c§lConfirm Reset", java.util.List.of("§7Restore defaults from jar", "§cThis cannot be undone!"), "reset_confirm_yes"));
+
+        player.openInventory(inv);
+    }
+
     // Keep the old mode selector for backward compatibility if needed
     public void openModeSelector(Player player) {
         int rows = 3;

@@ -26,16 +26,18 @@ public class GuiListener implements Listener {
     public void onInventoryClick(InventoryClickEvent event) {
         if (!(event.getWhoClicked() instanceof Player)) return;
         Player player = (Player) event.getWhoClicked();
-        // If this is a ControlGui inventory (Sapnap mode), let ControlGuiListener handle it exclusively
         org.bukkit.inventory.Inventory top = event.getView().getTopInventory();
+
+        // If this is a ControlGui inventory (Sapnap mode), let ControlGuiListener handle it exclusively
         if (top != null && top.getHolder() instanceof ControlGuiHolder) {
             return;
         }
 
         String title = getPlainTitle(event.getView());
+        boolean holderMarked = top != null && top.getHolder() instanceof com.example.speedrunnerswap.gui.PluginGuiHolder;
 
-        // Always cancel any click when a plugin GUI is open (regardless of item)
-        if (isPluginGui(title)) {
+        // Always cancel any click when a plugin GUI is open (either by title or holder marker)
+        if (holderMarked || isPluginGui(title)) {
             event.setCancelled(true);
             event.setResult(org.bukkit.event.Event.Result.DENY);
 
@@ -69,9 +71,10 @@ public class GuiListener implements Listener {
         org.bukkit.inventory.Inventory top = event.getView().getTopInventory();
         if (top != null && top.getHolder() instanceof ControlGuiHolder) return;
         String title = getPlainTitle(event.getView());
+        boolean holderMarked = top != null && top.getHolder() instanceof com.example.speedrunnerswap.gui.PluginGuiHolder;
         
         // Always cancel drag events in plugin GUIs
-        if (isPluginGui(title)) {
+        if (holderMarked || isPluginGui(title)) {
             event.setCancelled(true);
             event.setResult(org.bukkit.event.Event.Result.DENY);
         }
@@ -116,8 +119,15 @@ public class GuiListener implements Listener {
     // Block item movement events
     @EventHandler(priority = EventPriority.HIGHEST)
     public void onInventoryMoveItem(org.bukkit.event.inventory.InventoryMoveItemEvent event) {
-        // This would affect hopper/dropper interactions, but we need to be careful
-        // Only block if the inventory belongs to our GUI
+        org.bukkit.inventory.Inventory src = event.getSource();
+        org.bukkit.inventory.Inventory dst = event.getDestination();
+        if (src != null && src.getHolder() instanceof com.example.speedrunnerswap.gui.PluginGuiHolder) {
+            event.setCancelled(true);
+            return;
+        }
+        if (dst != null && dst.getHolder() instanceof com.example.speedrunnerswap.gui.PluginGuiHolder) {
+            event.setCancelled(true);
+        }
     }
 
     private boolean isPluginGui(String title) {
@@ -775,9 +785,25 @@ public class GuiListener implements Listener {
                     break;
                 }
                 case "reset_all_settings": {
-                    player.sendMessage("§c[Settings] Reset All Settings is not yet confirmed via GUI to avoid accidental resets.");
-                    player.sendMessage("§7Use config.yml or ask to add a confirmation flow.");
-                    break;
+                    guiManager.openResetConfirmMenu(player);
+                    return; // open confirm menu
+                }
+                case "reset_confirm_no": {
+                    guiManager.openSettingsMenu(player);
+                    return;
+                }
+                case "reset_confirm_yes": {
+                    // Restore defaults by overwriting config.yml from jar, then reload caches
+                    try {
+                        plugin.saveResource("config.yml", true); // overwrite existing with defaults
+                        plugin.reloadConfig();
+                        plugin.getConfigManager().loadConfig();
+                        player.sendMessage("§a[Settings] All settings restored to defaults.");
+                    } catch (Throwable t) {
+                        player.sendMessage("§c[Settings] Failed to reset settings: " + t.getMessage());
+                    }
+                    guiManager.openSettingsMenu(player);
+                    return;
                 }
                 case "ui_actionbar_ticks": {
                     int val = plugin.getConfigManager().getActionBarUpdateTicks();

@@ -16,17 +16,19 @@ public final class GuiCompat {
     private GuiCompat() {}
 
     public static Inventory createInventory(InventoryHolder holder, int size, String title) {
+        InventoryHolder effective = (holder != null) ? holder : new com.example.speedrunnerswap.gui.PluginGuiHolder();
         try {
-            return Bukkit.createInventory(holder, size, Component.text(title));
+            return Bukkit.createInventory(effective, size, Component.text(title));
         } catch (Throwable t) {
             // Fallback to legacy title if Component API is unavailable
-            return createInventoryLegacy(holder, size, title);
+            return createInventoryLegacy(effective, size, title);
         }
     }
 
     @SuppressWarnings("deprecation")
     private static Inventory createInventoryLegacy(InventoryHolder holder, int size, String title) {
-        return Bukkit.createInventory(holder, size, title);
+        InventoryHolder effective = (holder != null) ? holder : new com.example.speedrunnerswap.gui.PluginGuiHolder();
+        return Bukkit.createInventory(effective, size, title);
     }
 
     public static void setDisplayName(ItemMeta meta, String name) {
