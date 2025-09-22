@@ -76,24 +76,17 @@ public final class GuiCompat {
     }
 
     @SuppressWarnings("deprecation")
-    private static void setDisplayNameLegacy(ItemMeta meta, String name) {
-        try { meta.setDisplayName(name); } catch (Throwable ignored) {}
-    }
+    private static void setDisplayNameLegacy(ItemMeta meta, String name) { meta.setDisplayName(name); }
 
     @SuppressWarnings("deprecation")
-    private static String getDisplayNameLegacy(ItemMeta meta) {
-        try { return meta.getDisplayName(); } catch (Throwable ignored) {}
-        return "";
-    }
+    private static String getDisplayNameLegacy(ItemMeta meta) { return meta.hasDisplayName() ? meta.getDisplayName() : null; }
 
     @SuppressWarnings("deprecation")
-    private static void setLoreLegacy(ItemMeta meta, List<String> legacyLore) {
-        try { meta.setLore(legacyLore); } catch (Throwable ignored) {}
-    }
+    private static void setLoreLegacy(ItemMeta meta, List<String> legacyLore) { meta.setLore(legacyLore); }
 
     @SuppressWarnings("deprecation")
     private static List<String> getLoreLegacy(ItemMeta meta) {
-        try { return meta.getLore(); } catch (Throwable ignored) {}
-        return null;
+        List<String> lore = meta.getLore();
+        return (lore != null) ? lore : java.util.Collections.emptyList();
     }
 }

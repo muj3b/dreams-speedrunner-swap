@@ -17,16 +17,11 @@ website: https://github.com/muj3b/minecraft-speedrunner-swap-plugin
 
 commands:
   swap:
-    description: Main command for SpeedrunnerSwap plugin
-    usage: /<command> [start|stop|pause|resume|status|creator|setrunners|sethunters|reload|gui|mode|clearteams]
-    permission: speedrunnerswap.command
+    description: Control Speedrunner Swap
+    usage: /<command>
+    permission: speedrunnerswap.admin
     
 permissions:
-  speedrunnerswap.command:
-    description: Allows use of all SpeedrunnerSwap commands
-    default: op
   speedrunnerswap.admin:
-    description: Allows administration of SpeedrunnerSwap
     default: op
-    children:
-      speedrunnerswap.command: true
+    description: Full control over Speedrunner Swap plugin features

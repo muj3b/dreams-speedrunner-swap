@@ -2,7 +2,6 @@ package com.example.speedrunnerswap.utils;
 
 import com.example.speedrunnerswap.models.PlayerState;
 import org.bukkit.entity.Player;
-import org.bukkit.potion.PotionEffect;
 // Use fully-qualified reference for BukkitCompat to avoid IDE false positives
 
 import java.util.ArrayList;
@@ -57,69 +56,59 @@ public class PlayerStateUtil {
      * @param state The state to apply
      */
     public static void applyPlayerState(Player player, com.example.speedrunnerswap.models.PlayerState state) {
-        // Clear inventory and apply saved inventory
+        if (player == null || state == null) return;
+
+        // Inventory & offhand
         player.getInventory().clear();
         player.getInventory().setContents(state.getInventory());
         player.getInventory().setArmorContents(state.getArmor());
         player.getInventory().setItemInOffHand(state.getOffhand());
-        
-        // Teleport to saved location
-        player.teleport(state.getLocation());
-        
-        // Apply health and food (handle API changes across versions)
-        player.setHealth(Math.min(state.getHealth(), com.example.speedrunnerswap.utils.BukkitCompat.getMaxHealthValue(player)));
+
+        // Location
+        if (state.getLocation() != null) {
+            try { player.teleport(state.getLocation()); } catch (Throwable ignored) {}
+        }
+
+        // Vital stats (clamp)
+        double max = com.example.speedrunnerswap.utils.BukkitCompat.getMaxHealthValue(player);
+        double clamped = Math.max(0.0D, Math.min(max, state.getHealth()));
+        try { player.setHealth(clamped); } catch (Throwable ignored) {}
+
         player.setFoodLevel(state.getFoodLevel());
         player.setSaturation(state.getSaturation());
         player.setExhaustion(state.getExhaustion());
-        
-        // Apply XP
+
+        // Experience
         player.setTotalExperience(state.getTotalExperience());
         player.setExp(state.getExp());
         player.setLevel(state.getLevel());
-        
-        // Apply other attributes
+
+        // Environment
         player.setFireTicks(state.getFireTicks());
-        player.setRemainingAir(state.getRemainingAir());
-        player.setMaximumAir(state.getMaximumAir());
-        player.setGameMode(state.getGameMode());
+        try { player.setMaximumAir(state.getMaximumAir()); } catch (Throwable ignored) {}
+        try { player.setRemainingAir(state.getRemainingAir()); } catch (Throwable ignored) {}
+
+        // Mode & motion
+        if (state.getGameMode() != null) player.setGameMode(state.getGameMode());
         player.setFallDistance(state.getFallDistance());
-        player.setAllowFlight(state.isAllowFlight());
-        player.setFlying(state.isFlying());
-        player.setAbsorptionAmount(state.getAbsorptionAmount());
-        
-        // Clear and apply potion effects
-        for (PotionEffect effect : player.getActivePotionEffects()) {
-            player.removePotionEffect(effect.getType());
-        }
-        
-        for (PotionEffect effect : state.getActivePotionEffects()) {
-            player.addPotionEffect(effect);
-        }
-        
-        // Handle vehicle state
+        try { player.setAllowFlight(state.isAllowFlight()); } catch (Throwable ignored) {}
+        try { player.setFlying(state.isFlying()); } catch (Throwable ignored) {}
+
+        // Effects
         try {
-            if (player.isInsideVehicle() && player.getVehicle() != null) {
-                player.getVehicle().eject();
+            for (org.bukkit.potion.PotionEffect e : player.getActivePotionEffects()) player.removePotionEffect(e.getType());
+            if (state.getActivePotionEffects() != null) {
+                for (org.bukkit.potion.PotionEffect e : state.getActivePotionEffects()) player.addPotionEffect(e);
             }
-        } catch (Exception ignored) {}
-        // Do not attempt to re-mount the player onto the previous runner's vehicle.
-        // This can cross dimensions (Nether/End) and cause swap failures.
+        } catch (Throwable ignored) {}
 
-        // Apply speed settings
-        player.setWalkSpeed(state.getWalkSpeed());
-        player.setFlySpeed(state.getFlySpeed());
-
-        // Apply gliding state
-        player.setGliding(state.isGliding());
-
-        // Apply damage-related stats
-        player.setLastDamage(state.getLastDamage());
-        player.setNoDamageTicks(state.getNoDamageTicks());
-
-        // Apply portal cooldown
-        player.setPortalCooldown(state.getPortalCooldown());
-
-        // Update inventory
-        player.updateInventory();
+        // Misc
+        try { player.setAbsorptionAmount(state.getAbsorptionAmount()); } catch (Throwable ignored) {}
+        try { if (state.isGliding()) player.setGliding(true); } catch (Throwable ignored) {}
+        try { player.setTicksLived(state.getTicksLived()); } catch (Throwable ignored) {}
+        try { player.setNoDamageTicks(state.getNoDamageTicks()); } catch (Throwable ignored) {}
+        try { player.setWalkSpeed(state.getWalkSpeed()); } catch (Throwable ignored) {}
+        try { player.setFlySpeed(state.getFlySpeed()); } catch (Throwable ignored) {}
+        try { player.setPortalCooldown(state.getPortalCooldown()); } catch (Throwable ignored) {}
     }
 }

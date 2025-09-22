@@ -213,9 +213,9 @@ public class SwapCommand implements CommandExecutor, TabCompleter {
     }
     
     private boolean handleStop(CommandSender sender) {
-        if (!sender.hasPermission("speedrunnerswap.command")) {
-            sender.sendMessage("§cYou don't have permission to use this command.");
-            return false;
+        if (!sender.hasPermission("speedrunnerswap.admin")) {
+            sender.sendMessage("§cYou do not have permission to run this.");
+            return true;
         }
         
         if (!plugin.getGameManager().isGameRunning()) {
@@ -230,61 +230,29 @@ public class SwapCommand implements CommandExecutor, TabCompleter {
     }
     
     private boolean handlePause(CommandSender sender) {
-        if (!sender.hasPermission("speedrunnerswap.command")) {
-            sender.sendMessage("§cYou don't have permission to use this command.");
-            return false;
+        if (!sender.hasPermission("speedrunnerswap.admin")) {
+            sender.sendMessage("§cYou do not have permission to run this.");
+            return true;
         }
-        
-        if (!plugin.getGameManager().isGameRunning()) {
-            sender.sendMessage("§cThe game is not running.");
-            return false;
-        }
-        
-        if (plugin.getGameManager().isGamePaused()) {
-            sender.sendMessage("§cThe game is already paused.");
-            return false;
-        }
-        
-        boolean success = plugin.getGameManager().pauseGame();
-        if (success) {
-            sender.sendMessage("§aGame paused.");
-        } else {
-            sender.sendMessage("§cFailed to pause the game.");
-        }
-        
-        return success;
+        plugin.getGameManager().pauseGame();
+        sender.sendMessage("§eGame paused.");
+        return true;
     }
     
     private boolean handleResume(CommandSender sender) {
-        if (!sender.hasPermission("speedrunnerswap.command")) {
-            sender.sendMessage("§cYou don't have permission to use this command.");
-            return false;
+        if (!sender.hasPermission("speedrunnerswap.admin")) {
+            sender.sendMessage("§cYou do not have permission to run this.");
+            return true;
         }
-        
-        if (!plugin.getGameManager().isGameRunning()) {
-            sender.sendMessage("§cThe game is not running.");
-            return false;
-        }
-        
-        if (!plugin.getGameManager().isGamePaused()) {
-            sender.sendMessage("§cThe game is not paused.");
-            return false;
-        }
-        
-        boolean success = plugin.getGameManager().resumeGame();
-        if (success) {
-            sender.sendMessage("§aGame resumed.");
-        } else {
-            sender.sendMessage("§cFailed to resume the game.");
-        }
-        
-        return success;
+        plugin.getGameManager().resumeGame();
+        sender.sendMessage("§aGame resumed.");
+        return true;
     }
     
     private boolean handleStatus(CommandSender sender) {
-        if (!sender.hasPermission("speedrunnerswap.command")) {
-            sender.sendMessage("§cYou don't have permission to use this command.");
-            return false;
+        if (!sender.hasPermission("speedrunnerswap.admin")) {
+            sender.sendMessage("§cYou do not have permission to run this.");
+            return true;
         }
         
         sender.sendMessage("§6=== SpeedrunnerSwap Status ===");

@@ -46,22 +46,30 @@ public class EventListeners implements Listener {
                     Object s = serialize.invoke(serializer, comp);
                     if (s != null) return String.valueOf(s);
                 } catch (Throwable ignored) {
-                    // Fallback: common content() accessor or toString()
                     try {
                         java.lang.reflect.Method content = comp.getClass().getMethod("content");
-                        Object s2 = content.invoke(comp);
-                        if (s2 != null) return String.valueOf(s2);
-                    } catch (Throwable ignored2) {}
-                    return String.valueOf(comp);
+                        Object s = content.invoke(comp);
+                        if (s != null) return String.valueOf(s);
+                    } catch (Throwable alsoIgnored) {
+                        return String.valueOf(comp);
+                    }
                 }
             }
         } catch (Throwable ignored) {}
-        // Spigot's getTitle() via reflection
+
+        // Fallbacks in 1.21 API
         try {
-            java.lang.reflect.Method m2 = view.getClass().getMethod("getTitle");
-            Object s3 = m2.invoke(view);
-            return s3 != null ? String.valueOf(s3) : "";
+            java.lang.reflect.Method getTitle = view.getClass().getMethod("getTitle");
+            Object s = getTitle.invoke(view);
+            if (s != null) return String.valueOf(s);
         } catch (Throwable ignored) {}
+
+        try {
+            java.lang.reflect.Method getOrig = view.getClass().getMethod("getOriginalTitle");
+            Object s = getOrig.invoke(view);
+            if (s != null) return String.valueOf(s);
+        } catch (Throwable ignored) {}
+
         return "";
     }
     
@@ -72,10 +80,10 @@ public class EventListeners implements Listener {
         if (plugin.getGameManager() != null && plugin.getGameManager().isGameRunning()) {
             // Handle task mode rejoin logic and resume if needed
             plugin.getGameManager().handlePlayerJoin(player);
-            plugin.getGameManager().updateTeams();
-            // If the player is a hunter, give them a tracking compass
-            if (plugin.getGameManager().isHunter(player) && plugin.getTrackerManager() != null) {
-                plugin.getTrackerManager().giveTrackingCompass(player);
+            
+            // Initialize stats for late joiners if stats tracking is active
+            if (plugin.getConfig().getBoolean("stats.enabled", true)) {
+                plugin.getStatsManager().initializePlayerStats(player);
             }
         }
     }

@@ -36,6 +36,7 @@ public class AboutGuiListener implements Listener {
         String donateUrl = plugin.getConfig().getString("donation.url", "https://donate.stripe.com/8x29AT0H58K03judnR0Ba01");
         ChatTitleCompat.sendMessage(player, "§6§lControlSwap created by muj3b");
         ChatTitleCompat.sendClickableUrl(player, "§d§l❤ Donate: §r", donateUrl);
+        ChatTitleCompat.sendMessage(player, "§7(If the link isn't clickable, copy it from chat.)");
     }
 }
 

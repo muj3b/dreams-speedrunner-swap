@@ -66,21 +66,26 @@ public class StatsManager {
         return playerStats.computeIfAbsent(player.getUniqueId(), k -> new PlayerStats());
     }
 
+    /**
+     * Initialize stats for a player (useful for late joiners)
+     * @param player The player to initialize stats for
+     */
+    public void initializePlayerStats(Player player) {
+        getStats(player); // This will create the stats entry if it doesn't exist
+    }
+
     public void displayStats() {
         long gameDuration = System.currentTimeMillis() - gameStartTime;
-        
         Msg.broadcast("\n§6=== Game Statistics ===");
         Msg.broadcast("§7Total Game Time: §f" + formatTime(gameDuration));
-
-        for (Player player : Bukkit.getOnlinePlayers()) {
-            PlayerStats stats = getStats(player);
-            String role = plugin.getGameManager().isRunner(player) ? "Runner" : "Hunter";
-            
-            Msg.broadcast("\n§e" + player.getName() + " §7(" + role + ")");
-            Msg.broadcast("§7Time as Active: §f" + formatTime(stats.getActiveTime()));
-            Msg.broadcast("§7Distance Traveled: §f" + String.format("%.1f", stats.getDistanceTraveled()) + " blocks");
-            Msg.broadcast("§7Kills: §f" + stats.getKills());
-            Msg.broadcast("§7Deaths: §f" + stats.getDeaths());
+        for (java.util.Map.Entry<java.util.UUID, PlayerStats> e : playerStats.entrySet()) {
+            Player p = Bukkit.getPlayer(e.getKey());
+            if (p == null) continue;
+            PlayerStats s = e.getValue();
+            Msg.broadcast("§e" + p.getName() + " §7- Kills: §f" + s.getKills() +
+                    " §7Deaths: §f" + s.getDeaths() +
+                    " §7Active: §f" + formatTime(s.getActiveTime()) +
+                    " §7Distance: §f" + String.format(java.util.Locale.ROOT, "%.1f", s.getDistanceTraveled()) + "m");
         }
     }
 

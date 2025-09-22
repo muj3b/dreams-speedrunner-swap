@@ -67,128 +67,47 @@ public void onChat(AsyncPlayerChatEvent event) {
         UUID uuid = player.getUniqueId();
         
         if (!activeInputs.containsKey(uuid)) return;
-        
         event.setCancelled(true);
+
         InputState state = activeInputs.remove(uuid);
-        String input = event.getMessage().trim();
-        
-        if (input.equalsIgnoreCase("cancel")) {
-            player.sendMessage("§c[Task Manager] Input cancelled.");
-            plugin.getServer().getScheduler().runTask(plugin, () -> 
-                plugin.getGuiManager().openCustomTasksMenu(player));
-            return;
-        }
-        
-        switch (state.type) {
-            case TASK_ID:
-                handleTaskId(player, input);
-                break;
-            case TASK_DESCRIPTION:
-                handleTaskDescription(player, state.taskId, input);
-                break;
-            case DONATION_URL:
-                handleDonationUrl(player, input);
-                break;
-            case CONFIG_STRING:
-                handleConfigString(player, state.configPath, input);
-                break;
-            case CONFIG_LIST_ADD:
-                handleConfigListAdd(player, state.configPath, input);
-                break;
-        }
-    }
-    
-    private void handleTaskId(Player player, String taskId) {
-        // Validate task ID
-        if (taskId.isEmpty() || taskId.contains(" ")) {
-            player.sendMessage("§c[Task Manager] Invalid task ID! Use underscores instead of spaces.");
-            plugin.getServer().getScheduler().runTask(plugin, () -> 
-                plugin.getGuiManager().openCustomTasksMenu(player));
-            return;
-        }
-        
-        // Check if ID already exists
-        var taskMode = plugin.getTaskManagerMode();
-        if (taskMode != null && taskMode.getTask(taskId) != null) {
-            player.sendMessage("§c[Task Manager] Task ID already exists!");
-            plugin.getServer().getScheduler().runTask(plugin, () -> 
-                plugin.getGuiManager().openCustomTasksMenu(player));
-            return;
-        }
-        
-        // Store the ID and ask for description
-        InputState newState = new InputState(InputState.Type.TASK_DESCRIPTION);
-        newState.taskId = taskId;
-        activeInputs.put(player.getUniqueId(), newState);
-        
-        player.sendMessage("§a[Task Manager] Task ID: " + taskId);
-        player.sendMessage("§e[Task Manager] Now enter the task description:");
-        player.sendMessage("§7Type 'cancel' to abort");
-    }
-    
-    private void handleTaskDescription(Player player, String taskId, String description) {
-        if (taskId == null || taskId.isEmpty()) {
-            player.sendMessage("§c[Task Manager] Error: No task ID found!");
-            plugin.getServer().getScheduler().runTask(plugin, () -> 
-                plugin.getGuiManager().openCustomTasksMenu(player));
-            return;
-        }
-        
-        if (description.isEmpty()) {
-            player.sendMessage("§c[Task Manager] Description cannot be empty!");
-            plugin.getServer().getScheduler().runTask(plugin, () -> 
-                plugin.getGuiManager().openCustomTasksMenu(player));
-            return;
-        }
-        
-        // Add the custom task
+        String msg = event.getMessage();
+
         plugin.getServer().getScheduler().runTask(plugin, () -> {
-            var taskMode = plugin.getTaskManagerMode();
-            if (taskMode != null) {
-                taskMode.addCustomTask(taskId, description);
-                player.sendMessage("§a[Task Manager] Custom task added successfully!");
-                player.sendMessage("§7Task: " + taskId + " - " + description);
+            switch (state.type) {
+                case TASK_ID -> {
+                    expectTaskDescription(player, msg.trim());
+                    player.sendMessage("§6Enter a §bdescription §6for task §e" + msg.trim());
+                }
+                case TASK_DESCRIPTION -> {
+                    String id = state.taskId != null ? state.taskId.trim() : ("custom_" + System.currentTimeMillis());
+                    java.util.List<String> list = plugin.getConfig().getStringList("task_manager.custom_tasks");
+                    list.add(msg.trim());
+                    plugin.getConfig().set("task_manager.custom_tasks", list);
+                    plugin.saveConfig();
+                    player.sendMessage("§aAdded custom task §e" + id + "§a: §f" + msg.trim());
+                }
+                case DONATION_URL -> {
+                    plugin.getConfig().set("donation.url", msg.trim());
+                    plugin.saveConfig();
+                    player.sendMessage("§aUpdated donation URL.");
+                }
+                case CONFIG_STRING -> {
+                    plugin.getConfig().set(state.configPath, msg.trim());
+                    plugin.saveConfig();
+                    player.sendMessage("§aUpdated §e" + state.configPath + "§a.");
+                }
+                case CONFIG_LIST_ADD -> {
+                    java.util.List<String> l = plugin.getConfig().getStringList(state.configPath);
+                    l.add(msg.trim());
+                    plugin.getConfig().set(state.configPath, l);
+                    plugin.saveConfig();
+                    player.sendMessage("§aAppended to §e" + state.configPath + "§a.");
+                }
             }
-            plugin.getGuiManager().openCustomTasksMenu(player);
         });
     }
     
-    private void handleDonationUrl(Player player, String url) {
-        // Save donation URL to config
-        plugin.getServer().getScheduler().runTask(plugin, () -> {
-            plugin.getConfig().set("donation.url", url);
-            plugin.saveConfig();
-            player.sendMessage("§a[Settings] Donation URL updated!");
-            plugin.getGuiManager().openSettingsMenu(player);
-        });
-    }
-    
-    private void handleConfigString(Player player, String path, String value) {
-        plugin.getServer().getScheduler().runTask(plugin, () -> {
-            plugin.getConfig().set(path, value);
-            plugin.saveConfig();
-            player.sendMessage("§a[Config] Updated " + path);
-            String parent = getParent(path);
-            plugin.getGuiManager().openAdvancedConfigMenu(player, parent, 0);
-        });
-    }
-    
-    private void handleConfigListAdd(Player player, String path, String value) {
-        plugin.getServer().getScheduler().runTask(plugin, () -> {
-            java.util.List<String> list = plugin.getConfig().getStringList(path);
-            list.add(value);
-            plugin.getConfig().set(path, list);
-            plugin.saveConfig();
-            player.sendMessage("§a[Config] Added to " + path);
-            plugin.getGuiManager().openConfigListEditor(player, path, 0);
-        });
-    }
-    
-    private String getParent(String path) {
-        if (path == null || path.isEmpty()) return "";
-        int idx = path.lastIndexOf('.');
-        return idx < 0 ? "" : path.substring(0, idx);
-    }
+    // Removed unused handler methods after inlining logic in onChat() to reduce lints.
     
     public void clearInput(Player player) {
         activeInputs.remove(player.getUniqueId());

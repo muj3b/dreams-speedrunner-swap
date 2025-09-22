@@ -70,18 +70,18 @@ public class WorldBorderManager {
             borderWarningTask = null;
         }
 
-        // Schedule periodic warnings about border size
+        // Schedule periodic warnings about border size with configurable interval
+        int warnEverySec = Math.max(30, plugin.getConfig().getInt("world_border.warning_interval", 120));
+        long period = warnEverySec * 20L;
         borderWarningTask = Bukkit.getScheduler().runTaskTimer(plugin, () -> {
             if (!isActive) return;
-
-            World overworld = Bukkit.getWorlds().get(0);
-            double currentSize = overworld.getWorldBorder().getSize();
-            int finalSize = plugin.getConfig().getInt("world_border.final_size", 100);
-            
-            if (currentSize > finalSize) {
-                Msg.broadcast(String.format("§e§lWorld Border: §r§e%.0f blocks and shrinking!", currentSize));
-            }
-        }, 20 * 60 * 5, 20 * 60 * 5); // Every 5 minutes
+            try {
+                for (World world : Bukkit.getWorlds()) {
+                    double size = world.getWorldBorder().getSize();
+                    Msg.broadcast("§eWorld Border current size: §f" + (int) size + "§e blocks.");
+                }
+            } catch (Throwable ignored) {}
+        }, period, period);
     }
 
     public boolean isActive() {

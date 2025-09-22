@@ -70,7 +70,7 @@ public class ConfigManager {
      * Maximum allowed swap interval for UI enforcement (default 600s)
      */
     public int getSwapIntervalMax() {
-        return config.getInt("swap.max_interval", 90);
+        return config.getInt("swap.max_interval", 600);
     }
 
     /**

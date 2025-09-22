@@ -1142,6 +1142,13 @@ public class GameManager {
         if (titleTask != null) {
             titleTask.cancel();
         }
+        // Apply a brief heavy slowness to current active runner as a visual pause cue
+        Player ar = getActiveRunner();
+        if (ar != null) {
+            try { ar.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS, 60, 10, false, false)); } catch (Throwable ignored) {}
+        }
+        // Broadcast pause
+        Msg.broadcast("§e§lGame paused by admin.");
         return true;
     }
 
@@ -1158,6 +1165,8 @@ public class GameManager {
         startActionBarUpdates();
         startTitleUpdates();
         startCageEnforcement();
+        // Broadcast resume
+        Msg.broadcast("§a§lGame resumed.");
         return true;
     }
 

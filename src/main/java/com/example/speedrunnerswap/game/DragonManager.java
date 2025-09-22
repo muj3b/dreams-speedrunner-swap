@@ -63,12 +63,10 @@ public class DragonManager implements Listener {
                 for (Entity entity : world.getEntities()) {
                     if (entity instanceof EnderDragon dragon) {
                         Double savedHealth = dragonHealthCache.get(dragon.getUniqueId());
-                        if (savedHealth != null) {
-                            // Only restore if the dragon hasn't been naturally damaged/healed recently
-                            Long lastUpdate = lastHealthUpdate.get(dragon.getUniqueId());
-                            if (lastUpdate != null && System.currentTimeMillis() - lastUpdate < 1000) {
-                                dragon.setHealth(savedHealth);
-                            }
+                        if (savedHealth != null && isSwapInProgress) {
+                            double max = com.example.speedrunnerswap.utils.BukkitCompat.getMaxHealthValue(dragon);
+                            double clamped = Math.max(1.0D, Math.min(max, savedHealth));
+                            try { dragon.setHealth(clamped); } catch (Throwable ignored) {}
                         }
                     }
                 }

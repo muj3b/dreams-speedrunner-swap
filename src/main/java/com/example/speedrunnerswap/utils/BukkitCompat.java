@@ -62,11 +62,14 @@ public final class BukkitCompat {
         // Normalize common legacy aliases to modern names
         key = switch (key) {
             case "increase_damage" -> "strength";
-            case "damage_resistance" -> "resistance";
-            case "slow" -> "slowness";
+            case "damage_resistance", "resistance" -> "resistance";
+            case "slow", "slowness" -> "slowness";
             case "jump" -> "jump_boost";
             case "slow_digging" -> "mining_fatigue";
-            case "confusion" -> "nausea";
+            case "confusion", "nausea" -> "nausea";
+            case "glow", "glowing" -> "glowing";
+            case "dolphin", "dolphins_grace" -> "dolphins_grace";
+            case "hero_of_the_village", "hov" -> "hero_of_the_village";
             default -> key;
         };
 

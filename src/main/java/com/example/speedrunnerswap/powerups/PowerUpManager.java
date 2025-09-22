@@ -59,9 +59,15 @@ public class PowerUpManager {
             formatEffectName(selectedEffect.getKey().getKey()) + " " + (amplifier + 1));
     }
 
-    private String formatEffectName(String name) {
-        return name.substring(0, 1).toUpperCase() + 
-               name.substring(1).toLowerCase().replace("_", " ");
+    private String formatEffectName(String key) {
+        if (key == null || key.isEmpty()) return "";
+        String[] parts = key.split("_");
+        StringBuilder sb = new StringBuilder();
+        for (String p : parts) {
+            if (p.isEmpty()) continue;
+            sb.append(Character.toUpperCase(p.charAt(0))).append(p.substring(1)).append(' ');
+        }
+        return sb.toString().trim();
     }
 
     private PotionEffectType[] getConfiguredPool(boolean positive) {

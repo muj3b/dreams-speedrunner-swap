@@ -24,6 +24,7 @@ public class ActionBarUtil {
         } catch (Throwable ignored) {
         }
 
+        // NOTE: Fallback deliberately avoids ChatMessageType.ACTION_BAR to preserve cross-compat with Spigot/Paper 1.21 changes
         // Fallback: send as plain chat (keeps compatibility, avoids legacy bungee API)
         player.sendMessage(message);
     }

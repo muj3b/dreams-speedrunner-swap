@@ -14,7 +14,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class AboutGui {
-    private static final String TITLE = "ControlSwap — About";
+    private static final String TITLE = "ControlSwap — About (1.21 UI)";
 
     public AboutGui() {}
 
