@@ -1219,8 +1219,8 @@ public class GuiManager {
             List.of("§7Direct access to all config values",
                     "§7Edit any setting not in main GUI"), "advanced_config_root"));
 
-        // Reset to Defaults
-        inventory.setItem(53, createGuiButton(Material.BARRIER, "§c§lReset All Settings",
+        // Reset to Defaults (place at 45 to avoid overriding Advanced Config)
+        inventory.setItem(45, createGuiButton(Material.BARRIER, "§c§lReset All Settings",
             List.of("§7Reset all settings to defaults",
                     "§cThis cannot be undone!"),
             "reset_all_settings"));
@@ -1573,6 +1573,46 @@ public class GuiManager {
         return s.substring(0, n - 1) + "…";
     }
     
+    // Cross-version safe way to get the plain title of the open inventory for the first viewer
+    private String getOpenInventoryPlainTitle(Inventory inventory) {
+        try {
+            if (inventory == null || inventory.getViewers().isEmpty()) return "";
+            var viewer = inventory.getViewers().get(0);
+            var view = viewer.getOpenInventory();
+            if (view == null) return "";
+            // Try Paper's title() via reflection
+            try {
+                java.lang.reflect.Method m = view.getClass().getMethod("title");
+                Object comp = m.invoke(view);
+                if (comp != null) {
+                    try {
+                        Class<?> serCls = Class.forName("net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer");
+                        java.lang.reflect.Method plainText = serCls.getMethod("plainText");
+                        Object serializer = plainText.invoke(null);
+                        Class<?> componentCls = Class.forName("net.kyori.adventure.text.Component");
+                        java.lang.reflect.Method serialize = serializer.getClass().getMethod("serialize", componentCls);
+                        Object s = serialize.invoke(serializer, comp);
+                        if (s != null) return String.valueOf(s);
+                    } catch (Throwable ignored) {
+                        try {
+                            java.lang.reflect.Method content = comp.getClass().getMethod("content");
+                            Object s2 = content.invoke(comp);
+                            if (s2 != null) return String.valueOf(s2);
+                        } catch (Throwable ignored2) {}
+                        return String.valueOf(comp);
+                    }
+                }
+            } catch (Throwable ignored) {}
+            // Spigot-style getTitle()
+            try {
+                java.lang.reflect.Method m2 = view.getClass().getMethod("getTitle");
+                Object s3 = m2.invoke(view);
+                return s3 != null ? String.valueOf(s3) : "";
+            } catch (Throwable ignored) {}
+        } catch (Throwable ignored) {}
+        return "";
+    }
+    
     // Helper methods for menu identification
     private boolean isItem(ItemStack item, Material material, String name) {
         if (item == null || item.getType() != material || !item.hasItemMeta()) {
@@ -1586,7 +1626,7 @@ public class GuiManager {
         if (inventory == null || inventory.getHolder() != null || inventory.getViewers().isEmpty()) {
             return false;
         }
-        String title = net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer.plainText().serialize(inventory.getViewers().get(0).getOpenInventory().title());
+        String title = getOpenInventoryPlainTitle(inventory);
         return plugin.getConfigManager().getGuiMainMenuTitle().equals(title);
     }
     
@@ -1594,7 +1634,7 @@ public class GuiManager {
         if (inventory == null || inventory.getHolder() != null || inventory.getViewers().isEmpty()) {
             return false;
         }
-        String title = net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer.plainText().serialize(inventory.getViewers().get(0).getOpenInventory().title());
+        String title = getOpenInventoryPlainTitle(inventory);
         return plugin.getConfigManager().getGuiTeamSelectorTitle().equals(title);
     }
     
@@ -1602,7 +1642,7 @@ public class GuiManager {
         if (inventory == null || inventory.getHolder() != null || inventory.getViewers().isEmpty()) {
             return false;
         }
-        String title = net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer.plainText().serialize(inventory.getViewers().get(0).getOpenInventory().title());
+        String title = getOpenInventoryPlainTitle(inventory);
         return plugin.getConfigManager().getGuiSettingsTitle().equals(title);
     }
     

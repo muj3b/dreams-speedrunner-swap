@@ -29,19 +29,38 @@ public class EventListeners implements Listener {
         this.plugin = plugin;
     }
 
-    // Cross-version safe title extractor (Paper Component or Spigot String)
+    // Cross-version safe title extractor (reflection; no compile-time kyori dependency)
     private String getPlainTitle(org.bukkit.inventory.InventoryView view) {
         if (view == null) return "";
+        // Try Paper's title() via reflection first
         try {
-            // Paper: Component title()
-            net.kyori.adventure.text.Component comp = view.title();
-            return comp != null ? net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer.plainText().serialize(comp) : "";
+            java.lang.reflect.Method m = view.getClass().getMethod("title");
+            Object comp = m.invoke(view);
+            if (comp != null) {
+                try {
+                    Class<?> serCls = Class.forName("net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer");
+                    java.lang.reflect.Method plainText = serCls.getMethod("plainText");
+                    Object serializer = plainText.invoke(null);
+                    Class<?> componentCls = Class.forName("net.kyori.adventure.text.Component");
+                    java.lang.reflect.Method serialize = serializer.getClass().getMethod("serialize", componentCls);
+                    Object s = serialize.invoke(serializer, comp);
+                    if (s != null) return String.valueOf(s);
+                } catch (Throwable ignored) {
+                    // Fallback: common content() accessor or toString()
+                    try {
+                        java.lang.reflect.Method content = comp.getClass().getMethod("content");
+                        Object s2 = content.invoke(comp);
+                        if (s2 != null) return String.valueOf(s2);
+                    } catch (Throwable ignored2) {}
+                    return String.valueOf(comp);
+                }
+            }
         } catch (Throwable ignored) {}
+        // Spigot's getTitle() via reflection
         try {
-            // Spigot: String getTitle()
-            java.lang.reflect.Method m = view.getClass().getMethod("getTitle");
-            Object s = m.invoke(view);
-            return s != null ? String.valueOf(s) : "";
+            java.lang.reflect.Method m2 = view.getClass().getMethod("getTitle");
+            Object s3 = m2.invoke(view);
+            return s3 != null ? String.valueOf(s3) : "";
         } catch (Throwable ignored) {}
         return "";
     }

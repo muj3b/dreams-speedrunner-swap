@@ -2,7 +2,6 @@ package com.example.speedrunnerswap.gui;
 
 import com.example.speedrunnerswap.SpeedrunnerSwap;
 import org.bukkit.Bukkit;
-import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
@@ -38,27 +37,14 @@ public class GuiListener implements Listener {
         // Always cancel any click when a plugin GUI is open (regardless of item)
         if (isPluginGui(title)) {
             event.setCancelled(true);
-            // Extra safety: deny result and block ALL risky actions
             event.setResult(org.bukkit.event.Event.Result.DENY);
-            
-            // Block ALL inventory actions that could move items
-            org.bukkit.event.inventory.InventoryAction action = event.getAction();
-            org.bukkit.event.inventory.ClickType click = event.getClick();
-            
-            // Completely block any item movement attempts
-            if (click.isKeyboardClick() || click.isShiftClick() ||
-                action.name().contains("HOTBAR") || action.name().contains("MOVE_TO_OTHER_INVENTORY") ||
-                action.name().contains("COLLECT") || action.name().contains("DROP") ||
-                action.name().contains("PICKUP") || action.name().contains("PLACE") ||
-                action.name().contains("SWAP") || action.name().contains("CLONE")) {
+
+            // Only handle clicks in the top inventory; always block bottom/player inventory
+            int topSize = event.getView().getTopInventory().getSize();
+            if (event.getRawSlot() >= topSize) {
                 return;
             }
-            
-            // Block clicks in player inventory when GUI is open
-            if (event.getRawSlot() >= event.getView().getTopInventory().getSize()) {
-                return;
-            }
-            
+
             ItemStack clickedItem = event.getCurrentItem();
 
             // Admin permission check
@@ -91,19 +77,38 @@ public class GuiListener implements Listener {
         }
     }
 
-    // Cross-version safe title extractor (Paper Component or Spigot String)
+    // Cross-version safe title extractor without compile-time kyori dependency
     private String getPlainTitle(org.bukkit.inventory.InventoryView view) {
         if (view == null) return "";
+        // Try Paper's title() via reflection, then fall back to getTitle() and toString()
         try {
-            // Paper: Component title()
-            net.kyori.adventure.text.Component comp = view.title();
-            return comp != null ? PlainTextComponentSerializer.plainText().serialize(comp) : "";
+            java.lang.reflect.Method m = view.getClass().getMethod("title");
+            Object comp = m.invoke(view);
+            if (comp != null) {
+                // Try Adventure PlainTextComponentSerializer via reflection
+                try {
+                    Class<?> serCls = Class.forName("net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer");
+                    java.lang.reflect.Method plainText = serCls.getMethod("plainText");
+                    Object serializer = plainText.invoke(null);
+                    Class<?> componentCls = Class.forName("net.kyori.adventure.text.Component");
+                    java.lang.reflect.Method serialize = serializer.getClass().getMethod("serialize", componentCls);
+                    Object s = serialize.invoke(serializer, comp);
+                    if (s != null) return String.valueOf(s);
+                } catch (Throwable ignored) {
+                    // Fallback: try common "content" accessor or toString
+                    try {
+                        java.lang.reflect.Method content = comp.getClass().getMethod("content");
+                        Object s = content.invoke(comp);
+                        if (s != null) return String.valueOf(s);
+                    } catch (Throwable ignored2) {}
+                    return String.valueOf(comp);
+                }
+            }
         } catch (Throwable ignored) {}
         try {
-            // Spigot: String getTitle()
-            java.lang.reflect.Method m = view.getClass().getMethod("getTitle");
-            Object s = m.invoke(view);
-            return s != null ? String.valueOf(s) : "";
+            java.lang.reflect.Method m2 = view.getClass().getMethod("getTitle");
+            Object s2 = m2.invoke(view);
+            return s2 != null ? String.valueOf(s2) : "";
         } catch (Throwable ignored) {}
         return "";
     }
@@ -119,14 +124,17 @@ public class GuiListener implements Listener {
         if (title == null || title.isEmpty()) return false;
         // Include all plugin menus and the kit editor
         return title.contains("SpeedrunnerSwap") ||
+               title.contains("Speedrunner Swap") ||
                title.contains("Mode Selector") ||
                title.contains("Choose Gamemode") ||
+               title.contains("Mode Selection") ||
                title.contains("Confirm Mode Switch") ||
                title.contains("Main Menu") ||
                title.contains("Team Selector") ||
                title.contains("Settings") ||
                title.contains("Kits") ||
                (title.contains("Edit ") && title.contains(" Kit")) ||
+               title.contains("Kit Editor") ||
                title.contains("Effects") ||
                title.contains("Power-ups") ||
                title.contains("Power-up Durations") ||
@@ -136,6 +144,7 @@ public class GuiListener implements Listener {
                title.contains("Compass") ||
                title.contains("Sudden Death") ||
                title.contains("Statistics") ||
+               title.contains("Statistics & Tracking") ||
                title.contains("Dangerous Blocks") ||
                title.contains("Custom Tasks") ||
                // Add explicit mode menus and per-mode settings
@@ -202,6 +211,11 @@ public class GuiListener implements Listener {
                     guiManager.openMainMenu(player);
                     return;
                 }
+                case "broadcast_settings" -> { guiManager.openBroadcastSettingsMenu(player); return; }
+                case "limbo_settings" -> { guiManager.openLimboSettingsMenu(player); return; }
+                case "ui_performance" -> { guiManager.openUIPerformanceMenu(player); return; }
+                case "custom_tasks_menu" -> { guiManager.openCustomTasksMenu(player); return; }
+                case "dangerous_blocks" -> { guiManager.openDangerousBlocksMenu(player); return; }
             }
         }
 
@@ -507,23 +521,70 @@ public class GuiListener implements Listener {
         String buttonId = getButtonId(clicked);
         if (buttonId != null) {
             switch (buttonId) {
+                case "back_main": {
+                    guiManager.openMainMenu(player);
+                    return;
+                }
                 case "swap_interval": {
-                    // No-op: interval is adjusted via ±5s arrows to keep UI concise
+                    // No-op: interval is adjusted via ±5s arrows
+                    break;
+                }
+                case "interval_minus": {
+                    int current = plugin.getConfigManager().getSwapInterval();
+                    boolean beta = plugin.getConfigManager().isBetaIntervalEnabled();
+                    int minAllowed = beta ? 10 : plugin.getConfigManager().getMinSwapInterval();
+                    int maxAllowed = plugin.getConfigManager().getSwapIntervalMax();
+                    int val = Math.max(minAllowed, current - 5);
+                    if (!beta) val = Math.min(maxAllowed, val);
+                    plugin.getConfigManager().setSwapInterval(val);
+                    if (plugin.getGameManager().isGameRunning()) plugin.getGameManager().refreshSwapSchedule();
+                    break;
+                }
+                case "interval_plus": {
+                    int current = plugin.getConfigManager().getSwapInterval();
+                    boolean beta = plugin.getConfigManager().isBetaIntervalEnabled();
+                    int minAllowed = beta ? 10 : plugin.getConfigManager().getMinSwapInterval();
+                    int maxAllowed = plugin.getConfigManager().getSwapIntervalMax();
+                    int val = current + 5;
+                    val = Math.max(minAllowed, val);
+                    if (!beta) val = Math.min(maxAllowed, val);
+                    plugin.getConfigManager().setSwapInterval(val);
+                    if (plugin.getGameManager().isGameRunning()) plugin.getGameManager().refreshSwapSchedule();
                     break;
                 }
                 case "random_swaps":
                     toggleRandomSwaps(player);
                     break;
+                case "beta_intervals": {
+                    boolean en = plugin.getConfigManager().isBetaIntervalEnabled();
+                    plugin.getConfigManager().setBetaIntervalEnabled(!en);
+                    break;
+                }
+                case "random_range": {
+                    int min = plugin.getConfigManager().getMinSwapInterval();
+                    int max = plugin.getConfigManager().getMaxSwapInterval();
+                    int delta = event.isShiftClick() ? 15 : 5;
+                    if (event.isLeftClick()) {
+                        min = Math.max(1, Math.min(min + delta, max));
+                        plugin.getConfig().set("swap.min_interval", min);
+                    }
+                    if (event.isRightClick()) {
+                        max = Math.max(min, max - delta);
+                        plugin.getConfig().set("swap.max_interval", max);
+                    }
+                    plugin.saveConfig();
+                    break;
+                }
                 case "safe_swaps":
                     toggleSafeSwaps(player);
                     break;
-                case "pause_on_disconnect": {
+                case "pause_disconnect": {
                     boolean enabled = plugin.getConfigManager().isPauseOnDisconnect();
                     plugin.getConfig().set("swap.pause_on_disconnect", !enabled);
                     plugin.saveConfig();
                     break;
                 }
-                case "hunter_swap_toggle": {
+                case "hunter_swap": {
                     boolean enabled = plugin.getConfigManager().isHunterSwapEnabled();
                     plugin.getConfig().set("swap.hunter_swap.enabled", !enabled);
                     plugin.saveConfig();
@@ -539,13 +600,13 @@ public class GuiListener implements Listener {
                     plugin.saveConfig();
                     break;
                 }
-                case "hot_potato_toggle": {
+                case "hot_potato": {
                     boolean enabled = plugin.getConfigManager().isHotPotatoModeEnabled();
                     plugin.getConfig().set("swap.hot_potato_mode.enabled", !enabled);
                     plugin.saveConfig();
                     break;
                 }
-                case "single_player_sleep_toggle": {
+                case "single_sleep": {
                     boolean enabled = plugin.getConfigManager().isSinglePlayerSleepEnabled();
                     plugin.getConfigManager().setSinglePlayerSleepEnabled(!enabled);
                     player.sendMessage("§eSingle Player Sleep: " + (!enabled ? "§aEnabled" : "§cDisabled"));
@@ -698,11 +759,11 @@ public class GuiListener implements Listener {
                     plugin.saveConfig();
                     break;
                 }
-                case "safe_dangerous_blocks": {
+                case "dangerous_blocks": {
                     guiManager.openDangerousBlocksMenu(player);
                     break;
                 }
-                case "voice_chat_enabled_toggle": {
+                case "voice_chat": {
                     boolean enabled = plugin.getConfigManager().isVoiceChatIntegrationEnabled();
                     plugin.getConfigManager().setVoiceChatIntegrationEnabled(!enabled);
                     break;
@@ -711,6 +772,11 @@ public class GuiListener implements Listener {
                     boolean enabled = plugin.getConfigManager().isMuteInactiveRunners();
                     plugin.getConfig().set("voice_chat.mute_inactive_runners", !enabled);
                     plugin.saveConfig();
+                    break;
+                }
+                case "reset_all_settings": {
+                    player.sendMessage("§c[Settings] Reset All Settings is not yet confirmed via GUI to avoid accidental resets.");
+                    player.sendMessage("§7Use config.yml or ask to add a confirmation flow.");
                     break;
                 }
                 case "ui_actionbar_ticks": {
@@ -770,38 +836,7 @@ public class GuiListener implements Listener {
                     plugin.getConfigManager().setModeDefaultInterval(plugin.getCurrentMode(), curr);
                     break;
                 }
-                case "custom_tasks_menu": {
-                    guiManager.openCustomTasksMenu(player);
-                    return; // Don't refresh settings menu
-                }
-                case "task_settings": {
-                    guiManager.openTaskSettingsMenu(player);
-                    return;
-                }
-                case "dream_settings": {
-                    guiManager.openDreamSettingsMenu(player);
-                    return;
-                }
-                case "dangerous_blocks": {
-                    guiManager.openDangerousBlocksMenu(player);
-                    return;
-                }
-                case "broadcast_settings": {
-                    guiManager.openBroadcastSettingsMenu(player);
-                    return;
-                }
-                case "limbo_settings": {
-                    guiManager.openLimboSettingsMenu(player);
-                    return;
-                }
-                case "ui_performance": {
-                    guiManager.openUIPerformanceMenu(player);
-                    return;
-                }
-                case "advanced_config_root": {
-                    guiManager.openAdvancedConfigMenu(player, "", 0);
-                    return;
-                }
+                // duplicate routing cases removed (handled in early routing or above)
             }
         } else {
             // Handle timer visibility clocks and ±5s arrows (created without explicit IDs)
@@ -896,7 +931,7 @@ public class GuiListener implements Listener {
             return;
         }
 
-        String name = PlainTextComponentSerializer.plainText().serialize(clicked.getItemMeta().displayName());
+        String name = com.example.speedrunnerswap.utils.GuiCompat.getDisplayName(clicked.getItemMeta());
 
         // Select assignment team - check mode restrictions
         com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode currentMode = plugin.getCurrentMode();
@@ -961,7 +996,7 @@ public class GuiListener implements Listener {
         ItemStack clicked = event.getCurrentItem();
         if (clicked == null || !clicked.hasItemMeta()) return;
 
-        String name = PlainTextComponentSerializer.plainText().serialize(clicked.getItemMeta().displayName());
+        String name = com.example.speedrunnerswap.utils.GuiCompat.getDisplayName(clicked.getItemMeta());
 
         if ("§e§lToggle Power-ups".equals(name)) {
             boolean current = plugin.getConfigManager().isPowerUpsEnabled();
@@ -1003,7 +1038,7 @@ public class GuiListener implements Listener {
         Player player = (Player) event.getWhoClicked();
         ItemStack clicked = event.getCurrentItem();
         if (clicked == null || !clicked.hasItemMeta()) return;
-        String name = PlainTextComponentSerializer.plainText().serialize(clicked.getItemMeta().displayName());
+        String name = com.example.speedrunnerswap.utils.GuiCompat.getDisplayName(clicked.getItemMeta());
 
         boolean changed = false;
         switch (name) {
@@ -1052,7 +1087,7 @@ public class GuiListener implements Listener {
         Player player = (Player) event.getWhoClicked();
         ItemStack clicked = event.getCurrentItem();
         if (clicked == null || !clicked.hasItemMeta()) return;
-        String name = PlainTextComponentSerializer.plainText().serialize(clicked.getItemMeta().displayName());
+        String name = com.example.speedrunnerswap.utils.GuiCompat.getDisplayName(clicked.getItemMeta());
         if (isBackButton(clicked)) {
             guiManager.openSettingsMenu(player);
             return;
@@ -1079,7 +1114,7 @@ public class GuiListener implements Listener {
         ItemStack clicked = event.getCurrentItem();
         if (clicked == null || !clicked.hasItemMeta()) return;
 
-        String name = PlainTextComponentSerializer.plainText().serialize(clicked.getItemMeta().displayName());
+        String name = com.example.speedrunnerswap.utils.GuiCompat.getDisplayName(clicked.getItemMeta());
         boolean changed = false;
 
         switch (name) {
@@ -1153,7 +1188,7 @@ public class GuiListener implements Listener {
         ItemStack clicked = event.getCurrentItem();
         if (clicked == null || !clicked.hasItemMeta()) return;
 
-        String name = PlainTextComponentSerializer.plainText().serialize(clicked.getItemMeta().displayName());
+        String name = com.example.speedrunnerswap.utils.GuiCompat.getDisplayName(clicked.getItemMeta());
 
         switch (name) {
             case "§e§lKits: §aEnabled", "§e§lKits: §cDisabled" -> {
@@ -1173,7 +1208,7 @@ public class GuiListener implements Listener {
         Player player = (Player) event.getWhoClicked();
         ItemStack clicked = event.getCurrentItem();
         if (clicked == null || !clicked.hasItemMeta()) return;
-        String name = PlainTextComponentSerializer.plainText().serialize(clicked.getItemMeta().displayName());
+        String name = com.example.speedrunnerswap.utils.GuiCompat.getDisplayName(clicked.getItemMeta());
 
         if (name.contains("Bounty Status")) {
             boolean enabled = plugin.getConfig().getBoolean("bounty.enabled", true);
@@ -1285,7 +1320,7 @@ public class GuiListener implements Listener {
         }
         
         // Fallback to old display name handling
-        String name = PlainTextComponentSerializer.plainText().serialize(clicked.getItemMeta().displayName());
+        String name = com.example.speedrunnerswap.utils.GuiCompat.getDisplayName(clicked.getItemMeta());
         switch (name) {
             case "§e§lLast Stand: §aEnabled", "§e§lLast Stand: §cDisabled" -> {
                 boolean enabled = plugin.getConfigManager().isLastStandEnabled();
@@ -1328,7 +1363,7 @@ public class GuiListener implements Listener {
         Player player = (Player) event.getWhoClicked();
         ItemStack clicked = event.getCurrentItem();
         if (clicked == null || !clicked.hasItemMeta()) return;
-        String name = PlainTextComponentSerializer.plainText().serialize(clicked.getItemMeta().displayName());
+        String name = com.example.speedrunnerswap.utils.GuiCompat.getDisplayName(clicked.getItemMeta());
 
         switch (name) {
             case "§e§lCompass Jamming: §aEnabled", "§e§lCompass Jamming: §cDisabled" -> {
@@ -1421,7 +1456,7 @@ public class GuiListener implements Listener {
         }
         
         // Fallback to old display name handling 
-        String name = PlainTextComponentSerializer.plainText().serialize(clicked.getItemMeta().displayName());
+        String name = com.example.speedrunnerswap.utils.GuiCompat.getDisplayName(clicked.getItemMeta());
         switch (name) {
             case "§4§lSudden Death: §aActive" -> {
                 // Toggle off
@@ -1455,11 +1490,11 @@ public class GuiListener implements Listener {
         ItemStack clicked = event.getCurrentItem();
         if (clicked == null || !clicked.hasItemMeta()) return;
 
-        String name = PlainTextComponentSerializer.plainText().serialize(clicked.getItemMeta().displayName());
+        String name = com.example.speedrunnerswap.utils.GuiCompat.getDisplayName(clicked.getItemMeta());
         if (!name.equals("§a§lSave Kit")) return;
 
         // Extract kit type from title: "§e§lEdit <kit> Kit"
-        String plainTitle = PlainTextComponentSerializer.plainText().serialize(event.getView().title());
+        String plainTitle = getPlainTitle(event.getView());
         String kitType = "runner";
         int idxEdit = plainTitle.indexOf("Edit ");
         int idxKit = plainTitle.indexOf(" Kit");
@@ -1495,7 +1530,7 @@ public class GuiListener implements Listener {
         Player player = (Player) event.getWhoClicked();
         ItemStack clicked = event.getCurrentItem();
         if (clicked == null || !clicked.hasItemMeta()) return;
-        String name = PlainTextComponentSerializer.plainText().serialize(clicked.getItemMeta().displayName());
+        String name = com.example.speedrunnerswap.utils.GuiCompat.getDisplayName(clicked.getItemMeta());
         
         if (name.equals("§7§lBack")) {
             guiManager.openSettingsMenu(player);
@@ -1533,16 +1568,17 @@ public class GuiListener implements Listener {
         ItemStack clicked = event.getCurrentItem();
         if (clicked == null || !clicked.hasItemMeta()) return;
         String id = getButtonId(clicked);
-        if (id == null) {
-            // Back to settings via back button name
-            String name = PlainTextComponentSerializer.plainText().serialize(clicked.getItemMeta().displayName());
-            if ("§7§lBack".equals(name)) {
-                guiManager.openSettingsMenu(player);
-            }
-            return;
-        }
+        if (id == null) return;
+
         try {
-            if (id.equals("back_settings")) { guiManager.openSettingsMenu(player); return; }
+            if ("back_settings".equals(id)) {
+                guiManager.openSettingsMenu(player);
+                return;
+            }
+            if ("advanced_config_root".equals(id)) {
+                guiManager.openAdvancedConfigMenu(player, "", 0);
+                return;
+            }
             if (id.startsWith("cfg:nav:")) {
                 String path = id.substring("cfg:nav:".length());
                 guiManager.openAdvancedConfigMenu(player, path, 0);
@@ -1566,18 +1602,19 @@ public class GuiListener implements Listener {
             }
             if (id.startsWith("cfg:num:")) {
                 String path = id.substring("cfg:num:".length());
-                Number n = (Number) plugin.getConfig().get(path);
-                double val = n == null ? 0 : n.doubleValue();
-                double delta = (event.isShiftClick() ? 10 : 1) * (event.isRightClick() ? -1 : 1);
-                double next = val + delta;
-                // Write back preserving type
-                Object toSet;
-                if (n instanceof Integer || n instanceof Long || (n == null && path.toLowerCase().contains("ticks"))) {
-                    toSet = (long) Math.round(next);
+                Object val = plugin.getConfig().get(path);
+                // Use double for general numeric handling; store as int if original is integer-like
+                double num = 0;
+                if (val instanceof Number n) num = n.doubleValue();
+                double delta = event.isShiftClick() ? 10 : 1;
+                if (event.isLeftClick()) num += delta;
+                if (event.isRightClick()) num -= delta;
+                // If original was integer-like, round to nearest int
+                if (val instanceof Integer || (Math.rint(num) == num)) {
+                    plugin.getConfig().set(path, (int) Math.round(num));
                 } else {
-                    toSet = next;
+                    plugin.getConfig().set(path, num);
                 }
-                plugin.getConfig().set(path, toSet);
                 plugin.saveConfig();
                 guiManager.openAdvancedConfigMenu(player, getParentPath(path), 0);
                 return;
@@ -1586,7 +1623,7 @@ public class GuiListener implements Listener {
                 String path = id.substring("cfg:str:".length());
                 plugin.getChatInputHandler().expectConfigString(player, path);
                 player.closeInventory();
-                player.sendMessage("§e[Config] Enter new value for " + path + " §7(type 'cancel' to abort)");
+                player.sendMessage("§e[Config] Enter new value for §f" + path + " §7(type 'cancel' to abort)");
                 return;
             }
             if (id.startsWith("cfg:list:")) {
@@ -1594,43 +1631,29 @@ public class GuiListener implements Listener {
                 guiManager.openConfigListEditor(player, path, 0);
                 return;
             }
-        } catch (Exception ignored) {}
+        } catch (Exception ex) {
+            player.sendMessage("§c[Config] Error: " + ex.getMessage());
+        }
     }
-    
-    private String getParentPath(String path) {
-        if (path == null || path.isEmpty()) return "";
-        int idx = path.lastIndexOf(':') >= 0 ? path.lastIndexOf(':') : path.lastIndexOf('.');
-        if (idx < 0) return "";
-        return path.substring(0, idx);
-    }
-    
+
     private void handleConfigListClick(InventoryClickEvent event) {
         Player player = (Player) event.getWhoClicked();
         ItemStack clicked = event.getCurrentItem();
         if (clicked == null || !clicked.hasItemMeta()) return;
         String id = getButtonId(clicked);
-        if (id == null) {
-            String name = PlainTextComponentSerializer.plainText().serialize(clicked.getItemMeta().displayName());
-            if ("§7§lBack".equals(name)) {
-                String title = PlainTextComponentSerializer.plainText().serialize(event.getView().title());
-                int l = title.indexOf('(');
-                int r = title.lastIndexOf(')');
-                String path = (l >= 0 && r > l) ? title.substring(l + 1, r) : "";
-                guiManager.openAdvancedConfigMenu(player, getParentPath(path), 0);
-            }
-            return;
-        }
+        if (id == null) return;
+
         try {
             if (id.startsWith("cfg:nav:")) {
-                String path = id.substring("cfg:nav:".length());
-                guiManager.openAdvancedConfigMenu(player, path, 0);
+                String parent = id.substring("cfg:nav:".length());
+                guiManager.openAdvancedConfigMenu(player, parent == null ? "" : parent, 0);
                 return;
             }
             if (id.startsWith("cfg:list_add:")) {
                 String path = id.substring("cfg:list_add:".length());
                 plugin.getChatInputHandler().expectConfigListAdd(player, path);
                 player.closeInventory();
-                player.sendMessage("§e[Config] Enter list item to add to " + path + " §7(type 'cancel' to abort)");
+                player.sendMessage("§e[Config] Enter list item to add to §f" + path + " §7(type 'cancel' to abort)");
                 return;
             }
             if (id.startsWith("cfg:list_del:")) {
@@ -1655,7 +1678,16 @@ public class GuiListener implements Listener {
                 guiManager.openConfigListEditor(player, path, page);
                 return;
             }
-        } catch (Exception ignored) {}
+        } catch (Exception ex) {
+            player.sendMessage("§c[Config] Error: " + ex.getMessage());
+        }
+    }
+
+    private String getParentPath(String path) {
+        if (path == null || path.isEmpty()) return "";
+        int idx = path.lastIndexOf('.')
+        ;
+        return idx < 0 ? "" : path.substring(0, idx);
     }
     
     private void handleTaskSettingsClick(InventoryClickEvent event) {
@@ -1723,7 +1755,7 @@ public class GuiListener implements Listener {
             }
         }
 
-        String name = PlainTextComponentSerializer.plainText().serialize(clicked.getItemMeta().displayName());
+        String name = com.example.speedrunnerswap.utils.GuiCompat.getDisplayName(clicked.getItemMeta());
 
         switch (name) {
             case "§7§lBack" -> guiManager.openTaskManagerMenu(player);
@@ -1770,7 +1802,7 @@ public class GuiListener implements Listener {
         Player player = (Player) event.getWhoClicked();
         ItemStack clicked = event.getCurrentItem();
         if (clicked == null || !clicked.hasItemMeta()) return;
-        String name = PlainTextComponentSerializer.plainText().serialize(clicked.getItemMeta().displayName());
+        String name = com.example.speedrunnerswap.utils.GuiCompat.getDisplayName(clicked.getItemMeta());
         switch (name) {
             case "§7§lBack" -> guiManager.openDreamMenu(player);
             case "§e§lTracker: §aEnabled", "§e§lTracker: §cDisabled" -> {
@@ -1790,7 +1822,7 @@ public class GuiListener implements Listener {
         Player player = (Player) event.getWhoClicked();
         ItemStack clicked = event.getCurrentItem();
         if (clicked == null || !clicked.hasItemMeta()) return;
-        String name = PlainTextComponentSerializer.plainText().serialize(clicked.getItemMeta().displayName());
+        String name = com.example.speedrunnerswap.utils.GuiCompat.getDisplayName(clicked.getItemMeta());
 
         switch (name) {
             case "§e§lDisplay Statistics" -> plugin.getStatsManager().displayStats();
@@ -1832,11 +1864,10 @@ public class GuiListener implements Listener {
         ItemStack clicked = event.getCurrentItem();
         if (clicked == null || !clicked.hasItemMeta()) return;
 
-        java.util.List<net.kyori.adventure.text.Component> lore = clicked.getItemMeta().lore();
+        java.util.List<String> lore = com.example.speedrunnerswap.utils.GuiCompat.getLore(clicked.getItemMeta());
         if (lore == null) return;
         String effectId = null;
-        for (net.kyori.adventure.text.Component line : lore) {
-            String text = PlainTextComponentSerializer.plainText().serialize(line);
+        for (String text : lore) {
             int idx = text.indexOf("Effect ID:");
             if (idx >= 0) {
                 // format: "Effect ID: <ID>"

@@ -19,278 +19,116 @@ public class ControlGui {
     }
 
     public void openMainMenu(Player player) {
-        // Cache frequently accessed data for better performance
         boolean running = plugin.getGameManager().isGameRunning();
         List<Player> runners = plugin.getGameManager().getRunners();
         int runnerCount = runners != null ? runners.size() : 0;
-        
-        // Debug logging to help troubleshoot
-        plugin.getLogger().info("Opening GUI for " + player.getName() + ", runners: " + runnerCount);
-        
-        // Smart adaptive sizing based on team size and features needed
-        int baseRows = plugin.getConfigManager().getGuiMainMenuRows();
-        
-        // Adaptive row calculation for optimal UX
-        int adaptiveRows = baseRows;
-        if (running && runnerCount >= 4) {
-            adaptiveRows = Math.max(baseRows, 4); // Larger for big teams
-        } else if (running && runnerCount <= 2) {
-            adaptiveRows = Math.max(baseRows, 3); // Compact for small teams
-        }
-        
-        int size = Math.max(27, adaptiveRows * 9); // Minimum 3 rows
-        String title = "§b§lSapnap: Multi-Runner Cooperation";
-        
-        // Add live indicator to title
-        if (running) {
-            boolean paused = plugin.getGameManager().isGamePaused();
-            title += paused ? "§e §l[PAUSED]" : "§a §l[LIVE]";
-        }
-
-        Inventory inv = com.example.speedrunnerswap.utils.GuiCompat.createInventory(new ControlGuiHolder(ControlGuiHolder.Type.MAIN), size, title);
-
-        // Smart filler with adaptive theming
-        Material fillerMaterial = running ? 
-            (plugin.getGameManager().isGamePaused() ? Material.YELLOW_STAINED_GLASS_PANE : Material.CYAN_STAINED_GLASS_PANE) :
-            Material.GRAY_STAINED_GLASS_PANE;
-        
-        ItemStack filler = new ItemStack(fillerMaterial);
-        ItemMeta fm = filler.getItemMeta();
-        com.example.speedrunnerswap.utils.GuiCompat.setDisplayName(fm, " ");
-        filler.setItemMeta(fm);
-        for (int i = 0; i < inv.getSize(); i++) inv.setItem(i, filler);
-
-        // Get fresh state for GUI population
         boolean paused = plugin.getGameManager().isGamePaused();
         Player activeRunner = plugin.getGameManager().getActiveRunner();
 
-        // Smart positioning system - adapts to GUI size
-        int topRow = 0;
-        int midRow = Math.max(1, size / 18); // Middle row
-        int bottomRow = (size / 9) - 1; // Last row
-        
-        // Header corner placeholder
-        inv.setItem((topRow * 9) + 8, named(Material.GRAY_DYE, "§7Menu", List.of("§7Configure Sapnap mode")));
-        
-        // Back to Mode Selector (consistent top-left position)
-        inv.setItem(topRow * 9, named(Material.ARROW, "§7§lBack", List.of("§7Return to mode selector")));
+        // Fixed, clean layout: 5 rows (45 slots)
+        int rows = 5;
+        int size = rows * 9;
+        String title = "§b§lSapnap: Multi-Runner Cooperation" + (running ? (paused ? " §e§l[PAUSED]" : " §a§l[LIVE]") : "");
 
-        // Quick Status Display
+        Inventory inv = com.example.speedrunnerswap.utils.GuiCompat.createInventory(new ControlGuiHolder(ControlGuiHolder.Type.MAIN), size, title);
+
+        // Border-only filler for a clean look
+        ItemStack border = new ItemStack(Material.CYAN_STAINED_GLASS_PANE);
+        ItemMeta bm = border.getItemMeta();
+        com.example.speedrunnerswap.utils.GuiCompat.setDisplayName(bm, " ");
+        border.setItemMeta(bm);
+        fillBorder(inv, border);
+
+        // Top row
+        inv.setItem(0, named(Material.ARROW, "§7§lBack", List.of("§7Return to mode selector")));
         List<String> statusLore = new ArrayList<>();
         statusLore.add("§7Runners: §b" + runnerCount);
+        statusLore.add("§7Status: " + (running ? (paused ? "§ePaused" : "§aRunning") : "§cNot Running"));
         if (running) {
             statusLore.add("§7Active: §a" + (activeRunner != null ? activeRunner.getName() : "None"));
             statusLore.add("§7Next Swap: §e" + plugin.getGameManager().getTimeUntilNextSwap() + "s");
-            statusLore.add("§7Status: " + (paused ? "§ePaused" : "§aRunning"));
-        } else {
-            statusLore.add("§7Status: §cNot Running");
         }
-        // Adaptive status display (center position based on GUI size)
-        inv.setItem((topRow * 9) + 4, named(Material.CLOCK, "§6§lGame Status", statusLore));
-        
-        // Smart control layout - adapts to available space and uses calculated rows
-        int controlStart = (midRow * 9) + 1; // Start controls in middle row
-        int controlSpacing = size >= 45 ? 2 : 1; // Better spacing in larger GUIs
+        inv.setItem(4, named(Material.CLOCK, "§6§lGame Status", statusLore));
 
-        // Smart start/stop positioning
+        // Row 2: Game control cluster
         if (!running) {
             List<String> startLore = new ArrayList<>();
             startLore.add("§7Begin cooperative swapping");
             if (runnerCount < 2) {
                 startLore.add("§cNeed at least 2 runners!");
-                inv.setItem(controlStart, named(Material.GRAY_WOOL, "Start Game", startLore));
+                inv.setItem(10, named(Material.GRAY_WOOL, "Start Game", startLore));
             } else {
                 startLore.add("§7Interval: §a" + plugin.getConfigManager().getSwapInterval() + "s");
-                startLore.add("§7Ready with " + runnerCount + " runners");
-                inv.setItem(controlStart, named(Material.LIME_WOOL, "§a§lStart Game", startLore));
+                inv.setItem(10, named(Material.LIME_WOOL, "§a§lStart Game", startLore));
             }
         } else {
-            inv.setItem(controlStart, named(Material.RED_WOOL, "§c§lStop Game", List.of("§7End current cooperation session")));
+            inv.setItem(10, named(Material.RED_WOOL, "§c§lStop Game", List.of("§7End current session")));
         }
-
-        // Smart pause/resume positioning
         if (running && !paused) {
-            inv.setItem(controlStart + controlSpacing, named(Material.YELLOW_WOOL, "§e§lPause", List.of("§7Temporarily pause swapping", "§7All runners will be frozen")));
+            inv.setItem(12, named(Material.YELLOW_WOOL, "§e§lPause", List.of("§7Temporarily pause swapping")));
         } else if (running && paused) {
-            inv.setItem(controlStart + controlSpacing, named(Material.ORANGE_WOOL, "§a§lResume", List.of("§7Resume cooperative swapping")));
+            inv.setItem(12, named(Material.ORANGE_WOOL, "§a§lResume", List.of("§7Resume cooperative swapping")));
         } else {
-            inv.setItem(controlStart + controlSpacing, named(Material.GRAY_WOOL, "Pause", List.of("§7Game not running")));
+            inv.setItem(12, named(Material.GRAY_WOOL, "Pause", List.of("§7Game not running")));
         }
+        inv.setItem(14, named(Material.NETHER_STAR, "§d§lShuffle Queue", List.of("§7Randomize runner order")));
+        inv.setItem(16, namedWithId(Material.PLAYER_HEAD, "§b§lManage Runners", List.of("§7Select/deselect participants"), "manage_runners"));
 
-        // Shuffle queue
-        List<String> shuffleLore = new ArrayList<>();
-        shuffleLore.add("§7Randomize runner queue order");
-        
-        // Always show runner management for Sapnap mode
-        List<String> runnerLore = new ArrayList<>();
-        runnerLore.add("§7Manage cooperation participants");
-        runnerLore.add("§7Current: §b" + runnerCount + " runners");
-        runnerLore.add("§7All online players can join!");
-        
-        // Adaptive shuffle positioning
-        if (runnerCount < 2) {
-            shuffleLore.add("§cNeed multiple runners");
-            inv.setItem(controlStart + (controlSpacing * 2), named(Material.GRAY_DYE, "Shuffle Queue", shuffleLore));
-        } else {
-            inv.setItem(controlStart + (controlSpacing * 2), named(Material.NETHER_STAR, "§d§lShuffle Queue", shuffleLore));
-        }
-
-        // Adaptive runner management positioning with proper button ID
-        inv.setItem(controlStart + (controlSpacing * 3), namedWithId(Material.PLAYER_HEAD, "§b§lManage Runners", runnerLore, "manage_runners"));
-
-        // Random/fixed timing toggle
+        // Row 3: Interval and timing
         boolean randomize = plugin.getConfigManager().isSwapRandomized();
         List<String> randomizeLore = new ArrayList<>();
-        randomizeLore.add("§7Current: " + (randomize ? "§aRandom timing" : "§bFixed timing"));
-        if (randomize) {
-            randomizeLore.add("§7Range: §e" + plugin.getConfigManager().getMinSwapInterval() + "-" + plugin.getConfigManager().getMaxSwapInterval() + "s");
-            randomizeLore.add("§7Adds unpredictability!");
-        } else {
-            randomizeLore.add("§7Every §e" + plugin.getConfigManager().getSwapInterval() + "s §7exactly");
-        }
-        inv.setItem(22, named(Material.COMPARATOR, (randomize ? "§a" : "§b") + "§lTiming: " + (randomize ? "Random" : "Fixed"), randomizeLore));
+        randomizeLore.add("§7Current: " + (randomize ? "§aRandom" : "§bFixed"));
+        if (randomize) randomizeLore.add("§7Range: §e" + plugin.getConfigManager().getMinSwapInterval() + "-" + plugin.getConfigManager().getMaxSwapInterval() + "s");
+        inv.setItem(19, named(Material.COMPARATOR, (randomize ? "§a" : "§b") + "§lTiming: " + (randomize ? "Random" : "Fixed"), randomizeLore));
 
-        // Runner timer visibility (FULL/LAST 10s/HIDDEN)
-        String runnerVis = plugin.getConfigManager().getRunnerTimerVisibility();
-        String runnerLabel = switch (runnerVis.toLowerCase()) {
-            case "always" -> "FULL";
-            case "never" -> "HIDDEN";
-            default -> "LAST 10s";
-        };
-        inv.setItem(20, named(
-                Material.CLOCK,
-                "Runner Timer: " + runnerLabel,
-                List.of("Cycle active runner timer visibility",
-                        "FULL / LAST 10s / HIDDEN")));
-
-        // Waiting timer visibility (FULL/LAST 10s/HIDDEN)
-        String waitingVis = plugin.getConfigManager().getWaitingTimerVisibility();
-        String waitingLabel = switch (waitingVis.toLowerCase()) {
-            case "last_10" -> "LAST 10s";
-            case "never" -> "HIDDEN";
-            default -> "FULL";
-        };
-        inv.setItem(21, named(
-                Material.CLOCK,
-                "Waiting Timer: " + waitingLabel,
-                List.of("Cycle waiting runner timer visibility",
-                        "FULL / LAST 10s / HIDDEN")));
-
-        // Interval display and adjusters (±5s)
         int interval = plugin.getConfigManager().getSwapInterval();
-        boolean isBeta = plugin.getConfigManager().isBetaIntervalEnabled();
-        List<String> intervalLore = new java.util.ArrayList<>();
+        List<String> intervalLore = new ArrayList<>();
         intervalLore.add("§7Base swap interval");
-        if (isBeta && interval < 30) {
-            intervalLore.add("§cBETA: Running below 30s may be unstable");
-            if (interval < 15) intervalLore.add("§cWarning: <15s may impact performance");
-        }
-        if (isBeta && interval > plugin.getConfigManager().getSwapIntervalMax()) {
-            intervalLore.add("§cBETA: Running above configured maximum may be unstable");
-        }
-        inv.setItem(23, named(Material.PAPER, "Interval: " + interval + "s", intervalLore));
-        inv.setItem(18, named(Material.ARROW, "-5s", List.of("Decrease interval (±5s)")));
-        inv.setItem(26, named(Material.ARROW, "+5s", List.of("Increase interval (±5s)")));
+        inv.setItem(21, named(Material.PAPER, "Interval: " + interval + "s", intervalLore));
+        inv.setItem(20, named(Material.ARROW, "-5s", List.of("§7Decrease interval")));
+        inv.setItem(22, named(Material.ARROW, "+5s", List.of("§7Increase interval")));
 
-        // Experimental intervals toggle
         boolean betaToggle = plugin.getConfigManager().isBetaIntervalEnabled();
-        inv.setItem(25, named(
-                betaToggle ? Material.REDSTONE_TORCH : Material.LEVER,
-                "Experimental Intervals: " + (betaToggle ? "ON" : "OFF"),
-                List.of("Allow <30s and >max intervals", "Shows red warnings in UI")
-        ));
+        inv.setItem(23, named(betaToggle ? Material.REDSTONE_TORCH : Material.LEVER, "Experimental Intervals: " + (betaToggle ? "ON" : "OFF"), List.of("§7Allow <30s and >max intervals")));
 
-        // Freeze mode cycle
+        // Row 4: Safety and mode
         String freeze = plugin.getConfigManager().getFreezeMode();
-        List<String> freezeLore = new ArrayList<>();
-        freezeLore.add("§7How inactive runners are handled:");
-        freezeLore.add("§f• §bEFFECTS§7: Blind/Dark/Slow effects");
-        freezeLore.add("§f• §bSPECTATOR§7: Free-roam spectator mode");
-        freezeLore.add("§f• §bLIMBO§7: Teleport to safe limbo area");
-        freezeLore.add("§f• §bCAGE§7: Secure bedrock containment");
-        freezeLore.add("");
-        freezeLore.add("§7Currently: §a" + freeze);
-        freezeLore.add("§7Click to cycle through options");
         Material freezeIcon = switch (freeze.toUpperCase()) {
             case "SPECTATOR" -> Material.ENDER_EYE;
             case "LIMBO" -> Material.ENDER_PEARL;
             case "CAGE" -> Material.BEDROCK;
-            default -> Material.POTION; // EFFECTS
+            default -> Material.POTION;
         };
-        inv.setItem(19, named(freezeIcon, "§6§lInactive State: §a" + freeze, freezeLore));
+        inv.setItem(28, named(freezeIcon, "§6§lInactive State: §a" + freeze, List.of("§7Cycle inactive-runner behavior")));
 
-        // Safe Swap toggle
         boolean safeSwap = plugin.getConfigManager().isSafeSwapEnabled();
-        List<String> safeLore = new ArrayList<>();
-        safeLore.add("§7Prevents dangerous swap locations");
-        if (safeSwap) {
-            safeLore.add("§aProtection: §fActive");
-            safeLore.add("§7Avoids: Lava, fire, cactus, void");
-            safeLore.add("§7Scan radius: §e" + plugin.getConfigManager().getSafeSwapHorizontalRadius() + " blocks");
-        } else {
-            safeLore.add("§cProtection: §fDisabled");
-            safeLore.add("§7⚠ Runners may spawn in danger!");
-        }
-        inv.setItem(6, named(safeSwap ? Material.SLIME_BLOCK : Material.MAGMA_BLOCK,
-                (safeSwap ? "§a" : "§c") + "§lSafe Swaps: " + (safeSwap ? "ON" : "OFF"), safeLore));
+        inv.setItem(29, named(safeSwap ? Material.SLIME_BLOCK : Material.MAGMA_BLOCK, (safeSwap ? "§a" : "§c") + "§lSafe Swaps: " + (safeSwap ? "ON" : "OFF"), List.of("§7Prevent dangerous swap locations")));
 
-        // Single Player Sleep toggle
         boolean singlePlayerSleep = plugin.getConfigManager().isSinglePlayerSleepEnabled();
-        List<String> sleepLore = new ArrayList<>();
-        sleepLore.add("§7Night-time cooperation mechanic");
-        if (singlePlayerSleep) {
-            sleepLore.add("§aOnly active runner can sleep");
-            sleepLore.add("§7Perfect for caged teammates!");
-        } else {
-            sleepLore.add("§cAll players must sleep normally");
-            sleepLore.add("§7May cause issues with frozen players");
-        }
-        sleepLore.add("§7Recommended: §aON §7for Sapnap mode");
-        inv.setItem(8, named(singlePlayerSleep ? Material.WHITE_BED : Material.RED_BED,
-                (singlePlayerSleep ? "§a" : "§c") + "§lSingle Sleep: " + (singlePlayerSleep ? "ON" : "OFF"), sleepLore));
+        inv.setItem(30, named(singlePlayerSleep ? Material.WHITE_BED : Material.RED_BED, (singlePlayerSleep ? "§a" : "§c") + "§lSingle Sleep: " + (singlePlayerSleep ? "ON" : "OFF"), List.of("§7Only active runner can sleep")));
 
-        // Remove queue preview to keep UI focused on config
-        inv.setItem(5, named(Material.GRAY_DYE, "§7Queue", List.of("§7Configure settings above")));
-        
-        // Remove swap prediction to keep UI simple
-        inv.setItem(1, named(Material.GRAY_DYE, "§7Info", List.of("§7Game status shown above")));
-        
-        // Remove analytics panel to keep UI focused
-        inv.setItem(2, named(Material.GRAY_DYE, "§7Analytics", List.of("§7Not shown")));
-        
-        // Remove team coordination hub link
-        inv.setItem(3, named(Material.GRAY_DYE, "§7Coordination", List.of("§7Not shown")));
-        
-        // Remove quick actions toolbar
-        inv.setItem(9, named(Material.GRAY_DYE, "§7Quick Actions", List.of("§7Not shown")));
-
-        // Bottom-right placeholder
-        int advancedSlot = (bottomRow * 9) + 8; // Bottom-right corner
-        inv.setItem(advancedSlot, named(Material.GRAY_DYE, "§7Settings", List.of("§7Open Advanced Settings from Main Menu")));
-
-        // Remove smart help panel
-        int helpSlot = (bottomRow * 9);
-        inv.setItem(helpSlot, named(Material.GRAY_DYE, "§7Help", List.of("§7Not shown")));
-        
-        // Remove performance warning indicator
-        inv.setItem((bottomRow * 9) + 1, named(Material.GRAY_DYE, "§7Performance", List.of("§7Not shown")));
-
-        // Reset interval to current mode default (replaces Status)
-        int modeDefault = plugin.getConfigManager().getModeDefaultInterval(plugin.getCurrentMode());
-        inv.setItem(24, named(Material.BARRIER, "Reset Interval", List.of("Reset to mode default: "+modeDefault+"s")));
-
-        // Apply default on mode switch toggle
         boolean applyDefault = plugin.getConfigManager().getApplyDefaultOnModeSwitch();
-        inv.setItem(17, named(applyDefault ? Material.NOTE_BLOCK : Material.GRAY_DYE,
-                "Apply Mode Default on Switch: " + (applyDefault ? "Yes" : "No"),
-                List.of("When switching modes, apply the default",
-                        "interval if the game is not running")));
+        inv.setItem(31, named(applyDefault ? Material.NOTE_BLOCK : Material.GRAY_DYE, "Apply Mode Default on Switch: " + (applyDefault ? "Yes" : "No"), List.of("§7Apply mode default interval on switch")));
 
-        // Save current as this mode's default
-        inv.setItem(16, named(Material.WRITABLE_BOOK, "Save as Mode Default",
-                List.of("Set current interval ("+interval+"s)", "as this mode's default")));
+        inv.setItem(32, named(Material.WRITABLE_BOOK, "Save as Mode Default", List.of("§7Set current interval as default")));
+        inv.setItem(33, named(Material.BARRIER, "Reset Interval", List.of("§7Reset to this mode's default")));
 
         player.openInventory(inv);
+    }
+
+    // Border filler similar to GuiManager
+    private void fillBorder(Inventory inv, ItemStack filler) {
+        int size = inv.getSize();
+        int cols = 9;
+        int rows = size / cols;
+        for (int c = 0; c < cols; c++) {
+            inv.setItem(c, filler); // top
+            inv.setItem((rows - 1) * cols + c, filler); // bottom
+        }
+        for (int r = 1; r < rows - 1; r++) {
+            inv.setItem(r * cols, filler); // left
+            inv.setItem(r * cols + (cols - 1), filler); // right
+        }
     }
 
     public void openRunnerSelector(Player player) {

@@ -58,6 +58,21 @@ public final class GuiCompat {
         }
     }
 
+    public static List<String> getLore(ItemMeta meta) {
+        try {
+            List<Component> comps = meta.lore();
+            if (comps != null) {
+                List<String> out = new ArrayList<>(comps.size());
+                var serializer = net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer.plainText();
+                for (Component c : comps) {
+                    out.add(serializer.serialize(c));
+                }
+                return out;
+            }
+        } catch (Throwable ignored) {}
+        return getLoreLegacy(meta);
+    }
+
     @SuppressWarnings("deprecation")
     private static void setDisplayNameLegacy(ItemMeta meta, String name) {
         try { meta.setDisplayName(name); } catch (Throwable ignored) {}
@@ -72,5 +87,11 @@ public final class GuiCompat {
     @SuppressWarnings("deprecation")
     private static void setLoreLegacy(ItemMeta meta, List<String> legacyLore) {
         try { meta.setLore(legacyLore); } catch (Throwable ignored) {}
+    }
+
+    @SuppressWarnings("deprecation")
+    private static List<String> getLoreLegacy(ItemMeta meta) {
+        try { return meta.getLore(); } catch (Throwable ignored) {}
+        return null;
     }
 }
