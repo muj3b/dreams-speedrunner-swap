@@ -81,13 +81,13 @@ public class TaskManagerMode {
         if (p == null) return;
         String taskId = assignments.get(p.getUniqueId());
         if (taskId == null) return; // not assigned
-        // Announce winner and stop the game
+        // Announce winner and end the game with proper winner attribution
         Bukkit.getScheduler().runTask(plugin, () -> {
             for (Player pl : Bukkit.getOnlinePlayers()) {
                 BukkitCompat.showTitle(pl, "§a§lTASK COMPLETE!", "§e" + p.getName() + " §7completed: §f" + registry.get(taskId).description(), 10, 80, 16);
                 pl.sendMessage("§a[Task Manager] Winner: §f" + p.getName());
             }
-            try { plugin.getGameManager().stopGame(); } catch (Throwable ignored) {}
+            try { plugin.getGameManager().endGame(com.example.speedrunnerswap.models.Team.RUNNER); } catch (Throwable ignored) {}
         });
     }
 

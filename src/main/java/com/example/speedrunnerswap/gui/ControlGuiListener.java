@@ -23,8 +23,16 @@ import java.util.stream.Collectors;
 public class ControlGuiListener implements Listener {
     private final SpeedrunnerSwap plugin;
 
-    // Temporary selections per player for runner selector GUI
-    private final Map<java.util.UUID, Set<String>> pendingRunnerSelections = new HashMap<>();
+    // Temporary selections per player for runner selector GUI (static so ControlGui can reflect live selection)
+    private static final Map<java.util.UUID, Set<String>> pendingRunnerSelections = new HashMap<>();
+
+    public static Set<String> getPendingSelection(java.util.UUID uuid) {
+        return pendingRunnerSelections.get(uuid);
+    }
+
+    public static void setPendingSelection(java.util.UUID uuid, Set<String> sel) {
+        if (sel == null) pendingRunnerSelections.remove(uuid); else pendingRunnerSelections.put(uuid, sel);
+    }
 
     public ControlGuiListener(SpeedrunnerSwap plugin) {
         this.plugin = plugin;
@@ -144,7 +152,7 @@ public class ControlGuiListener implements Listener {
                     plugin.getLogger().info("Processing manage_runners button");
                     // Initialize pending selection with current config
                     Set<String> initial = new HashSet<>(plugin.getConfigManager().getRunnerNames());
-                    pendingRunnerSelections.put(player.getUniqueId(), initial);
+                    setPendingSelection(player.getUniqueId(), initial);
                     new ControlGui(plugin).openRunnerSelector(player);
                     return;
                 }

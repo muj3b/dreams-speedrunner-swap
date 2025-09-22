@@ -39,7 +39,6 @@ public class GuiListener implements Listener {
         // Always cancel any click when a plugin GUI is open (either by title or holder marker)
         if (holderMarked || isPluginGui(title)) {
             event.setCancelled(true);
-            event.setResult(org.bukkit.event.Event.Result.DENY);
 
             // Only handle clicks in the top inventory; always block bottom/player inventory
             int topSize = event.getView().getTopInventory().getSize();
@@ -57,6 +56,12 @@ public class GuiListener implements Listener {
 
             // If there is no clickable item, do nothing further
             if (clickedItem == null || clickedItem.getType() == Material.AIR) return;
+
+            // Global Back handling: map current menu title to its parent menu
+            if (isBackButton(clickedItem)) {
+                routeBack(title, player);
+                return;
+            }
 
             // Route to appropriate handler
             handleGuiClick(event, title);
@@ -76,7 +81,6 @@ public class GuiListener implements Listener {
         // Always cancel drag events in plugin GUIs
         if (holderMarked || isPluginGui(title)) {
             event.setCancelled(true);
-            event.setResult(org.bukkit.event.Event.Result.DENY);
         }
     }
 
@@ -114,6 +118,43 @@ public class GuiListener implements Listener {
             return s2 != null ? String.valueOf(s2) : "";
         } catch (Throwable ignored) {}
         return "";
+    }
+
+    // Route the Back button to the appropriate parent menu based on the current title
+    private void routeBack(String title, Player player) {
+        try {
+            if (title.contains("Task Manager: Secret Missions") || title.contains("Task Settings") || title.contains("Custom Tasks")) {
+                guiManager.openTaskManagerMenu(player);
+                return;
+            }
+            if (title.contains("Dream Settings") || title.contains("Compass Settings") || title.contains("World Border") ||
+                title.contains("Bounty System") || title.contains("Last Stand")) {
+                guiManager.openDreamMenu(player);
+                return;
+            }
+            if (title.contains("Power-up Durations") || title.contains("Positive Effects") || title.contains("Negative Effects") || title.contains("Power-ups")) {
+                guiManager.openPowerUpsMenu(player);
+                return;
+            }
+            if (title.contains("Advanced Config") || title.contains("List Editor") || title.contains("Statistics")) {
+                guiManager.openSettingsMenu(player);
+                return;
+            }
+            if (title.contains("Team Selector")) {
+                guiManager.openMainMenu(player);
+                return;
+            }
+            if (title.contains("Confirm Mode Switch") || title.contains("Mode Selection") || title.contains("Choose Gamemode")) {
+                guiManager.openModeSelector(player);
+                return;
+            }
+            if (title.contains("Confirm Reset All Settings")) {
+                guiManager.openSettingsMenu(player);
+                return;
+            }
+        } catch (Throwable ignored) {}
+        // Fallback: go to main menu
+        guiManager.openMainMenu(player);
     }
     
     // Block item movement events
@@ -226,14 +267,11 @@ public class GuiListener implements Listener {
                 case "ui_performance" -> { guiManager.openUIPerformanceMenu(player); return; }
                 case "custom_tasks_menu" -> { guiManager.openCustomTasksMenu(player); return; }
                 case "dangerous_blocks" -> { guiManager.openDangerousBlocksMenu(player); return; }
+                case "cage_settings" -> { guiManager.openSettingsMenu(player); return; }
             }
         }
 
-        // Handle back buttons first
-        if (isBackButton(clickedItem)) {
-            guiManager.openMainMenu(player);
-            return;
-        }
+        // Defer Back handling to specific menu handlers so the correct parent is opened.
 
         // Special-case handling for submenus not covered by a general section
         if (maybeHandlePowerUpDurationsMenu(event, title)) return;
@@ -980,8 +1018,9 @@ public class GuiListener implements Listener {
         // Assign a player by clicking their head, using current selected team
         if (clicked.getType() == Material.PLAYER_HEAD && clicked.getItemMeta() != null) {
             String targetName = com.example.speedrunnerswap.utils.GuiCompat.getDisplayName(clicked.getItemMeta());
-            // displayName might be colored; strip any color prefixes/suffixes
-            targetName = targetName.replace("§b", "").replace("§c", "").replace("§f", "").replace("§r", "");
+            // Strip all color codes and formatting
+            try { targetName = org.bukkit.ChatColor.stripColor(targetName); } catch (Throwable ignored) {}
+            if (targetName != null) targetName = targetName.trim();
             Player target = Bukkit.getPlayerExact(targetName);
             if (target == null) {
                 player.sendMessage("§cPlayer not found or offline: " + targetName);
@@ -990,8 +1029,14 @@ public class GuiListener implements Listener {
 
             com.example.speedrunnerswap.models.Team selected = guiManager.getSelectedTeam(player);
             if (selected == com.example.speedrunnerswap.models.Team.NONE) {
-                player.sendMessage("§eSelect a team (Runners/Hunters) first.");
-                return;
+                // In Task mode, default to RUNNER for convenience
+                if (currentMode == com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode.TASK) {
+                    try { plugin.getGameManager().getPlayerState(player).setSelectedTeam(com.example.speedrunnerswap.models.Team.RUNNER); } catch (Throwable ignored) {}
+                    selected = com.example.speedrunnerswap.models.Team.RUNNER;
+                } else {
+                    player.sendMessage("§eSelect a team (Runners/Hunters) first.");
+                    return;
+                }
             }
 
             // Build updated team lists
@@ -1012,10 +1057,8 @@ public class GuiListener implements Listener {
             // Refresh GUI to reflect changes
             guiManager.openTeamSelector(player);
         }
-    }
 
-    // removed duplicate; implemented below
-    
+    }
 
     private void handlePowerUpsMenuClick(InventoryClickEvent event) {
         Player player = (Player) event.getWhoClicked();
@@ -1031,15 +1074,15 @@ public class GuiListener implements Listener {
             return;
         }
 
-        if (name.contains("Positive Effects")) {
+        if (name != null && name.contains("Positive Effects")) {
             guiManager.openPositiveEffectsMenu(player);
             return;
         }
-        if (name.contains("Negative Effects")) {
+        if (name != null && name.contains("Negative Effects")) {
             guiManager.openNegativeEffectsMenu(player);
             return;
         }
-        if (name.contains("Effect Durations")) {
+        if (name != null && name.contains("Effect Durations")) {
             guiManager.openPowerUpDurationsMenu(player);
             return;
         }
@@ -1234,65 +1277,47 @@ public class GuiListener implements Listener {
         Player player = (Player) event.getWhoClicked();
         ItemStack clicked = event.getCurrentItem();
         if (clicked == null || !clicked.hasItemMeta()) return;
+        String id = getButtonId(clicked);
         String name = com.example.speedrunnerswap.utils.GuiCompat.getDisplayName(clicked.getItemMeta());
-
-        if (name.contains("Bounty Status")) {
-            boolean enabled = plugin.getConfig().getBoolean("bounty.enabled", true);
-            plugin.getConfig().set("bounty.enabled", !enabled);
-            plugin.saveConfig();
+        if (id != null) {
+            switch (id) {
+                case "toggle_bounty" -> {
+                    boolean enabled = plugin.getConfig().getBoolean("bounty.enabled", false);
+                    plugin.getConfig().set("bounty.enabled", !enabled);
+                    plugin.saveConfig();
+                }
+                case "bounty_base" -> {
+                    int val = plugin.getConfig().getInt("bounty.base_amount", 10);
+                    int delta = event.isShiftClick() ? 10 : 5;
+                    if (event.isLeftClick()) val += delta; if (event.isRightClick()) val -= delta;
+                    val = Math.max(0, Math.min(10000, val));
+                    plugin.getConfig().set("bounty.base_amount", val);
+                    plugin.saveConfig();
+                }
+                case "bounty_multiplier" -> {
+                    int val = plugin.getConfig().getInt("bounty.kill_multiplier", 2);
+                    int delta = event.isShiftClick() ? 2 : 1;
+                    if (event.isLeftClick()) val += delta; if (event.isRightClick()) val -= delta;
+                    val = Math.max(1, Math.min(10, val));
+                    plugin.getConfig().set("bounty.kill_multiplier", val);
+                    plugin.saveConfig();
+                }
+                case "bounty_max" -> {
+                    int val = plugin.getConfig().getInt("bounty.max_amount", 100);
+                    int delta = event.isShiftClick() ? 20 : 10;
+                    if (event.isLeftClick()) val += delta; if (event.isRightClick()) val -= delta;
+                    val = Math.max(1, Math.min(100000, val));
+                    plugin.getConfig().set("bounty.max_amount", val);
+                    plugin.saveConfig();
+                }
+                default -> {}
+            }
             guiManager.openBountyMenu(player);
             return;
         }
-        if (name.equals("§e§lAssign New Bounty")) {
-            plugin.getBountyManager().assignNewBounty();
-            guiManager.openBountyMenu(player);
-            return;
-        }
-        if (name.equals("§c§lClear Bounty")) {
-            plugin.getBountyManager().clearBounty();
-            guiManager.openBountyMenu(player);
-            return;
-        }
-        if (name.equals("§6§lBounty Cooldown (s)")) {
-            int val = plugin.getConfig().getInt("bounty.cooldown", 300);
-            if (event.isLeftClick()) val += 30;
-            if (event.isRightClick()) val -= 30;
-            val = Math.max(30, Math.min(3600, val));
-            plugin.getConfig().set("bounty.cooldown", val);
-            plugin.saveConfig();
-            guiManager.openBountyMenu(player);
-            return;
-        }
-        if (name.equals("§e§lGlow Duration (s)")) {
-            int val = plugin.getConfig().getInt("bounty.glow_duration", 300);
-            if (event.isLeftClick()) val += 30;
-            if (event.isRightClick()) val -= 30;
-            val = Math.max(30, Math.min(3600, val));
-            plugin.getConfig().set("bounty.glow_duration", val);
-            plugin.saveConfig();
-            guiManager.openBountyMenu(player);
-            return;
-        }
-        if (name.equals("§e§lReward Strength (s)")) {
-            int val = plugin.getConfig().getInt("bounty.rewards.strength_duration", 300);
-            if (event.isLeftClick()) val += 30;
-            if (event.isRightClick()) val -= 30;
-            val = Math.max(30, Math.min(3600, val));
-            plugin.getConfig().set("bounty.rewards.strength_duration", val);
-            plugin.saveConfig();
-            guiManager.openBountyMenu(player);
-            return;
-        }
-        if (name.equals("§e§lReward Speed (s)")) {
-            int val = plugin.getConfig().getInt("bounty.rewards.speed_duration", 300);
-            if (event.isLeftClick()) val += 30;
-            if (event.isRightClick()) val -= 30;
-            val = Math.max(30, Math.min(3600, val));
-            plugin.getConfig().set("bounty.rewards.speed_duration", val);
-            plugin.saveConfig();
-            guiManager.openBountyMenu(player);
-            return;
-        }
+        // Fallback handling based on display name if IDs are missing
+        if (name != null && name.startsWith("§e§lAssign New Bounty")) { plugin.getBountyManager().assignNewBounty(); guiManager.openBountyMenu(player); }
+        else if (name != null && name.startsWith("§c§lClear Bounty")) { plugin.getBountyManager().clearBounty(); guiManager.openBountyMenu(player); }
     }
 
     private void handleLastStandClick(InventoryClickEvent event) {
@@ -1848,41 +1873,31 @@ public class GuiListener implements Listener {
         Player player = (Player) event.getWhoClicked();
         ItemStack clicked = event.getCurrentItem();
         if (clicked == null || !clicked.hasItemMeta()) return;
-        String name = com.example.speedrunnerswap.utils.GuiCompat.getDisplayName(clicked.getItemMeta());
-
-        switch (name) {
-            case "§e§lDisplay Statistics" -> plugin.getStatsManager().displayStats();
-            case "§a§lStart Tracking" -> plugin.getStatsManager().startTracking();
-            case "§c§lStop Tracking" -> plugin.getStatsManager().stopTracking();
-            case "§e§lStats: §aEnabled", "§e§lStats: §cDisabled" -> {
-                boolean current = plugin.getConfig().getBoolean("stats.enabled", true);
-                plugin.getConfig().set("stats.enabled", !current);
-                plugin.saveConfig();
+        String id = getButtonId(clicked);
+        if (id != null) {
+            switch (id) {
+                case "toggle_stats" -> {
+                    boolean statsEnabled = plugin.getConfig().getBoolean("stats.enabled", true);
+                    plugin.getConfig().set("stats.enabled", !statsEnabled);
+                    plugin.saveConfig();
+                }
+                case "toggle_distance_tracking" -> {
+                    boolean distanceTracking = plugin.getConfig().getBoolean("stats.distance_tracking", true);
+                    plugin.getConfig().set("stats.distance_tracking", !distanceTracking);
+                    plugin.saveConfig();
+                }
+                case "stats_update_rate" -> {
+                    int ticks = plugin.getConfig().getInt("stats.distance_update_ticks", 20);
+                    int delta = event.isShiftClick() ? 20 : 5;
+                    if (event.isLeftClick()) ticks += delta; if (event.isRightClick()) ticks -= delta;
+                    ticks = Math.max(1, Math.min(200, ticks));
+                    plugin.getConfig().set("stats.distance_update_ticks", ticks);
+                    plugin.saveConfig();
+                }
+                default -> {}
             }
-            case "§e§lPeriodic Display: §aEnabled", "§e§lPeriodic Display: §cDisabled" -> {
-                boolean current = plugin.getConfig().getBoolean("stats.periodic_display", false);
-                plugin.getConfig().set("stats.periodic_display", !current);
-                plugin.saveConfig();
-            }
-            case "§6§lPeriodic Interval (s)" -> {
-                int val = plugin.getConfig().getInt("stats.periodic_display_interval", 300);
-                if (event.isLeftClick()) val += 30;
-                if (event.isRightClick()) val -= 30;
-                val = Math.max(30, Math.min(3600, val));
-                plugin.getConfig().set("stats.periodic_display_interval", val);
-                plugin.saveConfig();
-            }
-            case "§6§lDistance Update (ticks)" -> {
-                int val = plugin.getConfig().getInt("stats.distance_update_ticks", 20);
-                if (event.isLeftClick()) val += 5;
-                if (event.isRightClick()) val -= 5;
-                val = Math.max(1, Math.min(200, val));
-                plugin.getConfig().set("stats.distance_update_ticks", val);
-                plugin.saveConfig();
-            }
-            default -> {}
+            guiManager.openStatisticsMenu(player);
         }
-        guiManager.openStatisticsMenu(player);
     }
 
     private void handleEffectsMenuClick(InventoryClickEvent event, String title) {

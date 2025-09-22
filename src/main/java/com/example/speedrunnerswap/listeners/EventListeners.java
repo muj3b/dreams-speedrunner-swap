@@ -122,18 +122,27 @@ public class EventListeners implements Listener {
             event.getDrops().removeIf(item -> item != null && item.getType() == Material.COMPASS);
         }
 
-        // Show pop-up title when a runner dies, then end the game
+        // Runner death handling: Dream mode declares Hunters as winners; other modes preserve prior behavior
         if (plugin.getGameManager().isGameRunning() && plugin.getGameManager().isRunner(player)) {
-            for (Player p : plugin.getServer().getOnlinePlayers()) {
-                BukkitCompat.showTitle(p, "§4§lRUNNER DIED", "§cGame over", 4, 32, 4);
-            }
-
-            // End the game shortly after the title displays
-            plugin.getServer().getScheduler().runTaskLater(plugin, () -> {
-                if (plugin.getGameManager().isGameRunning()) {
-                    plugin.getGameManager().stopGame(); // no winner, ends cleanly
+            var mode = plugin.getCurrentMode();
+            if (mode == com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode.DREAM) {
+                // Declare Hunters as winners
+                plugin.getServer().getScheduler().runTask(plugin, () -> {
+                    if (plugin.getGameManager().isGameRunning()) {
+                        plugin.getGameManager().endGame(com.example.speedrunnerswap.models.Team.HUNTER);
+                    }
+                });
+            } else {
+                // Preserve existing behavior for non-Dream modes
+                for (Player p : plugin.getServer().getOnlinePlayers()) {
+                    BukkitCompat.showTitle(p, "§4§lRUNNER DIED", "§cGame over", 4, 32, 4);
                 }
-            }, 20L);
+                plugin.getServer().getScheduler().runTaskLater(plugin, () -> {
+                    if (plugin.getGameManager().isGameRunning()) {
+                        plugin.getGameManager().stopGame();
+                    }
+                }, 20L);
+            }
         }
     }
 

@@ -113,7 +113,15 @@ public class ControlGui {
         inv.setItem(32, named(Material.WRITABLE_BOOK, "Save as Mode Default", List.of("§7Set current interval as default")));
         inv.setItem(33, named(Material.BARRIER, "Reset Interval", List.of("§7Reset to this mode's default")));
 
-        player.openInventory(inv);
+        openInventorySoon(player, inv);
+    }
+
+    // Always schedule inventory opens to the next tick to avoid re-entrancy issues
+    private void openInventorySoon(Player player, Inventory inv) {
+        if (player == null || inv == null) return;
+        plugin.getServer().getScheduler().runTask(plugin, () -> {
+            if (player.isOnline()) player.openInventory(inv);
+        });
     }
 
     // Border filler similar to GuiManager
@@ -144,8 +152,9 @@ public class ControlGui {
         filler.setItemMeta(fm);
         for (int i = 0; i < inv.getSize(); i++) inv.setItem(i, filler);
 
-        // Online players as selectable entries
-        java.util.List<String> selected = plugin.getConfigManager().getRunnerNames();
+        // Online players as selectable entries; prefer pending selections if present
+        java.util.Set<String> pending = com.example.speedrunnerswap.gui.ControlGuiListener.getPendingSelection(player.getUniqueId());
+        java.util.List<String> selected = pending != null ? new java.util.ArrayList<>(pending) : plugin.getConfigManager().getRunnerNames();
         int idx = 0;
         for (Player p : Bukkit.getOnlinePlayers()) {
             ItemStack icon = new ItemStack(Material.PLAYER_HEAD);
@@ -176,7 +185,7 @@ public class ControlGui {
         inv.setItem(size - 6, named(Material.EMERALD_BLOCK, "Save", List.of("Apply selected runners")));
         inv.setItem(size - 4, named(Material.BARRIER, "Cancel", List.of("Discard changes")));
 
-        player.openInventory(inv);
+        openInventorySoon(player, inv);
     }
 
     private ItemStack named(Material mat, String name, List<String> loreText) {
@@ -339,7 +348,6 @@ public class ControlGui {
         emergencyLore.add("§7   • Leave signs at key locations");
         emergencyLore.add("§7   • Follow predetermined protocols");
         inv.setItem(16, named(Material.REDSTONE_TORCH, "§c§lEmergency Protocols", emergencyLore));
-        
-        player.openInventory(inv);
+        openInventorySoon(player, inv);
     }
 }

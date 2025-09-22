@@ -24,6 +24,14 @@ public class GuiManager {
         this.plugin = plugin;
     }
 
+    // Always schedule inventory opens to the next tick to avoid re-entrancy issues
+    private void openInventorySoon(org.bukkit.entity.Player player, org.bukkit.inventory.Inventory inv) {
+        if (player == null || inv == null) return;
+        plugin.getServer().getScheduler().runTask(plugin, () -> {
+            if (player.isOnline()) player.openInventory(inv);
+        });
+    }
+
     // New direct gamemode selector - opens each gamemode's actual main menu
     public void openDirectGamemodeSelector(Player player) {
         int rows = 3;
@@ -84,7 +92,7 @@ public class GuiManager {
         if (currentMode.equals("TASK")) taskMode = createGlowingItem(taskMode);
         inv.setItem(15, taskMode);
 
-        player.openInventory(inv);
+        openInventorySoon(player, inv);
     }
 
     public void openResetConfirmMenu(Player player) {
@@ -96,7 +104,7 @@ public class GuiManager {
         inv.setItem(3, createGuiButton(Material.EMERALD_BLOCK, "§a§lCancel", java.util.List.of("§7Do nothing"), "reset_confirm_no"));
         inv.setItem(5, createGuiButton(Material.REDSTONE_BLOCK, "§c§lConfirm Reset", java.util.List.of("§7Restore defaults from jar", "§cThis cannot be undone!"), "reset_confirm_yes"));
 
-        player.openInventory(inv);
+        openInventorySoon(player, inv);
     }
 
     // Keep the old mode selector for backward compatibility if needed
@@ -167,7 +175,7 @@ public class GuiManager {
             inv.setItem(22, createItem(Material.PAPER, "§e§lGame In Progress", infoLore));
         }
 
-        player.openInventory(inv);
+        openInventorySoon(player, inv);
     }
 
     public void openForceConfirm(Player player, com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode target) {
@@ -184,7 +192,7 @@ public class GuiManager {
         ItemStack no = createGuiButton(Material.EMERALD_BLOCK, "§a§lCancel", java.util.List.of("§7Do nothing"), "force_no");
         inv.setItem(3, no);
         inv.setItem(5, yes);
-        player.openInventory(inv);
+        openInventorySoon(player, inv);
     }
 
     public String formatTime(int seconds) {
@@ -218,7 +226,7 @@ public class GuiManager {
         }
         // Hint to add more via config for now
         inv.setItem(49, createItem(Material.PAPER, "§7Note", List.of("§7To add new blocks, use config.yml", "§7GUI supports removal quickly")));
-        player.openInventory(inv);
+        openInventorySoon(player, inv);
     }
     
     public void openPositiveEffectsMenu(Player player) {
@@ -246,7 +254,7 @@ public class GuiManager {
         // Back button
         inventory.setItem(35, createItem(Material.BARRIER, BACK_BUTTON_TITLE));
 
-        player.openInventory(inventory);
+        openInventorySoon(player, inventory);
     }
 
     public void openNegativeEffectsMenu(Player player) {
@@ -274,7 +282,7 @@ public class GuiManager {
         // Back button
         inventory.setItem(35, createItem(Material.BARRIER, BACK_BUTTON_TITLE));
 
-        player.openInventory(inventory);
+        openInventorySoon(player, inventory);
     }
 
     public ItemStack createEffectItem(Material material, String displayName, String effectId) {
@@ -345,7 +353,7 @@ public class GuiManager {
         // Back button
         inventory.setItem(31, createItem(Material.BARRIER, BACK_BUTTON_TITLE));
 
-        player.openInventory(inventory);
+        openInventorySoon(player, inventory);
     }
 
     public void openPowerUpDurationsMenu(Player player) {
@@ -371,7 +379,7 @@ public class GuiManager {
         inv.setItem(14, minLvlItem);
         inv.setItem(16, maxLvlItem);
 
-        player.openInventory(inv);
+        openInventorySoon(player, inv);
     }
 
     public void openWorldBorderMenu(Player player) {
@@ -439,7 +447,7 @@ public class GuiManager {
         // Back button
         inventory.setItem(26, createItem(Material.BARRIER, BACK_BUTTON_TITLE));
 
-        player.openInventory(inventory);
+        openInventorySoon(player, inventory);
     }
 
     public void openMainMenu(Player player) {
@@ -604,7 +612,7 @@ public class GuiManager {
                         "§7Track performance across games"), 
                 "statistics"));
 
-            player.openInventory(inventory);
+            openInventorySoon(player, inventory);
         } catch (Exception e) {
             plugin.getLogger().log(Level.SEVERE, "Error opening Dream main menu", e);
             player.sendMessage("§cFailed to open Dream menu: " + e.getMessage());
@@ -750,7 +758,7 @@ public class GuiManager {
             infoLore.add("§b• §7Swap control to give everyone chances");
             inventory.setItem(49, createItem(Material.PAPER, "§e§lMode Information", infoLore));
 
-            player.openInventory(inventory);
+            openInventorySoon(player, inventory);
         } catch (Exception e) {
             plugin.getLogger().log(Level.SEVERE, "Error opening Task Manager menu", e);
             player.sendMessage("§cFailed to open Task Manager menu: " + e.getMessage());
@@ -836,7 +844,7 @@ public class GuiManager {
         // Reload tasks button
         inv.setItem(53, createItem(Material.BOOK, "§6§lReload Tasks", List.of("§7Reload tasks from config")));
 
-        player.openInventory(inv);
+        openInventorySoon(player, inv);
     }
 
     public void openDreamSettingsMenu(Player player) {
@@ -860,7 +868,7 @@ public class GuiManager {
                 "dream_single_sleep_toggle");
         inv.setItem(15, sleepToggle);
 
-        player.openInventory(inv);
+        openInventorySoon(player, inv);
     }
 
     public void openTeamSelector(Player player) {
@@ -1000,7 +1008,7 @@ public class GuiManager {
             inventory.setItem(slot++, playerHead);
         }
         
-        player.openInventory(inventory);
+        openInventorySoon(player, inventory);
     }
     
     public void openSettingsMenu(Player player) {
@@ -1237,7 +1245,7 @@ public class GuiManager {
                     "§cThis cannot be undone!"),
             "reset_all_settings"));
 
-        player.openInventory(inventory);
+        openInventorySoon(player, inventory);
     }
 
 
@@ -1295,7 +1303,7 @@ public class GuiManager {
             }
         }
         
-        player.openInventory(inv);
+        openInventorySoon(player, inv);
     }
     
     // Method to prompt player for task input
@@ -1536,7 +1544,7 @@ public class GuiManager {
         if (page > 0) inv.setItem(45, createGuiButton(Material.ARROW, "§7§lPrev Page", List.of(), "cfg:page:" + path + ":" + (page - 1)));
         if (end < sorted.size()) inv.setItem(53, createGuiButton(Material.ARROW, "§7§lNext Page", List.of(), "cfg:page:" + path + ":" + (page + 1)));
 
-        Bukkit.getPlayer(player.getUniqueId()).openInventory(inv);
+        openInventorySoon(player, inv);
     }
 
     public void openConfigListEditor(Player player, String path, int page) {
@@ -1569,7 +1577,7 @@ public class GuiManager {
         if (page > 0) inv.setItem(45, createGuiButton(Material.ARROW, "§7§lPrev Page", List.of(), "cfg:list_page:" + path + ":" + (page - 1)));
         if (end < list.size()) inv.setItem(53, createGuiButton(Material.ARROW, "§7§lNext Page", List.of(), "cfg:list_page:" + path + ":" + (page + 1)));
 
-        Bukkit.getPlayer(player.getUniqueId()).openInventory(inv);
+        openInventorySoon(player, inv);
     }
 
     private String getParentPath(String path) {
@@ -1853,7 +1861,7 @@ public class GuiManager {
             "stats_update_rate");
         inventory.setItem(15, updateRate);
         
-        player.openInventory(inventory);
+        openInventorySoon(player, inventory);
     }
     
     // Kits Menu
@@ -1885,7 +1893,7 @@ public class GuiManager {
             "edit_hunter_kit");
         inventory.setItem(24, hunterKit);
         
-        player.openInventory(inventory);
+        openInventorySoon(player, inventory);
     }
     
     // Kit Editor
@@ -1908,7 +1916,7 @@ public class GuiManager {
         inventory.setItem(45, createGuiButton(Material.ARROW, "§7§lBack", 
             List.of("§7Return to Kit Menu"), "back_kits"));
         
-        player.openInventory(inventory);
+        openInventorySoon(player, inventory);
     }
     
     // Bounty Menu
@@ -1950,7 +1958,7 @@ public class GuiManager {
             "bounty_max");
         inventory.setItem(17, maxAmount);
         
-        player.openInventory(inventory);
+        openInventorySoon(player, inventory);
     }
     
     // Last Stand Menu
@@ -2005,7 +2013,7 @@ public class GuiManager {
             "last_stand_speed");
         inventory.setItem(24, speedAmp);
         
-        player.openInventory(inventory);
+        openInventorySoon(player, inventory);
     }
     
     // Compass Settings Menu
@@ -2049,7 +2057,7 @@ public class GuiManager {
             "compass_distance");
         inventory.setItem(17, distanceToggle);
         
-        player.openInventory(inventory);
+        openInventorySoon(player, inventory);
     }
     
     // Sudden Death Menu
@@ -2124,7 +2132,7 @@ public class GuiManager {
             inventory.setItem(31, schedule);
         }
         
-        player.openInventory(inventory);
+        openInventorySoon(player, inventory);
     }
     
     public void openBroadcastSettingsMenu(Player player) {
@@ -2156,7 +2164,7 @@ public class GuiManager {
             "§e§lTeam Changes: " + (teamChanges ? "§aON" : "§cOFF"),
             List.of("§7Broadcast team assignment changes"), "toggle_team_changes"));
         
-        player.openInventory(inventory);
+        openInventorySoon(player, inventory);
     }
     
     public void openLimboSettingsMenu(Player player) {
@@ -2188,7 +2196,7 @@ public class GuiManager {
         inventory.setItem(14, createGuiButton(Material.ENDER_PEARL, "§a§lSet to Current Location",
             List.of("§7Set limbo to your current position"), "limbo_set_current"));
         
-        player.openInventory(inventory);
+        openInventorySoon(player, inventory);
     }
     
     public void openUIPerformanceMenu(Player player) {
@@ -2227,6 +2235,6 @@ public class GuiManager {
                     "§7Higher values = better server performance",
                     "§7Recommended: 10-20 ticks"), "performance_info"));
         
-        player.openInventory(inventory);
+        openInventorySoon(player, inventory);
     }
 }
