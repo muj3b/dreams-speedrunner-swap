@@ -29,6 +29,22 @@ public class ControlGuiListener implements Listener {
     public static Set<String> getPendingSelection(java.util.UUID uuid) {
         return pendingRunnerSelections.get(uuid);
     }
+    
+    // About screen interactions: Back and donation link
+    private void handleAboutClick(Player player, ItemStack clicked) {
+        if (clicked == null || !clicked.hasItemMeta()) return;
+        org.bukkit.Material type = clicked.getType();
+        String name = com.example.speedrunnerswap.utils.GuiCompat.getDisplayName(clicked.getItemMeta());
+        if (type == org.bukkit.Material.ARROW || (name != null && name.contains("Back"))) {
+            new ControlGui(plugin).openMainMenu(player);
+            return;
+        }
+        if (type == org.bukkit.Material.PLAYER_HEAD && name != null && name.contains("Creator")) {
+            String url = plugin.getConfig().getString("donation.url", "https://buymeacoffee.com/muj3b");
+            player.sendMessage("§6Support the creator: §b" + url);
+            player.sendMessage("§7Copy or click the link above in chat.");
+        }
+    }
 
     public static void setPendingSelection(java.util.UUID uuid, Set<String> sel) {
         if (sel == null) pendingRunnerSelections.remove(uuid); else pendingRunnerSelections.put(uuid, sel);
@@ -63,6 +79,10 @@ public class ControlGuiListener implements Listener {
         return inv != null && inv.getHolder() instanceof ControlGuiHolder holder && holder.getType() == ControlGuiHolder.Type.COORDINATION;
     }
 
+    private boolean isAbout(Inventory inv) {
+        return inv != null && inv.getHolder() instanceof ControlGuiHolder holder && holder.getType() == ControlGuiHolder.Type.ABOUT;
+    }
+
     @EventHandler(priority = EventPriority.HIGHEST)
     public void onInventoryClick(InventoryClickEvent event) {
         if (!(event.getWhoClicked() instanceof Player player)) return;
@@ -70,13 +90,13 @@ public class ControlGuiListener implements Listener {
         if (top == null) return;
         
         // Check if this is one of our GUI inventories
-        if (!isMain(top) && !isRunnerSelector(top) && !isCoordination(top)) return;
+        if (!isMain(top) && !isRunnerSelector(top) && !isCoordination(top) && !isAbout(top)) return;
         
         // ALWAYS cancel the event to prevent item movement
         event.setCancelled(true);
         
-        // Debug logging
-        plugin.getLogger().info("GUI Click detected - Slot: " + event.getSlot() + ", RawSlot: " + event.getRawSlot());
+        // Debug logging (reduced verbosity)
+        plugin.getLogger().fine("GUI Click detected - Slot: " + event.getSlot() + ", RawSlot: " + event.getRawSlot());
         
         // Prevent any click in player inventory when GUI is open
         if (event.getRawSlot() >= top.getSize()) {
@@ -87,7 +107,7 @@ public class ControlGuiListener implements Listener {
         ItemStack clicked = event.getCurrentItem();
         if (clicked == null || clicked.getType() == Material.AIR) return;
         
-        plugin.getLogger().info("Processing click on item: " + clicked.getType());
+        plugin.getLogger().fine("Processing click on item: " + clicked.getType());
 
         if (isMain(top)) {
             handleMainClick(player, clicked);
@@ -95,6 +115,8 @@ public class ControlGuiListener implements Listener {
             handleRunnerSelectorClick(player, clicked, event.getRawSlot(), top.getSize());
         } else if (isCoordination(top)) {
             handleCoordinationClick(player, clicked);
+        } else if (isAbout(top)) {
+            handleAboutClick(player, clicked);
         }
     }
 
@@ -109,7 +131,7 @@ public class ControlGuiListener implements Listener {
         
         // ALWAYS cancel drag events in our GUIs
         event.setCancelled(true);
-        plugin.getLogger().info("Blocked drag attempt in GUI");
+        plugin.getLogger().fine("Blocked drag attempt in GUI");
     }
     
     @EventHandler(priority = EventPriority.HIGHEST)
@@ -118,8 +140,8 @@ public class ControlGuiListener implements Listener {
         Inventory destination = event.getDestination();
         
         // Block any item movement from/to our GUIs
-        if ((source != null && (isMain(source) || isRunnerSelector(source) || isCoordination(source))) ||
-            (destination != null && (isMain(destination) || isRunnerSelector(destination) || isCoordination(destination)))) {
+        if ((source != null && (isMain(source) || isRunnerSelector(source) || isCoordination(source) || isAbout(source))) ||
+            (destination != null && (isMain(destination) || isRunnerSelector(destination) || isCoordination(destination) || isAbout(destination)))) {
             event.setCancelled(true);
         }
     }
@@ -141,12 +163,12 @@ public class ControlGuiListener implements Listener {
         
         // Debug logging
         String itemName = com.example.speedrunnerswap.utils.GuiCompat.getDisplayName(clicked.getItemMeta());
-        plugin.getLogger().info("Main GUI click - Material: " + type + ", Display Name: " + itemName);
+        plugin.getLogger().fine("Main GUI click - Material: " + type + ", Display Name: " + itemName);
         
         // Check for button ID first (more reliable than material type)
         String buttonId = getButtonId(clicked);
         if (buttonId != null) {
-            plugin.getLogger().info("Found button ID: " + buttonId);
+            plugin.getLogger().fine("Found button ID: " + buttonId);
             switch (buttonId) {
                 case "manage_runners" -> {
                     plugin.getLogger().info("Processing manage_runners button");
@@ -160,7 +182,7 @@ public class ControlGuiListener implements Listener {
         }
 
         if (type == Material.LIME_WOOL) {
-            plugin.getLogger().info("Processing LIME_WOOL (Start Game) click");
+            plugin.getLogger().fine("Processing LIME_WOOL (Start Game) click");
             if (!running) {
                 // Ensure mode is runner-only
                 plugin.setCurrentMode(SpeedrunnerSwap.SwapMode.SAPNAP);
@@ -178,7 +200,7 @@ public class ControlGuiListener implements Listener {
         }
 
         if (type == Material.RED_WOOL) {
-            plugin.getLogger().info("Processing RED_WOOL (Stop Game) click");
+            plugin.getLogger().fine("Processing RED_WOOL (Stop Game) click");
             if (running) {
                 plugin.getGameManager().stopGame();
                 player.sendMessage("§cGame stopped!");
@@ -190,7 +212,7 @@ public class ControlGuiListener implements Listener {
         }
 
         if (type == Material.YELLOW_WOOL) {
-            plugin.getLogger().info("Processing YELLOW_WOOL (Pause Game) click");
+            plugin.getLogger().fine("Processing YELLOW_WOOL (Pause Game) click");
             if (running && !plugin.getGameManager().isGamePaused()) {
                 plugin.getGameManager().pauseGame();
                 player.sendMessage("§eGame paused!");
@@ -202,7 +224,7 @@ public class ControlGuiListener implements Listener {
         }
 
         if (type == Material.ORANGE_WOOL) {
-            plugin.getLogger().info("Processing ORANGE_WOOL (Resume Game) click");
+            plugin.getLogger().fine("Processing ORANGE_WOOL (Resume Game) click");
             if (running && plugin.getGameManager().isGamePaused()) {
                 plugin.getGameManager().resumeGame();
                 player.sendMessage("§aGame resumed!");
@@ -214,7 +236,7 @@ public class ControlGuiListener implements Listener {
         }
 
         if (type == Material.NETHER_STAR) {
-            plugin.getLogger().info("Processing NETHER_STAR (Shuffle Queue) click");
+            plugin.getLogger().fine("Processing NETHER_STAR (Shuffle Queue) click");
             if (plugin.getGameManager().shuffleQueue()) {
                 player.sendMessage("§aShuffled runner queue successfully.");
             } else {
@@ -226,7 +248,7 @@ public class ControlGuiListener implements Listener {
 
         if (type == Material.PLAYER_HEAD) {
             String name = com.example.speedrunnerswap.utils.GuiCompat.getDisplayName(clicked.getItemMeta());
-            plugin.getLogger().info("Processing PLAYER_HEAD click with name: " + name);
+            plugin.getLogger().fine("Processing PLAYER_HEAD click with name: " + name);
             if (name != null && name.contains("Manage Runners")) {
                 plugin.getLogger().info("Opening runner selector");
                 // Initialize pending selection with current config

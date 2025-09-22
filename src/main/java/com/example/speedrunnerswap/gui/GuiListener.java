@@ -57,7 +57,13 @@ public class GuiListener implements Listener {
             // If there is no clickable item, do nothing further
             if (clickedItem == null || clickedItem.getType() == Material.AIR) return;
 
-            // Global Back handling: map current menu title to its parent menu
+            // Prefer ID-based Back handling first to ensure correct parent routing
+            String backId = getButtonId(clickedItem);
+            if ("back_settings".equals(backId)) { guiManager.openSettingsMenu(player); return; }
+            if ("back_mode".equals(backId)) { guiManager.openModeSelector(player); return; }
+            if ("back_kits".equals(backId)) { guiManager.openKitsMenu(player); return; }
+
+            // Generic Back fallback (for older menus without IDs)
             if (isBackButton(clickedItem)) {
                 routeBack(title, player);
                 return;
@@ -132,11 +138,23 @@ public class GuiListener implements Listener {
                 guiManager.openDreamMenu(player);
                 return;
             }
-            if (title.contains("Power-up Durations") || title.contains("Positive Effects") || title.contains("Negative Effects") || title.contains("Power-ups")) {
+            // Power-ups subpages -> back to Power-ups; Power-ups main -> back to Dream menu
+            if (title.contains("Power-up Durations") || title.contains("Positive Effects") || title.contains("Negative Effects")) {
                 guiManager.openPowerUpsMenu(player);
                 return;
             }
+            if (title.contains("Power-ups")) {
+                guiManager.openDreamMenu(player);
+                return;
+            }
             if (title.contains("Advanced Config") || title.contains("List Editor") || title.contains("Statistics")) {
+                guiManager.openSettingsMenu(player);
+                return;
+            }
+            // Additional settings submenus: ensure Back returns to Settings
+            if (title.contains("Broadcast Settings") || title.contains("Limbo Configuration") ||
+                title.contains("UI Performance") || title.contains("Kit Management") ||
+                title.contains("Kit Editor")) {
                 guiManager.openSettingsMenu(player);
                 return;
             }
@@ -1257,8 +1275,19 @@ public class GuiListener implements Listener {
         ItemStack clicked = event.getCurrentItem();
         if (clicked == null || !clicked.hasItemMeta()) return;
 
-        String name = com.example.speedrunnerswap.utils.GuiCompat.getDisplayName(clicked.getItemMeta());
+        // Prefer button IDs
+        String id = getButtonId(clicked);
+        if (id != null) {
+            switch (id) {
+                case "edit_runner_kit" -> { guiManager.openKitEditor(player, "runner"); return; }
+                case "edit_hunter_kit" -> { guiManager.openKitEditor(player, "hunter"); return; }
+                case "back_settings" -> { guiManager.openSettingsMenu(player); return; }
+            }
+        }
 
+        // Legacy name-based fallbacks
+        String name = com.example.speedrunnerswap.utils.GuiCompat.getDisplayName(clicked.getItemMeta());
+        if (name == null) return;
         switch (name) {
             case "§e§lKits: §aEnabled", "§e§lKits: §cDisabled" -> {
                 boolean enabled = plugin.getConfigManager().isKitsEnabled();
@@ -1414,12 +1443,50 @@ public class GuiListener implements Listener {
         Player player = (Player) event.getWhoClicked();
         ItemStack clicked = event.getCurrentItem();
         if (clicked == null || !clicked.hasItemMeta()) return;
-        String name = com.example.speedrunnerswap.utils.GuiCompat.getDisplayName(clicked.getItemMeta());
+        // Prefer button IDs (new Compass Settings)
+        String id = getButtonId(clicked);
+        if (id != null) {
+            switch (id) {
+                case "back_settings" -> { guiManager.openSettingsMenu(player); return; }
+                case "toggle_compass" -> {
+                    boolean enabled = plugin.getConfig().getBoolean("compass.enabled", true);
+                    plugin.getConfig().set("compass.enabled", !enabled);
+                    plugin.saveConfig();
+                }
+                case "compass_update" -> {
+                    int val = plugin.getConfig().getInt("compass.update_interval", 20);
+                    int delta = event.isShiftClick() ? 10 : 5;
+                    if (event.isLeftClick()) val += delta;
+                    if (event.isRightClick()) val -= delta;
+                    val = Math.max(1, Math.min(200, val));
+                    plugin.getConfig().set("compass.update_interval", val);
+                    plugin.saveConfig();
+                }
+                case "compass_range" -> {
+                    int val = plugin.getConfig().getInt("compass.tracking_range", 100);
+                    int delta = event.isShiftClick() ? 50 : 10;
+                    if (event.isLeftClick()) val += delta;
+                    if (event.isRightClick()) val -= delta;
+                    val = Math.max(10, Math.min(100000, val));
+                    plugin.getConfig().set("compass.tracking_range", val);
+                    plugin.saveConfig();
+                }
+                case "compass_distance" -> {
+                    boolean show = plugin.getConfig().getBoolean("compass.show_distance", true);
+                    plugin.getConfig().set("compass.show_distance", !show);
+                    plugin.saveConfig();
+                }
+                default -> {}
+            }
+            guiManager.openCompassSettingsMenu(player);
+            return;
+        }
 
+        // Legacy name-based fallbacks (older compass jamming UI)
+        String name = com.example.speedrunnerswap.utils.GuiCompat.getDisplayName(clicked.getItemMeta());
         switch (name) {
             case "§e§lCompass Jamming: §aEnabled", "§e§lCompass Jamming: §cDisabled" -> {
                 boolean enabled = plugin.getConfigManager().isCompassJammingEnabled();
-                // Write both paths for robustness
                 plugin.getConfig().set("tracker.compass_jamming.enabled", !enabled);
                 plugin.getConfig().set("sudden_death.compass_jamming.enabled", !enabled);
                 plugin.saveConfig();
@@ -1540,17 +1607,23 @@ public class GuiListener implements Listener {
         Player player = (Player) event.getWhoClicked();
         ItemStack clicked = event.getCurrentItem();
         if (clicked == null || !clicked.hasItemMeta()) return;
-
-        String name = com.example.speedrunnerswap.utils.GuiCompat.getDisplayName(clicked.getItemMeta());
-        if (!name.equals("§a§lSave Kit")) return;
-
-        // Extract kit type from title: "§e§lEdit <kit> Kit"
-        String plainTitle = getPlainTitle(event.getView());
-        String kitType = "runner";
-        int idxEdit = plainTitle.indexOf("Edit ");
-        int idxKit = plainTitle.indexOf(" Kit");
-        if (idxEdit >= 0 && idxKit > idxEdit + 5) {
-            kitType = plainTitle.substring(idxEdit + 5, idxKit).trim().toLowerCase();
+        // Prefer ID-based save buttons: save_runner_kit, save_hunter_kit
+        String kitType = null;
+        String id = getButtonId(clicked);
+        if (id != null && id.startsWith("save_") && id.endsWith("_kit")) {
+            kitType = id.substring("save_".length(), id.length() - "_kit".length());
+        } else {
+            // Legacy by-name detection
+            String name = com.example.speedrunnerswap.utils.GuiCompat.getDisplayName(clicked.getItemMeta());
+            if (!"§a§lSave Kit".equals(name)) return;
+            // Extract kit type from title: "§e§lEdit <kit> Kit"
+            String plainTitle = getPlainTitle(event.getView());
+            kitType = "runner";
+            int idxEdit = plainTitle.indexOf("Edit ");
+            int idxKit = plainTitle.indexOf(" Kit");
+            if (idxEdit >= 0 && idxKit > idxEdit + 5) {
+                kitType = plainTitle.substring(idxEdit + 5, idxKit).trim().toLowerCase();
+            }
         }
 
         // Gather contents (first 45 slots), armor in 45..48 -> [helmet, chest, legs, boots]
@@ -1853,6 +1926,34 @@ public class GuiListener implements Listener {
         Player player = (Player) event.getWhoClicked();
         ItemStack clicked = event.getCurrentItem();
         if (clicked == null || !clicked.hasItemMeta()) return;
+        // Prefer ID-based handling
+        String id = getButtonId(clicked);
+        if (id != null) {
+            switch (id) {
+                case "back_settings" -> { guiManager.openDreamMenu(player); return; }
+                case "dream_tracker_toggle" -> {
+                    boolean enabled = plugin.getConfigManager().isTrackerEnabled();
+                    plugin.getConfigManager().setTrackerEnabled(!enabled);
+                    if (!enabled) {
+                        plugin.getTrackerManager().startTracking();
+                        for (org.bukkit.entity.Player hunter : plugin.getGameManager().getHunters()) {
+                            if (hunter.isOnline()) plugin.getTrackerManager().giveTrackingCompass(hunter);
+                        }
+                    } else {
+                        plugin.getTrackerManager().stopTracking();
+                    }
+                }
+                case "dream_single_sleep_toggle" -> {
+                    boolean enabled = plugin.getConfigManager().isSinglePlayerSleepEnabled();
+                    plugin.getConfigManager().setSinglePlayerSleepEnabled(!enabled);
+                }
+                default -> {}
+            }
+            guiManager.openDreamSettingsMenu(player);
+            return;
+        }
+
+        // Legacy name-based fallbacks
         String name = com.example.speedrunnerswap.utils.GuiCompat.getDisplayName(clicked.getItemMeta());
         switch (name) {
             case "§7§lBack" -> guiManager.openDreamMenu(player);
