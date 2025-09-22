@@ -24,6 +24,13 @@ public class SuddenDeathManager {
         this.scheduledTask = null;
     }
 
+// Cross-platform broadcast of legacy strings (avoids Adventure dependency)
+private void broadcastLegacy(String msg) {
+    for (Player p : Bukkit.getOnlinePlayers()) {
+        try { p.sendMessage(msg); } catch (Throwable ignored) {}
+    }
+}
+
     public void scheduleSuddenDeath() {
         if (isActive) return;
 
@@ -41,13 +48,9 @@ public class SuddenDeathManager {
         // Schedule sudden death activation
         scheduledTask = Bukkit.getScheduler().runTaskLater(plugin, this::activateSuddenDeath, activationDelayTicks);
 
-        // Announce scheduled activation
-        Bukkit.broadcast(
-            net.kyori.adventure.text.Component.text("\n§4§l=== SUDDEN DEATH SCHEDULED ===")
-        );
-        Bukkit.broadcast(
-            net.kyori.adventure.text.Component.text("§cSudden Death will begin in " + minutes + " minutes!")
-        );
+        // Announce scheduled activation (cross-platform)
+        broadcastLegacy("\n§4§l=== SUDDEN DEATH SCHEDULED ===");
+        broadcastLegacy("§cSudden Death will begin in " + minutes + " minutes!");
     }
 
     public void activateSuddenDeath() {
@@ -113,9 +116,9 @@ public class SuddenDeathManager {
     }
 
     private void announceSuddenDeath() {
-        Bukkit.broadcast(net.kyori.adventure.text.Component.text("\n§4§l=== SUDDEN DEATH ACTIVATED ==="));
-        Bukkit.broadcast(net.kyori.adventure.text.Component.text("§cAll players have been teleported to The End!"));
-        Bukkit.broadcast(net.kyori.adventure.text.Component.text("§cFight to the death!"));
+        broadcastLegacy("\n§4§l=== SUDDEN DEATH ACTIVATED ===");
+        broadcastLegacy("§cAll players have been teleported to The End!");
+        broadcastLegacy("§cFight to the death!");
         
         // Play dramatic sound for all players
         for (Player player : Bukkit.getOnlinePlayers()) {
@@ -142,7 +145,7 @@ public class SuddenDeathManager {
         if (scheduledTask != null) {
             scheduledTask.cancel();
             scheduledTask = null;
-            Bukkit.broadcast(net.kyori.adventure.text.Component.text("§eSudden Death schedule cancelled."));
+            broadcastLegacy("§eSudden Death schedule cancelled.");
         }
     }
 

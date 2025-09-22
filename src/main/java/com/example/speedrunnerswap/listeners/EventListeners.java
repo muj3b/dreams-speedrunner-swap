@@ -1,8 +1,9 @@
 package com.example.speedrunnerswap.listeners;
 
 import com.example.speedrunnerswap.SpeedrunnerSwap;
-import io.papermc.paper.event.player.AsyncChatEvent;
+import com.example.speedrunnerswap.utils.BukkitCompat;
 import org.bukkit.event.player.AsyncPlayerChatEvent;
+import io.papermc.paper.event.player.AsyncChatEvent;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
@@ -17,12 +18,6 @@ import org.bukkit.event.entity.EntityDamageEvent;
 import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
-import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
-import net.kyori.adventure.title.Title;
-import net.kyori.adventure.text.format.NamedTextColor;
-import net.kyori.adventure.text.format.TextDecoration;
-import java.time.Duration;
 
 public class EventListeners implements Listener {
     
@@ -33,14 +28,52 @@ public class EventListeners implements Listener {
     public EventListeners(SpeedrunnerSwap plugin) {
         this.plugin = plugin;
     }
+
+    // Cross-version safe title extractor (reflection; no compile-time kyori dependency)
+    private String getPlainTitle(org.bukkit.inventory.InventoryView view) {
+        if (view == null) return "";
+        // Try Paper's title() via reflection first
+        try {
+            java.lang.reflect.Method m = view.getClass().getMethod("title");
+            Object comp = m.invoke(view);
+            if (comp != null) {
+                try {
+                    Class<?> serCls = Class.forName("net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer");
+                    java.lang.reflect.Method plainText = serCls.getMethod("plainText");
+                    Object serializer = plainText.invoke(null);
+                    Class<?> componentCls = Class.forName("net.kyori.adventure.text.Component");
+                    java.lang.reflect.Method serialize = serializer.getClass().getMethod("serialize", componentCls);
+                    Object s = serialize.invoke(serializer, comp);
+                    if (s != null) return String.valueOf(s);
+                } catch (Throwable ignored) {
+                    // Fallback: common content() accessor or toString()
+                    try {
+                        java.lang.reflect.Method content = comp.getClass().getMethod("content");
+                        Object s2 = content.invoke(comp);
+                        if (s2 != null) return String.valueOf(s2);
+                    } catch (Throwable ignored2) {}
+                    return String.valueOf(comp);
+                }
+            }
+        } catch (Throwable ignored) {}
+        // Spigot's getTitle() via reflection
+        try {
+            java.lang.reflect.Method m2 = view.getClass().getMethod("getTitle");
+            Object s3 = m2.invoke(view);
+            return s3 != null ? String.valueOf(s3) : "";
+        } catch (Throwable ignored) {}
+        return "";
+    }
     
     @EventHandler
     public void onPlayerJoin(PlayerJoinEvent event) {
         Player player = event.getPlayer();
         
-        // If the player is a hunter, give them a tracking compass
         if (plugin.getGameManager() != null && plugin.getGameManager().isGameRunning()) {
+            // Handle task mode rejoin logic and resume if needed
+            plugin.getGameManager().handlePlayerJoin(player);
             plugin.getGameManager().updateTeams();
+            // If the player is a hunter, give them a tracking compass
             if (plugin.getGameManager().isHunter(player) && plugin.getTrackerManager() != null) {
                 plugin.getTrackerManager().giveTrackingCompass(player);
             }
@@ -71,7 +104,17 @@ public class EventListeners implements Listener {
 
         // Suppress death messages during active games to maintain mystery
         if (plugin.getGameManager().isGameRunning()) {
-            event.deathMessage(Component.empty());
+            // Try Spigot API first: setDeathMessage(String)
+            try {
+                java.lang.reflect.Method m = event.getClass().getMethod("setDeathMessage", String.class);
+                m.invoke(event, new Object[]{null});
+            } catch (Throwable t) {
+                // Paper API: deathMessage(Component) — set to null to clear if present
+                try {
+                    java.lang.reflect.Method m2 = event.getClass().getMethod("deathMessage", Class.forName("net.kyori.adventure.text.Component"));
+                    m2.invoke(event, new Object[]{null});
+                } catch (Throwable ignored) {}
+            }
         }
 
         // Ensure hunters don't drop tracking compasses on death
@@ -79,27 +122,27 @@ public class EventListeners implements Listener {
             event.getDrops().removeIf(item -> item != null && item.getType() == Material.COMPASS);
         }
 
-        // Show pop-up title when a runner dies, then end the game
+        // Runner death handling: Dream mode declares Hunters as winners; other modes preserve prior behavior
         if (plugin.getGameManager().isGameRunning() && plugin.getGameManager().isRunner(player)) {
-            Component titleText = Component.text("bro speedrunners died bro no shot")
-                    .color(NamedTextColor.RED)
-                    .decorate(TextDecoration.BOLD);
-            Component subText = Component.text("");
-            Title deathTitle = Title.title(
-                    titleText,
-                    subText,
-                    Title.Times.times(Duration.ofMillis(200), Duration.ofMillis(1600), Duration.ofMillis(200))
-            );
-            for (Player p : plugin.getServer().getOnlinePlayers()) {
-                p.showTitle(deathTitle);
-            }
-
-            // End the game shortly after the title displays
-            plugin.getServer().getScheduler().runTaskLater(plugin, () -> {
-                if (plugin.getGameManager().isGameRunning()) {
-                    plugin.getGameManager().stopGame(); // no winner, ends cleanly
+            var mode = plugin.getCurrentMode();
+            if (mode == com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode.DREAM) {
+                // Declare Hunters as winners
+                plugin.getServer().getScheduler().runTask(plugin, () -> {
+                    if (plugin.getGameManager().isGameRunning()) {
+                        plugin.getGameManager().endGame(com.example.speedrunnerswap.models.Team.HUNTER);
+                    }
+                });
+            } else {
+                // Preserve existing behavior for non-Dream modes
+                for (Player p : plugin.getServer().getOnlinePlayers()) {
+                    BukkitCompat.showTitle(p, "§4§lRUNNER DIED", "§cGame over", 4, 32, 4);
                 }
-            }, 20L);
+                plugin.getServer().getScheduler().runTaskLater(plugin, () -> {
+                    if (plugin.getGameManager().isGameRunning()) {
+                        plugin.getGameManager().stopGame();
+                    }
+                }, 20L);
+            }
         }
     }
 
@@ -193,7 +236,7 @@ public class EventListeners implements Listener {
         if (inventory == null || clickedItem == null || clickedItem.getType() == Material.AIR) return;
     
         // If this is one of our plugin GUIs, let the dedicated GuiListener handle it
-        String title = PlainTextComponentSerializer.plainText().serialize(event.getView().title());
+        String title = getPlainTitle(event.getView());
         if (isPluginGuiTitle(title)) {
             return; // Do not cancel or handle here
         }
@@ -284,6 +327,7 @@ public class EventListeners implements Listener {
                title.contains("Compass") ||
                title.contains("Sudden Death") ||
                title.contains("Statistics") ||
+               title.contains("Dangerous Blocks") ||
                title.contains("Edit ") && title.contains(" Kit");
     }
 

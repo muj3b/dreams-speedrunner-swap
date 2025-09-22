@@ -16,17 +16,19 @@ public final class GuiCompat {
     private GuiCompat() {}
 
     public static Inventory createInventory(InventoryHolder holder, int size, String title) {
+        InventoryHolder effective = (holder != null) ? holder : new com.example.speedrunnerswap.gui.PluginGuiHolder();
         try {
-            return Bukkit.createInventory(holder, size, Component.text(title));
+            return Bukkit.createInventory(effective, size, Component.text(title));
         } catch (Throwable t) {
             // Fallback to legacy title if Component API is unavailable
-            return createInventoryLegacy(holder, size, title);
+            return createInventoryLegacy(effective, size, title);
         }
     }
 
     @SuppressWarnings("deprecation")
     private static Inventory createInventoryLegacy(InventoryHolder holder, int size, String title) {
-        return Bukkit.createInventory(holder, size, title);
+        InventoryHolder effective = (holder != null) ? holder : new com.example.speedrunnerswap.gui.PluginGuiHolder();
+        return Bukkit.createInventory(effective, size, title);
     }
 
     public static void setDisplayName(ItemMeta meta, String name) {
@@ -58,6 +60,21 @@ public final class GuiCompat {
         }
     }
 
+    public static List<String> getLore(ItemMeta meta) {
+        try {
+            List<Component> comps = meta.lore();
+            if (comps != null) {
+                List<String> out = new ArrayList<>(comps.size());
+                var serializer = net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer.plainText();
+                for (Component c : comps) {
+                    out.add(serializer.serialize(c));
+                }
+                return out;
+            }
+        } catch (Throwable ignored) {}
+        return getLoreLegacy(meta);
+    }
+
     @SuppressWarnings("deprecation")
     private static void setDisplayNameLegacy(ItemMeta meta, String name) {
         try { meta.setDisplayName(name); } catch (Throwable ignored) {}
@@ -72,5 +89,11 @@ public final class GuiCompat {
     @SuppressWarnings("deprecation")
     private static void setLoreLegacy(ItemMeta meta, List<String> legacyLore) {
         try { meta.setLore(legacyLore); } catch (Throwable ignored) {}
+    }
+
+    @SuppressWarnings("deprecation")
+    private static List<String> getLoreLegacy(ItemMeta meta) {
+        try { return meta.getLore(); } catch (Throwable ignored) {}
+        return null;
     }
 }

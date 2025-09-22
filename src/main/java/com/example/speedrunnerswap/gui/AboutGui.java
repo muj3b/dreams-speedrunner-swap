@@ -1,4 +1,5 @@
 package com.example.speedrunnerswap.gui;
+import com.example.speedrunnerswap.SpeedrunnerSwap;
 import com.example.speedrunnerswap.utils.GuiCompat;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
@@ -41,7 +42,10 @@ public class AboutGui {
         head.setItemMeta(meta);
         inv.setItem(8, head);
 
-        player.openInventory(inv);
+        // Schedule open to next tick for safety across servers
+        Bukkit.getScheduler().runTask(SpeedrunnerSwap.getInstance(), () -> {
+            if (player.isOnline()) player.openInventory(inv);
+        });
     }
 
     public static String getTitle() {

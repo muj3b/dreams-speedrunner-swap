@@ -45,10 +45,8 @@ public class SwapCommand implements CommandExecutor, TabCompleter {
                 case "creator":
                     return handleCreator(sender);
                 case "setrunners":
-                case "setrunner":
                     return handleSetRunners(sender, Arrays.copyOfRange(args, 1, args.length));
                 case "sethunters":
-                case "sethunter":
                     return handleSetHunters(sender, Arrays.copyOfRange(args, 1, args.length));
                 case "reload":
                     return handleReload(sender);
@@ -58,6 +56,10 @@ public class SwapCommand implements CommandExecutor, TabCompleter {
                     return handleMode(sender, Arrays.copyOfRange(args, 1, args.length));
                 case "clearteams":
                     return handleClearTeams(sender);
+                case "tasks":
+                    return handleTasks(sender, Arrays.copyOfRange(args, 1, args.length));
+                case "complete":
+                    return handleTaskComplete(sender, Arrays.copyOfRange(args, 1, args.length));
                 default:
                     sender.sendMessage("§cUnknown subcommand. Use /swap for help.");
                     return false;
@@ -78,8 +80,8 @@ public class SwapCommand implements CommandExecutor, TabCompleter {
 
         if (rest.length == 0) {
             sender.sendMessage("§eCurrent mode: §f" + plugin.getCurrentMode().name().toLowerCase());
-            sender.sendMessage("§7Usage: /swap mode <dream|sapnap> [--force]");
-            sender.sendMessage("§7       /swap mode default <dream|sapnap>");
+            sender.sendMessage("§7Usage: /swap mode <dream|sapnap|task> [--force]");
+            sender.sendMessage("§7       /swap mode default <dream|sapnap|task>");
             return true;
         }
 
@@ -92,11 +94,15 @@ public class SwapCommand implements CommandExecutor, TabCompleter {
                 return true;
             }
             String val = rest[1].toLowerCase();
-            if (!val.equals("dream") && !val.equals("sapnap")) {
+            if (!val.equals("dream") && !val.equals("sapnap") && !val.equals("task")) {
                 sender.sendMessage("§cUnknown mode: " + val);
                 return false;
             }
-            com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode m = val.equals("sapnap") ? com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode.SAPNAP : com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode.DREAM;
+            com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode m = switch (val) {
+                case "sapnap" -> com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode.SAPNAP;
+                case "task" -> com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode.TASK;
+                default -> com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode.DREAM;
+            };
             plugin.getConfigManager().setDefaultMode(m);
             sender.sendMessage("§aDefault mode set to §f" + val + "§a.");
             return true;
@@ -126,8 +132,13 @@ public class SwapCommand implements CommandExecutor, TabCompleter {
                     try { new com.example.speedrunnerswap.gui.ControlGui(plugin).openMainMenu(p); } catch (Throwable ignored) {}
                 }
                 return true;
+            case "task":
+                plugin.setCurrentMode(com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode.TASK);
+                sender.sendMessage("§aMode set to §6Task Manager§a (runners only, secret tasks)");
+                if (sender instanceof Player p) plugin.getGuiManager().openMainMenu(p);
+                return true;
             default:
-                sender.sendMessage("§cUnknown mode: " + mode + ". Use dream|sapnap");
+                sender.sendMessage("§cUnknown mode: " + mode + ". Use dream|sapnap|task");
                 return false;
         }
     }
@@ -139,26 +150,10 @@ public class SwapCommand implements CommandExecutor, TabCompleter {
                 "https://donate.stripe.com/8x29AT0H58K03judnR0Ba01"
         );
 
-        net.kyori.adventure.text.Component header = net.kyori.adventure.text.Component.text("Speedrunner Swap")
-                .color(net.kyori.adventure.text.format.NamedTextColor.GOLD)
-                .decorate(net.kyori.adventure.text.format.TextDecoration.BOLD);
-        net.kyori.adventure.text.Component author = net.kyori.adventure.text.Component.text("Created by muj3b")
-                .color(net.kyori.adventure.text.format.NamedTextColor.YELLOW);
-        net.kyori.adventure.text.Component donate = net.kyori.adventure.text.Component.text("❤ Donate to support development")
-                .color(net.kyori.adventure.text.format.NamedTextColor.LIGHT_PURPLE)
-                .decorate(net.kyori.adventure.text.format.TextDecoration.BOLD)
-                .hoverEvent(net.kyori.adventure.text.event.HoverEvent.showText(
-                        net.kyori.adventure.text.Component.text("Open donation page", net.kyori.adventure.text.format.NamedTextColor.GOLD)))
-                .clickEvent(net.kyori.adventure.text.event.ClickEvent.openUrl(donateUrl));
-
-        if (sender instanceof org.bukkit.entity.Player p) {
-            p.sendMessage(header);
-            p.sendMessage(author);
-            p.sendMessage(donate);
-        } else {
-            sender.sendMessage("Speedrunner Swap — Created by muj3b");
-            sender.sendMessage("Donate: " + donateUrl);
-        }
+        sender.sendMessage("§6§lSpeedrunner Swap");
+        sender.sendMessage("§eCreated by §f m u j 3 b");
+        sender.sendMessage("§d❤ Donate to support development");
+        sender.sendMessage("§b" + donateUrl);
         return true;
     }
 
@@ -180,8 +175,8 @@ public class SwapCommand implements CommandExecutor, TabCompleter {
         }
 
         try {
-            // Open 2-button mode selector first
-            plugin.getGuiManager().openModeSelector((Player) sender);
+            // Open direct gamemode selector - allows access to each gamemode's main menu
+            plugin.getGuiManager().openDirectGamemodeSelector((Player) sender);
             return true;
         } catch (Exception e) {
             sender.sendMessage("§cError opening GUI: " + e.getMessage());
@@ -205,7 +200,13 @@ public class SwapCommand implements CommandExecutor, TabCompleter {
         if (success) {
             sender.sendMessage("§aGame started successfully.");
         } else {
-            sender.sendMessage("§cFailed to start the game. Make sure there are runners set.");
+            // Provide clearer guidance depending on current mode
+            var mode = plugin.getCurrentMode();
+            if (mode == com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode.DREAM) {
+                sender.sendMessage("§cFailed to start. Dream mode requires at least §e1 runner§c and §e1 hunter§c.");
+            } else {
+                sender.sendMessage("§cFailed to start. You must set at least §e1 runner§c.");
+            }
         }
         
         return success;
@@ -396,6 +397,86 @@ public class SwapCommand implements CommandExecutor, TabCompleter {
         return true;
     }
 
+    private boolean handleTasks(CommandSender sender, String[] rest) {
+        if (!sender.hasPermission("speedrunnerswap.admin")) {
+            sender.sendMessage("§cYou don't have permission to manage tasks.");
+            return false;
+        }
+        if (rest.length == 0) {
+            sender.sendMessage("§eUsage: /swap tasks <list|reroll|endwhenoneleft <on|off|toggle>|reload>");
+            return true;
+        }
+        String sub = rest[0].toLowerCase();
+        switch (sub) {
+            case "list": {
+                var tmm = plugin.getTaskManagerMode();
+                if (tmm == null) { sender.sendMessage("§cTask Manager not initialized."); return false; }
+                var map = tmm.getAssignments();
+                if (map.isEmpty()) {
+                    sender.sendMessage("§7No task assignments.");
+                    return true;
+                }
+                sender.sendMessage("§6Task Assignments:");
+                for (var e : map.entrySet()) {
+                    java.util.UUID uuid = e.getKey();
+                    String taskId = e.getValue();
+                    String name = plugin.getServer().getOfflinePlayer(uuid).getName();
+                    if (name == null) name = uuid.toString().substring(0, 8);
+                    var def = tmm.getTask(taskId);
+                    String desc = def != null ? def.description() : taskId;
+                    sender.sendMessage("§e" + name + "§7: §f" + desc + " (§8"+taskId+"§7)");
+                }
+                return true;
+            }
+            case "reroll": {
+                if (plugin.getGameManager().isGameRunning()) {
+                    sender.sendMessage("§cYou can only reroll before the game starts.");
+                    return false;
+                }
+                if (plugin.getCurrentMode() != com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode.TASK) {
+                    sender.sendMessage("§cSwitch to Task Manager mode first: /swap mode task");
+                    return false;
+                }
+                var tmm = plugin.getTaskManagerMode();
+                if (tmm == null) { sender.sendMessage("§cTask Manager not initialized."); return false; }
+                // Build runner list from selected team assignments
+                java.util.List<Player> selectedRunners = new java.util.ArrayList<>();
+                for (Player p : Bukkit.getOnlinePlayers()) {
+                    var st = plugin.getGameManager().getPlayerState(p);
+                    if (st != null && st.getSelectedTeam() == com.example.speedrunnerswap.models.Team.RUNNER) selectedRunners.add(p);
+                }
+                if (selectedRunners.isEmpty()) {
+                    sender.sendMessage("§cNo selected runners found. Use the Team Selector first.");
+                    return false;
+                }
+                tmm.assignAndAnnounceTasks(selectedRunners);
+                sender.sendMessage("§aRerolled tasks for §f"+selectedRunners.size()+"§a selected runners.");
+                return true;
+            }
+            case "endwhenoneleft": {
+                boolean cur = plugin.getConfig().getBoolean("task_manager.end_when_one_left", false);
+                if (rest.length >= 2) {
+                    String opt = rest[1].toLowerCase();
+                    if (opt.equals("on") || opt.equals("true")) cur = true; else if (opt.equals("off") || opt.equals("false")) cur = false; else cur = !cur;
+                } else { cur = !cur; }
+                plugin.getConfig().set("task_manager.end_when_one_left", cur);
+                plugin.saveConfig();
+                sender.sendMessage("§eEnd When One Runner Left: " + (cur ? "§aON" : "§cOFF"));
+                return true;
+            }
+            case "reload": {
+                var tmm = plugin.getTaskManagerMode();
+                if (tmm == null) { sender.sendMessage("§cTask Manager not initialized."); return false; }
+                tmm.reloadTasks();
+                sender.sendMessage("§a[Task Manager] Tasks reloaded from config without restarting!");
+                return true;
+            }
+            default:
+                sender.sendMessage("§cUnknown tasks subcommand. Use list|reroll|endwhenoneleft|reload");
+                return false;
+        }
+    }
+
     private boolean handleClearTeams(CommandSender sender) {
         if (!sender.hasPermission("speedrunnerswap.admin")) {
             sender.sendMessage("§cYou don't have permission to use this command.");
@@ -418,22 +499,25 @@ public class SwapCommand implements CommandExecutor, TabCompleter {
         List<String> completions = new ArrayList<>();
         
         if (args.length == 1) {
-            // Subcommands
-            List<String> subCommands = Arrays.asList("start", "stop", "pause", "resume", "status", "creator", "setrunners", "setrunner", "sethunters", "sethunter", "reload", "gui", "mode", "clearteams");
+            // Subcommands (canonical names only)
+            List<String> subCommands = Arrays.asList("start", "stop", "pause", "resume", "status", "creator", "setrunners", "sethunters", "reload", "gui", "mode", "clearteams", "tasks", "complete");
             for (String subCommand : subCommands) {
                 if (subCommand.startsWith(args[0].toLowerCase())) {
                     completions.add(subCommand);
                 }
             }
         } else if (args.length > 1) {
-            // Player names for setrunners and sethunters (both singular and plural)
-            if (args[0].equalsIgnoreCase("setrunners") || args[0].equalsIgnoreCase("setrunner") || 
-                args[0].equalsIgnoreCase("sethunters") || args[0].equalsIgnoreCase("sethunter")) {
+            // Player names for setrunners and sethunters
+            if (args[0].equalsIgnoreCase("setrunners") || args[0].equalsIgnoreCase("sethunters")) {
                 for (Player player : Bukkit.getOnlinePlayers()) {
                     String name = player.getName();
                     if (name.toLowerCase().startsWith(args[args.length - 1].toLowerCase())) {
                         completions.add(name);
                     }
+                }
+            } else if (args[0].equalsIgnoreCase("complete") && args.length == 2) {
+                if ("confirm".startsWith(args[1].toLowerCase())) {
+                    completions.add("confirm");
                 }
             } else if (args[0].equalsIgnoreCase("mode") && args.length == 2) {
                 for (String opt : new String[]{"dream", "sapnap", "default"}) {
@@ -447,5 +531,69 @@ public class SwapCommand implements CommandExecutor, TabCompleter {
         }
 
         return completions;
+    }
+    
+    private boolean handleTaskComplete(CommandSender sender, String[] rest) {
+        // Allow any player to manually complete their task
+        if (!(sender instanceof Player player)) {
+            sender.sendMessage("§cOnly players can complete tasks.");
+            return false;
+        }
+        
+        if (plugin.getCurrentMode() != com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode.TASK) {
+            sender.sendMessage("§cTask completion is only available in Task Manager mode.");
+            return false;
+        }
+        
+        if (!plugin.getGameManager().isGameRunning()) {
+            sender.sendMessage("§cTasks can only be completed during an active game.");
+            return false;
+        }
+        
+        var taskMode = plugin.getTaskManagerMode();
+        if (taskMode == null) {
+            sender.sendMessage("§cTask Manager not initialized.");
+            return false;
+        }
+        
+        String assignedTask = taskMode.getAssignedTask(player);
+        if (assignedTask == null) {
+            sender.sendMessage("§cYou don't have a task assigned. Join the game as a runner first.");
+            return false;
+        }
+        
+        // Get task description for confirmation
+        var taskDef = taskMode.getTask(assignedTask);
+        String description = taskDef != null ? taskDef.description() : assignedTask;
+        
+        // Check if player wants to see their task or complete it
+        if (rest.length == 0) {
+            // Show current task and instructions
+            player.sendMessage("§6========== §e§lYOUR TASK §6==========");
+            player.sendMessage("§f" + description);
+            player.sendMessage("");
+            player.sendMessage("§a§lTo complete your task:");
+            player.sendMessage("§e/swap complete confirm");
+            player.sendMessage("");
+            player.sendMessage("§7When you use this command, you will win the game!");
+            player.sendMessage("§7Only use it when you have actually finished your task.");
+            player.sendMessage("§6" + "=".repeat(35));
+            return true;
+        }
+        
+        String action = rest[0].toLowerCase();
+        if (!"confirm".equals(action)) {
+            sender.sendMessage("§cUse '/swap complete confirm' to complete your task, or '/swap complete' to see your task.");
+            return false;
+        }
+        
+        // Confirm completion
+        player.sendMessage("§a§lCongratulations! You completed your task:");
+        player.sendMessage("§f" + description);
+        
+        // Complete the task
+        taskMode.complete(player);
+        
+        return true;
     }
 }

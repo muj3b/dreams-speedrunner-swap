@@ -97,6 +97,76 @@ public final class BukkitCompat {
     }
 
     /**
+     * Get server TPS in a cross-platform way. Returns the 1-minute TPS value if available.
+     * Uses reflection to avoid hard dependency on Paper's Bukkit#getTPS().
+     *
+     * @return TPS value as Double, or null if not available on this platform
+     */
+    public static Double getServerTPS() {
+        try {
+            // Paper exposes static double[] Bukkit#getTPS()
+            java.lang.reflect.Method m = org.bukkit.Bukkit.class.getMethod("getTPS");
+            Object tpsObj = m.invoke(null);
+            if (tpsObj instanceof double[] arr && arr.length > 0) {
+                return arr[0];
+            }
+        } catch (Throwable ignored) {
+            // Not Paper or method not available
+        }
+        return null;
+    }
+
+    /**
+     * Show a title to a player in a cross-platform way. Uses Adventure Title API when available (Paper),
+     * otherwise falls back to Player#sendTitle on Spigot/Bukkit.
+     */
+    public static void showTitle(org.bukkit.entity.Player player, String title, String subtitle,
+                                 int fadeInTicks, int stayTicks, int fadeOutTicks) {
+        if (player == null) return;
+        // Try Adventure (Paper)
+        try {
+            Class<?> compCls = Class.forName("net.kyori.adventure.text.Component");
+            Class<?> titleCls = Class.forName("net.kyori.adventure.title.Title");
+            Class<?> timesCls = Class.forName("net.kyori.adventure.title.Title$Times");
+
+            java.lang.reflect.Method text = compCls.getMethod("text", String.class);
+            Object main = text.invoke(null, title);
+            Object sub = text.invoke(null, subtitle);
+
+            Class<?> durationCls = Class.forName("java.time.Duration");
+            java.lang.reflect.Method ofMillis = durationCls.getMethod("ofMillis", long.class);
+            Object fadeIn = ofMillis.invoke(null, fadeInTicks * 50L);
+            Object stay = ofMillis.invoke(null, stayTicks * 50L);
+            Object fadeOut = ofMillis.invoke(null, fadeOutTicks * 50L);
+
+            java.lang.reflect.Method timesFactory = timesCls.getMethod("times", durationCls, durationCls, durationCls);
+            Object times = timesFactory.invoke(null, fadeIn, stay, fadeOut);
+
+            java.lang.reflect.Method titleFactory = titleCls.getMethod("title", compCls, compCls, timesCls);
+            Object advTitle = titleFactory.invoke(null, main, sub, times);
+
+            java.lang.reflect.Method showTitle = player.getClass().getMethod("showTitle", titleCls);
+            showTitle.invoke(player, advTitle);
+            return;
+        } catch (Throwable ignored) {
+            // Adventure not present; fall through
+        }
+
+        // Fallback to legacy Spigot API
+        try {
+            // Player#sendTitle(String, String, int, int, int)
+            java.lang.reflect.Method send = player.getClass().getMethod("sendTitle", String.class, String.class, int.class, int.class, int.class);
+            send.invoke(player, title, subtitle, fadeInTicks, stayTicks, fadeOutTicks);
+        } catch (Throwable ignored) {
+            // As ultimate fallback, send chat messages
+            try {
+                player.sendMessage("§6§l" + title);
+                if (subtitle != null && !subtitle.isEmpty()) player.sendMessage("§7" + subtitle);
+            } catch (Throwable ignored2) {}
+        }
+    }
+
+    /**
      * Resolve targeted entity for a player across Paper/Bukkit versions.
      * Tries Player#getTargetEntity(int, boolean), then Player#getTargetEntity(int),
      * finally falls back to a ray trace against entities.

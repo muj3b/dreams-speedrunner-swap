@@ -5,12 +5,6 @@ import com.example.speedrunnerswap.models.PlayerState;
 import com.example.speedrunnerswap.models.Team;
 import com.example.speedrunnerswap.utils.PlayerStateUtil;
 import com.example.speedrunnerswap.utils.SafeLocationFinder;
-import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.format.NamedTextColor;
-import net.kyori.adventure.text.format.TextDecoration;
-import net.kyori.adventure.text.event.ClickEvent;
-import net.kyori.adventure.text.event.HoverEvent;
-import net.kyori.adventure.title.Title;
 import org.bukkit.Location;
 import org.bukkit.*;
 import org.bukkit.entity.Entity;
@@ -20,11 +14,10 @@ import org.bukkit.potion.PotionEffectType;
 import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.scheduler.BukkitTask;
 
-import com.example.speedrunnerswap.utils.BukkitCompat;
 import com.example.speedrunnerswap.utils.Msg;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.GameMode;
-import java.time.Duration;
+import com.example.speedrunnerswap.utils.BukkitCompat;
 
 import java.util.*;
 import java.util.concurrent.ThreadLocalRandom;
@@ -43,8 +36,10 @@ public class GameManager {
     private BukkitTask titleTask;
     private BukkitTask freezeCheckTask;
     private BukkitTask cageTask;
+    private BukkitTask runnerTimeoutTask;
     private long nextSwapTime;
     private final Map<UUID, PlayerState> playerStates;
+    private final Map<UUID, Long> runnerDisconnectAt = new HashMap<>();
     // Shared cage management per-world (one cage in each world)
     private final java.util.Map<org.bukkit.World, java.util.List<org.bukkit.block.BlockState>> sharedCageBlocks = new java.util.HashMap<>();
     private final java.util.Map<org.bukkit.World, org.bukkit.Location> sharedCageCenters = new java.util.HashMap<>();
@@ -81,14 +76,8 @@ public class GameManager {
             @Override
             public void run() {
                 if (count > 0) {
-                    Title title = Title.title(
-                        Component.text("Starting in " + count).color(NamedTextColor.GREEN).decorate(TextDecoration.BOLD),
-                        Component.text("Made by muj3b").color(NamedTextColor.GRAY),
-                        Title.Times.times(Duration.ofMillis(500), Duration.ofMillis(3500), Duration.ofMillis(500))
-                    );
-                    
                     for (Player player : Bukkit.getOnlinePlayers()) {
-                        player.showTitle(title);
+                        BukkitCompat.showTitle(player, "§a§lStarting in " + count, "§7Made by muj3b", 10, 70, 10);
                     }
                     count--;
                 } else {
@@ -109,12 +98,22 @@ public class GameManager {
                 
                 applyInactiveEffects();
                 scheduleNextSwap();
-                if (plugin.getCurrentMode() != com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode.SAPNAP) {
+                if (plugin.getCurrentMode() == com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode.DREAM) {
                     scheduleNextHunterSwap();
                 }
                 startActionBarUpdates();
+
+                // If Task Manager mode, assign tasks and announce to each runner
+                if (plugin.getCurrentMode() == com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode.TASK) {
+                    try { plugin.getTaskManagerMode().assignAndAnnounceTasks(runners); } catch (Throwable t) {
+                        plugin.getLogger().warning("Task assignment failed: " + t.getMessage());
+                    }
+                }
                 startTitleUpdates();
                 startCageEnforcement();
+                if (plugin.getCurrentMode() == com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode.TASK) {
+                    startRunnerTimeoutWatcher();
+                }
                 
                 if (plugin.getCurrentMode() != com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode.SAPNAP && plugin.getConfigManager().isTrackerEnabled()) {
                     plugin.getTrackerManager().startTracking();
@@ -143,38 +142,27 @@ public class GameManager {
             return;
         }
 
-        Component titleText;
+        String titleStr;
         String runnerSubtitle = "";
         String hunterSubtitle = "";
 
         if (winner == Team.RUNNER) {
-            titleText = Component.text("RUNNERS WIN!", NamedTextColor.GREEN, TextDecoration.BOLD);
-            runnerSubtitle = "bro y'all are locked in, good stuff";
-            hunterSubtitle = "bro y'all are locked in, good stuff";
+            titleStr = "§a§lRUNNERS WIN!";
+            runnerSubtitle = "§eBro y'all are locked in, good stuff";
+            hunterSubtitle = "§eBro y'all are locked in, good stuff";
         } else if (winner == Team.HUNTER) {
-            titleText = Component.text("HUNTERS WIN!", NamedTextColor.RED, TextDecoration.BOLD);
-            runnerSubtitle = "you ain't the main character unc";
-            hunterSubtitle = "bro those speedrunners are trash asf";
+            titleStr = "§c§lHUNTERS WIN!";
+            runnerSubtitle = "§eYou ain't the main character, unc";
+            hunterSubtitle = "§eBro those speedrunners are trash";
         } else {
-            titleText = Component.text("GAME OVER", NamedTextColor.RED, TextDecoration.BOLD);
-            runnerSubtitle = "No winner declared.";
-            hunterSubtitle = "No winner declared.";
+            titleStr = "§c§lGAME OVER";
+            runnerSubtitle = "§eNo winner declared.";
+            hunterSubtitle = "§eNo winner declared.";
         }
 
         for (Player player : Bukkit.getOnlinePlayers()) {
-            Component subtitleText;
-            if (isRunner(player)) {
-                subtitleText = Component.text(runnerSubtitle, NamedTextColor.YELLOW);
-            } else {
-                subtitleText = Component.text(hunterSubtitle, NamedTextColor.YELLOW);
-            }
-
-            Title endTitle = Title.title(
-                titleText,
-                subtitleText,
-                Title.Times.times(Duration.ofMillis(500), Duration.ofMillis(5000), Duration.ofMillis(500))
-            );
-            player.showTitle(endTitle);
+            String sub = isRunner(player) ? runnerSubtitle : hunterSubtitle;
+            BukkitCompat.showTitle(player, titleStr, sub, 10, 100, 10);
         }
 
         if (swapTask != null) swapTask.cancel();
@@ -183,6 +171,7 @@ public class GameManager {
         if (titleTask != null) titleTask.cancel();
         if (freezeCheckTask != null) freezeCheckTask.cancel();
         if (cageTask != null) { cageTask.cancel(); cageTask = null; }
+        if (runnerTimeoutTask != null) { runnerTimeoutTask.cancel(); runnerTimeoutTask = null; }
         plugin.getTrackerManager().stopTracking();
         try { plugin.getStatsManager().stopTracking(); } catch (Exception ignored) {}
 
@@ -226,24 +215,13 @@ public class GameManager {
             "https://donate.stripe.com/8x29AT0H58K03judnR0Ba01"
         );
 
-        Component spacer = Component.text("");
-        Component header = Component.text("=== Support the Creator ===")
-            .color(NamedTextColor.GOLD)
-            .decorate(TextDecoration.BOLD);
-        Component desc = Component.text("Enjoyed the game? Help keep updates coming!")
-            .color(NamedTextColor.YELLOW);
-        Component donate = Component.text("❤ Click to Donate")
-            .color(NamedTextColor.LIGHT_PURPLE)
-            .decorate(TextDecoration.BOLD)
-            .hoverEvent(HoverEvent.showText(Component.text("Open donation page", NamedTextColor.GOLD)))
-            .clickEvent(ClickEvent.openUrl(donateUrl));
-
         for (Player player : Bukkit.getOnlinePlayers()) {
-            player.sendMessage(spacer);
-            player.sendMessage(header);
-            player.sendMessage(desc);
-            player.sendMessage(donate);
-            player.sendMessage(spacer);
+            player.sendMessage("");
+            player.sendMessage("§6§l=== Support the Creator ===");
+            player.sendMessage("§eEnjoyed the game? Help keep updates coming!");
+            player.sendMessage("§d❤ Donate to support development");
+            player.sendMessage("§b" + donateUrl);
+            player.sendMessage("");
         }
     }
     /** Stop the game without declaring a winner */
@@ -339,7 +317,8 @@ public class GameManager {
         }
         loadTeams();
         if (!runners.isEmpty()) {
-            if (plugin.getCurrentMode() == com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode.SAPNAP) return true;
+            if (plugin.getCurrentMode() == com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode.SAPNAP ||
+                plugin.getCurrentMode() == com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode.TASK) return true;
             return !hunters.isEmpty();
         }
         return false;
@@ -381,6 +360,17 @@ public class GameManager {
                 plugin.getLogger().warning("A team is empty; game continues (pause_on_disconnect=false)");
             }
         }
+
+        // End-when-one-left behavior (Task mode)
+        if (gameRunning && plugin.getCurrentMode() == com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode.TASK && plugin.getConfig().getBoolean("task_manager.end_when_one_left", false)) {
+            int online = 0;
+            for (Player r : runners) if (r.isOnline()) online++;
+            if (online <= 1) {
+                Msg.broadcast("§e[Task Manager] Ending: only one runner remains.");
+                stopGame();
+                return;
+            }
+        }
     }
 
     /**
@@ -392,8 +382,20 @@ public class GameManager {
             return;
         }
 
+        if (isRunner(player)) {
+            runnerDisconnectAt.put(player.getUniqueId(), System.currentTimeMillis());
+            // Persist runtime disconnect time for Task mode
+            if (plugin.getCurrentMode() == com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode.TASK) {
+                setRuntimeDisconnectTime(player.getUniqueId(), System.currentTimeMillis());
+            }
+        }
+
+        boolean pauseOnDc = plugin.getCurrentMode() == com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode.TASK
+                ? plugin.getConfig().getBoolean("task_manager.pause_on_disconnect", plugin.getConfigManager().isPauseOnDisconnect())
+                : plugin.getConfigManager().isPauseOnDisconnect();
+
         if (player.equals(activeRunner)) {
-            if (plugin.getConfigManager().isPauseOnDisconnect()) {
+            if (pauseOnDc) {
                 pauseGame();
             } else {
                 performSwap();
@@ -401,6 +403,115 @@ public class GameManager {
         }
         
         savePlayerState(player);
+    }
+
+    /** Handle player rejoin */
+    public void handlePlayerJoin(Player player) {
+        if (!gameRunning) return;
+        if (plugin.getCurrentMode() == com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode.TASK) {
+            // If they had an assignment, ensure they're in runners
+            var tmm = plugin.getTaskManagerMode();
+            if (tmm != null && tmm.getAssignedTask(player) != null) {
+                if (!isRunner(player)) {
+                    // Add back into runners at end of queue
+                    runners.add(player);
+                }
+                // Remind their task
+                var def = tmm.getTask(tmm.getAssignedTask(player));
+                if (def != null) {
+                    player.sendMessage("§6[Task Manager] Your task:");
+                    player.sendMessage("§e → " + def.description());
+                }
+            } else if (plugin.getConfig().getBoolean("task_manager.allow_late_joiners", false)) {
+                // Late joiner allowed: add as runner and optionally assign a task if pool available
+                if (!isRunner(player)) {
+                    runners.add(player);
+                }
+                if (tmm != null && tmm.getAssignedTask(player) == null) {
+                    tmm.assignAndAnnounceTasks(java.util.List.of(player));
+                }
+            }
+
+            // Clear disconnect record
+            runnerDisconnectAt.remove(player.getUniqueId());
+            clearRuntimeDisconnectTime(player.getUniqueId());
+
+            // If paused and we have at least one online runner, resume automatically
+            if (isGamePaused()) {
+                boolean anyOnline = false;
+                for (Player r : runners) if (r.isOnline()) { anyOnline = true; break; }
+                if (anyOnline) {
+                    resumeGame();
+                }
+            }
+        }
+    }
+
+    private void startRunnerTimeoutWatcher() {
+        if (runnerTimeoutTask != null) runnerTimeoutTask.cancel();
+        runnerTimeoutTask = new BukkitRunnable() {
+            @Override public void run() {
+                if (!gameRunning) return;
+                long now = System.currentTimeMillis();
+                int graceSec = plugin.getConfig().getInt("task_manager.rejoin_grace_seconds", 180);
+                boolean remove = plugin.getConfig().getBoolean("task_manager.remove_on_timeout", true);
+                boolean pauseOnDc = plugin.getConfig().getBoolean("task_manager.pause_on_disconnect", true);
+
+                java.util.List<UUID> toRemove = new java.util.ArrayList<>();
+                for (var e : runnerDisconnectAt.entrySet()) {
+                    long elapsed = now - e.getValue();
+                    if (elapsed >= graceSec * 1000L) {
+                        UUID uuid = e.getKey();
+                        if (remove) {
+                            // Remove from runners
+                            runners.removeIf(r -> r.getUniqueId().equals(uuid));
+                            toRemove.add(uuid);
+                        }
+                        // If active runner, move on
+                        if (activeRunner != null && activeRunner.getUniqueId().equals(uuid)) {
+                            performSwap();
+                        }
+                    }
+                }
+                for (UUID id : toRemove) {
+                    runnerDisconnectAt.remove(id);
+                    clearRuntimeDisconnectTime(id);
+                }
+
+                // Enforce end-when-one-left if enabled
+                if (gameRunning && plugin.getConfig().getBoolean("task_manager.end_when_one_left", false) && plugin.getCurrentMode() == com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode.TASK) {
+                    int online = 0;
+                    for (Player r : runners) if (r.isOnline()) { online++; }
+                    if (online <= 1) {
+                        Msg.broadcast("§e[Task Manager] Ending: only one runner remains.");
+                        stopGame();
+                        return;
+                    }
+                }
+
+                // If paused due to disconnect and we still have online runners, resume
+                if (gamePaused && pauseOnDc) {
+                    boolean anyOnline = false;
+                    for (Player r : runners) if (r.isOnline()) { anyOnline = true; break; }
+                    if (anyOnline) resumeGame();
+                }
+            }
+        }.runTaskTimer(plugin, 20L, 20L * 5);
+    }
+
+    private void setRuntimeDisconnectTime(UUID uuid, long when) {
+        try {
+            String path = "task_manager.runtime.disconnect_times." + uuid;
+            plugin.getConfig().set(path, when);
+            plugin.saveConfig();
+        } catch (Throwable ignored) {}
+    }
+    private void clearRuntimeDisconnectTime(UUID uuid) {
+        try {
+            String path = "task_manager.runtime.disconnect_times." + uuid;
+            plugin.getConfig().set(path, null);
+            plugin.saveConfig();
+        } catch (Throwable ignored) {}
     }
 
     /**
@@ -798,6 +909,16 @@ public class GameManager {
     }
     
     private void performSwap() {
+        // End-when-one-left early check
+        if (gameRunning && plugin.getCurrentMode() == com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode.TASK && plugin.getConfig().getBoolean("task_manager.end_when_one_left", false)) {
+            int online = 0;
+            for (Player r : runners) if (r.isOnline()) online++;
+            if (online <= 1) {
+                Msg.broadcast("§e[Task Manager] Ending: only one runner remains.");
+                stopGame();
+                return;
+            }
+        }
         if (!gameRunning || gamePaused || runners.isEmpty()) {
             return;
         }
@@ -1106,21 +1227,9 @@ public class GameManager {
             
             // For caged players, show large aesthetic title
             if (isCaged && !isActive) {
-                net.kyori.adventure.text.Component titleText = net.kyori.adventure.text.Component.text(
-                        String.format("Swap in: %ds", Math.max(0, timeLeft)))
-                        .color(NamedTextColor.GOLD)
-                        .decorate(TextDecoration.BOLD);
-
-                net.kyori.adventure.text.Component sub = net.kyori.adventure.text.Component.text(
-                        String.format("Sneaking: %s  |  Running: %s", isSneak ? "Yes" : "No", isSprint ? "Yes" : "No"))
-                        .color(NamedTextColor.YELLOW);
-
-                Title title = Title.title(
-                        titleText,
-                        sub,
-                        Title.Times.times(Duration.ZERO, Duration.ofMillis(1000), Duration.ZERO)
-                );
-                p.showTitle(title);
+                String t = String.format("§6§lSwap in: %ds", Math.max(0, timeLeft));
+                String sub = String.format("§eSneaking: %s  §7|  §eRunning: %s", isSneak ? "Yes" : "No", isSprint ? "Yes" : "No");
+                BukkitCompat.showTitle(p, t, sub, 0, 20, 0);
                 continue;
             }
             
@@ -1128,21 +1237,9 @@ public class GameManager {
             boolean shouldShow = !isActive && !isCaged && (waitingAlways || (waitingLast10 && timeLeft <= 10));
             if (!shouldShow) continue;
 
-            net.kyori.adventure.text.Component titleText = net.kyori.adventure.text.Component.text(
-                    String.format("Swap in: %ds", Math.max(0, timeLeft)))
-                    .color(NamedTextColor.GOLD)
-                    .decorate(TextDecoration.BOLD);
-
-            net.kyori.adventure.text.Component sub = net.kyori.adventure.text.Component.text(
-                    String.format("Sneaking: %s  |  Running: %s", isSneak ? "Yes" : "No", isSprint ? "Yes" : "No"))
-                    .color(NamedTextColor.YELLOW);
-
-            Title title = Title.title(
-                    titleText,
-                    sub,
-                    Title.Times.times(Duration.ZERO, Duration.ofMillis(600), Duration.ZERO)
-            );
-            p.showTitle(title);
+            String t = String.format("§6§lSwap in: %ds", Math.max(0, timeLeft));
+            String sub = String.format("§eSneaking: %s  §7|  §eRunning: %s", isSneak ? "Yes" : "No", isSprint ? "Yes" : "No");
+            BukkitCompat.showTitle(p, t, sub, 0, 12, 0);
         }
     }
 

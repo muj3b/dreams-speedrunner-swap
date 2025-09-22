@@ -12,9 +12,17 @@ swap:
   randomize: false
   # Base interval in seconds (or mean if randomized)
   interval: 60
+  # Enable experimental intervals (<30s and >max) via GUI toggle
+  beta_enabled: true
+  # Apply per-mode default interval when switching modes (if game not running)
+  apply_default_on_mode_switch: true
   # Min and max interval in seconds (only used if randomize is true)
   min_interval: 30
   max_interval: 90
+  # Per-mode default intervals
+  default_intervals:
+    dream: 60
+    sapnap: 60
   # Jitter settings (only used if randomize is true)
   jitter:
     # Standard deviation in seconds
@@ -225,7 +233,34 @@ donation:
   # URL used for the clickable donate message shown when the game ends
   url: "https://donate.stripe.com/8x29AT0H58K03judnR0Ba01"
 
+# Task Manager Configuration
+task_manager:
+  # Custom tasks that players can add to the task pool
+  # Each task needs a unique ID and description
+  custom_tasks:
+    # Example custom tasks - add your own below!
+    # - id: "build_wool_rainbow"
+    #   description: "Build a rainbow using all 16 colors of wool"
+    # - id: "survive_night_no_shelter"
+    #   description: "Survive an entire night without any shelter or armor"
+    # - id: "collect_100_flowers"
+    #   description: "Collect 100 flowers of any type"
+  # Whether to include default built-in tasks
+  include_default_tasks: true
+  # Maximum time for a task game (in minutes, 0 = no limit)
+  max_game_duration: 0
+  # Disconnect/rejoin behavior
+  pause_on_disconnect: true
+  rejoin_grace_seconds: 180
+  remove_on_timeout: true
+  allow_late_joiners: false
+  end_when_one_left: false
+  # Runtime state (do not edit manually unless you know what you're doing)
+  runtime:
+    assignments: {}
+    disconnect_times: {}
+
 # General game settings
 game:
-  # Default mode selected on server start: dream | sapnap
+  # Default mode selected on server start: dream | sapnap | task
   default_mode: dream
