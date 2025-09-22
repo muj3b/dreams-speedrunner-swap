@@ -130,26 +130,22 @@ public class EventListeners implements Listener {
             event.getDrops().removeIf(item -> item != null && item.getType() == Material.COMPASS);
         }
 
-        // Runner death handling: Dream mode declares Hunters as winners; other modes preserve prior behavior
+        // Runner death handling by mode
         if (plugin.getGameManager().isGameRunning() && plugin.getGameManager().isRunner(player)) {
             var mode = plugin.getCurrentMode();
             if (mode == com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode.DREAM) {
-                // Declare Hunters as winners
+                // Dream mode: a runner death ends the game (Hunters win)
                 plugin.getServer().getScheduler().runTask(plugin, () -> {
                     if (plugin.getGameManager().isGameRunning()) {
                         plugin.getGameManager().endGame(com.example.speedrunnerswap.models.Team.HUNTER);
                     }
                 });
             } else {
-                // Preserve existing behavior for non-Dream modes
-                for (Player p : plugin.getServer().getOnlinePlayers()) {
-                    BukkitCompat.showTitle(p, "§4§lRUNNER DIED", "§cGame over", 4, 32, 4);
-                }
-                plugin.getServer().getScheduler().runTaskLater(plugin, () -> {
-                    if (plugin.getGameManager().isGameRunning()) {
-                        plugin.getGameManager().stopGame();
-                    }
-                }, 20L);
+                // Sapnap and Task modes: allow unlimited respawns (no game stop)
+                // Optional: lightweight feedback
+                try {
+                    player.sendMessage("§eYou died, but the game continues in this mode.");
+                } catch (Throwable ignored) {}
             }
         }
     }

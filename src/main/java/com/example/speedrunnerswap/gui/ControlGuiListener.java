@@ -54,16 +54,31 @@ public class ControlGuiListener implements Listener {
         this.plugin = plugin;
     }
     
-    // Helper method to get button ID from persistent data
+    // Helper method to get button ID from persistent data or by robust name fallback
     private String getButtonId(ItemStack item) {
         if (item == null || !item.hasItemMeta()) return null;
-        
-        org.bukkit.persistence.PersistentDataContainer container = item.getItemMeta().getPersistentDataContainer();
-        org.bukkit.NamespacedKey key = new org.bukkit.NamespacedKey(plugin, "ssw_button_id");
-        
-        if (container.has(key, org.bukkit.persistence.PersistentDataType.STRING)) {
-            return container.get(key, org.bukkit.persistence.PersistentDataType.STRING);
-        }
+        org.bukkit.inventory.meta.ItemMeta im = item.getItemMeta();
+        try {
+            org.bukkit.persistence.PersistentDataContainer pdc = im.getPersistentDataContainer();
+            // Prefer new compact key "btn"
+            String id = pdc.get(new org.bukkit.NamespacedKey(plugin, "btn"), org.bukkit.persistence.PersistentDataType.STRING);
+            if (id != null && !id.isEmpty()) return id;
+            // Back-compat: read legacy key used elsewhere
+            id = pdc.get(new org.bukkit.NamespacedKey(plugin, "ssw_button_id"), org.bukkit.persistence.PersistentDataType.STRING);
+            if (id != null && !id.isEmpty()) return id;
+        } catch (Throwable ignored) {}
+
+        // Fallback: infer from display name
+        String name = com.example.speedrunnerswap.utils.GuiCompat.getDisplayName(im);
+        if (name == null) return null;
+        String plain = org.bukkit.ChatColor.stripColor(name).toLowerCase(java.util.Locale.ROOT);
+        if (plain.contains("back")) return "back";
+        if (plain.contains("start")) return "start";
+        if (plain.contains("stop")) return "stop";
+        if (plain.contains("pause")) return "pause";
+        if (plain.contains("resume")) return "resume";
+        if (plain.contains("about")) return "about";
+        if (plain.contains("runner") && plain.contains("select")) return "manage_runners";
         return null;
     }
 
@@ -170,9 +185,62 @@ public class ControlGuiListener implements Listener {
         if (buttonId != null) {
             plugin.getLogger().fine("Found button ID: " + buttonId);
             switch (buttonId) {
+                case "back" -> { plugin.getGuiManager().openModeSelector(player); return; }
+                case "start" -> {
+                    if (!running) {
+                        plugin.setCurrentMode(SpeedrunnerSwap.SwapMode.SAPNAP);
+                        List<String> names = Bukkit.getOnlinePlayers().stream().map(Player::getName).collect(Collectors.toList());
+                        plugin.getConfigManager().setRunnerNames(names);
+                        plugin.getGameManager().setRunners(new ArrayList<>(Bukkit.getOnlinePlayers()));
+                        plugin.getGameManager().startGame();
+                        player.sendMessage("§aGame started!");
+                    } else {
+                        player.sendMessage("§cGame is already running!");
+                    }
+                    new ControlGui(plugin).openMainMenu(player);
+                    return;
+                }
+                case "stop" -> {
+                    if (running) {
+                        plugin.getGameManager().stopGame();
+                        player.sendMessage("§cGame stopped!");
+                    } else {
+                        player.sendMessage("§cGame is not running!");
+                    }
+                    new ControlGui(plugin).openMainMenu(player);
+                    return;
+                }
+                case "pause" -> {
+                    if (running && !plugin.getGameManager().isGamePaused()) {
+                        plugin.getGameManager().pauseGame();
+                        player.sendMessage("§eGame paused!");
+                    } else {
+                        player.sendMessage("§cCannot pause - game not running or already paused!");
+                    }
+                    new ControlGui(plugin).openMainMenu(player);
+                    return;
+                }
+                case "resume" -> {
+                    if (running && plugin.getGameManager().isGamePaused()) {
+                        plugin.getGameManager().resumeGame();
+                        player.sendMessage("§aGame resumed!");
+                    } else {
+                        player.sendMessage("§cCannot resume - game not running or not paused!");
+                    }
+                    new ControlGui(plugin).openMainMenu(player);
+                    return;
+                }
+                case "shuffle" -> {
+                    if (plugin.getGameManager().shuffleQueue()) {
+                        player.sendMessage("§aShuffled runner queue successfully.");
+                    } else {
+                        player.sendMessage("§cCannot shuffle queue - need at least 2 runners.");
+                    }
+                    new ControlGui(plugin).openMainMenu(player);
+                    return;
+                }
                 case "manage_runners" -> {
                     plugin.getLogger().info("Processing manage_runners button");
-                    // Initialize pending selection with current config
                     Set<String> initial = new HashSet<>(plugin.getConfigManager().getRunnerNames());
                     setPendingSelection(player.getUniqueId(), initial);
                     new ControlGui(plugin).openRunnerSelector(player);

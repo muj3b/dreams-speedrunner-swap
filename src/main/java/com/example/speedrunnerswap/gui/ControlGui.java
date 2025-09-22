@@ -40,7 +40,7 @@ public class ControlGui {
         fillBorder(inv, border);
 
         // Top row
-        inv.setItem(0, named(Material.ARROW, "§7§lBack", List.of("§7Return to mode selector")));
+        inv.setItem(0, button(Material.ARROW, "back", "§7§lBack", List.of("§7Return to mode selector")));
         List<String> statusLore = new ArrayList<>();
         statusLore.add("§7Runners: §b" + runnerCount);
         statusLore.add("§7Status: " + (running ? (paused ? "§ePaused" : "§aRunning") : "§cNot Running"));
@@ -56,22 +56,22 @@ public class ControlGui {
             startLore.add("§7Begin cooperative swapping");
             if (runnerCount < 2) {
                 startLore.add("§cNeed at least 2 runners!");
-                inv.setItem(10, named(Material.GRAY_WOOL, "Start Game", startLore));
+                inv.setItem(10, button(Material.GRAY_WOOL, "start", "Start Game", startLore));
             } else {
                 startLore.add("§7Interval: §a" + plugin.getConfigManager().getSwapInterval() + "s");
-                inv.setItem(10, named(Material.LIME_WOOL, "§a§lStart Game", startLore));
+                inv.setItem(10, button(Material.LIME_WOOL, "start", "§a§lStart Game", startLore));
             }
         } else {
-            inv.setItem(10, named(Material.RED_WOOL, "§c§lStop Game", List.of("§7End current session")));
+            inv.setItem(10, button(Material.RED_WOOL, "stop", "§c§lStop Game", List.of("§7End current session")));
         }
         if (running && !paused) {
-            inv.setItem(12, named(Material.YELLOW_WOOL, "§e§lPause", List.of("§7Temporarily pause swapping")));
+            inv.setItem(12, button(Material.YELLOW_WOOL, "pause", "§e§lPause", List.of("§7Temporarily pause swapping")));
         } else if (running && paused) {
-            inv.setItem(12, named(Material.ORANGE_WOOL, "§a§lResume", List.of("§7Resume cooperative swapping")));
+            inv.setItem(12, button(Material.ORANGE_WOOL, "resume", "§a§lResume", List.of("§7Resume cooperative swapping")));
         } else {
-            inv.setItem(12, named(Material.GRAY_WOOL, "Pause", List.of("§7Game not running")));
+            inv.setItem(12, button(Material.GRAY_WOOL, "pause", "Pause", List.of("§7Game not running")));
         }
-        inv.setItem(14, named(Material.NETHER_STAR, "§d§lShuffle Queue", List.of("§7Randomize runner order")));
+        inv.setItem(14, button(Material.NETHER_STAR, "shuffle", "§d§lShuffle Queue", List.of("§7Randomize runner order")));
         inv.setItem(16, namedWithId(Material.PLAYER_HEAD, "§b§lManage Runners", List.of("§7Select/deselect participants"), "manage_runners"));
 
         // Row 3: Interval and timing
@@ -219,6 +219,20 @@ public class ControlGui {
         if (loreText != null && !loreText.isEmpty()) {
             com.example.speedrunnerswap.utils.GuiCompat.setLore(im, loreText);
         }
+        it.setItemMeta(im);
+        return it;
+    }
+    
+    // Helper to tag buttons with a compact persistent ID used by ControlGuiListener
+    private ItemStack button(Material mat, String id, String display, java.util.List<String> lore) {
+        ItemStack it = new ItemStack(mat);
+        ItemMeta im = it.getItemMeta();
+        com.example.speedrunnerswap.utils.GuiCompat.setDisplayName(im, display);
+        if (lore != null && !lore.isEmpty()) com.example.speedrunnerswap.utils.GuiCompat.setLore(im, lore);
+        try {
+            org.bukkit.persistence.PersistentDataContainer pdc = im.getPersistentDataContainer();
+            pdc.set(new org.bukkit.NamespacedKey(plugin, "btn"), org.bukkit.persistence.PersistentDataType.STRING, id);
+        } catch (Throwable ignored) {}
         it.setItemMeta(im);
         return it;
     }
