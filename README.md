@@ -1,284 +1,365 @@
-# 🌀 Speedrunner Swap — Ultimate Challenge Plugin
-
 <div align="center">
 
-![Minecraft](https://img.shields.io/badge/Minecraft-1.21.8%2B-brightgreen?style=for-the-badge&logo=minecraft)
-![API](https://img.shields.io/badge/API-Paper%2FSpigot_1.21.8-blue?style=for-the-badge)
-![Status](https://img.shields.io/badge/Status-Two_Game_Modes-9cf?style=for-the-badge)
-![Downloads](https://img.shields.io/badge/Downloads-🔥Hot-red?style=for-the-badge)
+# 🌀 Speedrunner Swap + Task Master 🌀
+
+### Three Epic Game Modes in One Plugin
 
 </div>
 
----
-
-> **🎮 Two Epic Game Modes in One Plugin!**  
-> Experience both Dream's classic **Speedrunners vs Hunters** challenge AND the innovative **Multi-Runner Control Swap** mode. Choose your adventure!
-
----
-
-## 📺 Watch the Originals!
-
 <div align="center">
 
-**🏹 Speedrunners vs Hunters Mode**
-https://www.youtube.com/watch?v=Zj3G5hN-EBQ
-
-**🎛️ Multi-Runner Control Mode**
-https://www.youtube.com/watch?v=GwrAvYlT7xg
+![Minecraft](https://img.shields.io/badge/Minecraft-1.21.x%2B-28A745?style=for-the-badge&logo=minecraft)
+![API](https://img.shields.io/badge/API-Paper%2FSpigot-2875D7?style=for-the-badge)
+![Game Modes](https://img.shields.io/badge/Game_Modes-3_in_1-8A2BE2?style=for-the-badge)
+![Task Master](https://img.shields.io/badge/Task_Master-BETA-FF6B35?style=for-the-badge)
+![Tasks](https://img.shields.io/badge/100%2B_Tasks-Included-FFC107?style=for-the-badge)
 
 </div>
 
----
-
-## 🎮 Game Modes
-
-### 🏹 **Speedrunners vs Hunters Mode**
-Classic Dream-style gameplay with speedrunners swapping control while hunters pursue them.
-
-**Core Mechanics:**
-- 🔄 Speedrunners swap control on intervals
-- 🧭 Hunters track with compasses  
-- ⚔️ PvP elimination mechanics
-- 🎯 Goal: Beat the Ender Dragon before getting caught
-
-### 🎛️ **Multi-Runner Control Mode** 
-Pure cooperation mode where multiple runners share one character with no hunters.
-
-**Core Mechanics:**
-- 🔄 Queue-based rotation system
-- 👥 Any number of runners (2+)
-- 🤝 Shared inventory, health, XP, effects
-- 🎯 Goal: Beat the Ender Dragon together
+> **Experience Dream's legendary challenges in one powerful plugin! Play the classic Speedrunners vs Hunters, the cooperative Multi-Runner Control Swap, or the brand-new mind-bending Task Master mode where deception and strategy reign supreme.**
 
 ---
-
-## 🚀 How Both Modes Work
 
 <div align="center">
+
+## 🎬 Inspired by Dream's Original Videos
 
 <table>
-<tr>
-<td width="50%">
-
-### 🔄 **Swap System**
-- ⏰ Configurable intervals (default: 60s)
-- 🎲 Fixed or randomized timing
-- 🛡️ Safe swap locations
-- 🕶️ Inactive players frozen/spectating
-
-</td>
-<td width="50%">
-
-### 🤝 **Shared Elements**
-- 🎒 Inventory, health, XP sync
-- 📍 Position continuity  
-- 💬 Teamwork coordination
-- 🔗 Seamless transitions
-
-</td>
-</tr>
+  <tr>
+    <td align="center">
+      <strong>🏹 Speedrunners vs Hunters</strong><br>
+      <a href="https://www.youtube.com/watch?v=Zj3G5hN-EBQ"><img src="https://img.youtube.com/vi/Zj3G5hN-EBQ/0.jpg" width="300"></a>
+    </td>
+    <td align="center">
+      <strong>🎛️ Multi-Runner Control</strong><br>
+      <a href="https://www.youtube.com/watch?v=GwrAvYlT7xg"><img src="https://img.youtube.com/vi/GwrAvYlT7xg/0.jpg" width="300"></a>
+    </td>
+    <td align="center">
+      <strong>🎯 Task Master (NEW!)</strong><br>
+      <a href="https://www.youtube.com/watch?v=gTgrHPax0hk"><img src="https://img.youtube.com/vi/gTgrHPax0hk/0.jpg" width="300"></a>
+    </td>
+  </tr>
 </table>
-
 </div>
 
 ---
 
-## ✨ Core Features
+## 🎯 NEW: Task Master Mode (BETA)
 
 <div align="center">
 
-| 🎛️ **Feature** | 📝 **Description** | 🏹 **Hunters** | 🎛️ **Control** |
-|:---|:---|:---:|:---:|
-| **🔄 Customizable Swaps** | Fixed/random intervals, jitter, grace period | ✅ | ✅ |
-| **🛡️ Safe Swap Mode** | Avoid lava/fire/dangerous blocks | ✅ | ✅ |
-| **🧭 Hunter Tracking** | Compass updates, coordinate display | ✅ | ❌ |
-| **👥 Queue System** | Fair rotation for multiple runners | ❌ | ✅ |
-| **🖥️ GUI Interface** | Team selection, settings management | ✅ | ✅ |
-| **🎤 Voice Chat Support** | Mute inactive runners | ✅ | ✅ |
-| **🏰 Cage System** | Robust cross-world containment | ❌ | ✅ |
+### The Ultimate Mind Game - As Seen in Dream's Latest Video!
+
+**One body. Multiple players. Secret tasks. Pure chaos.**
 
 </div>
 
----
+In Task Master mode, players take turns controlling a single character while racing to complete their secret objectives. Every minute, control swaps to the next player. Will you help others to hide your true goal? Will you sabotage their progress? The choice is yours, but only the first to complete their task wins!
 
-## 🎯 Exclusive Hunter Mode Features
-### *10 Additions Not in the Original!*
+### 🎲 100+ Unique Tasks Included!
 
 <details>
-<summary><strong>🔥 Click to Reveal All New Features</strong></summary>
+<summary><strong>Click to see all task categories (100+ tasks!)</strong></summary>
 
-<div align="center">
+#### 🔥 Special Multi-Step Tasks (Like Dream's Video)
+- Fall from surface to bedrock and die from fall damage
+- Kill an iron golem in the Nether with a bed explosion
+- Kill one of every colored sheep with an iron shovel
+- Sleep in a Nether fortress bed
+- Die holding exactly 10 diamonds
+- Get a full stack of rotten flesh
+- Kill a mob by dropping an anvil on it
+- Take 100 damage without dying
+- Name 5 different mobs
+- Collect all 9 wood types
 
-<table>
-<tr>
-<td>
+#### ⛏️ Underground & Mining Challenges
+- Mine 1000 blocks total
+- Find 12 diamonds
+- Create 100-block strip mine at Y=11
+- Die in lava below Y=5
+- Place torch on bedrock
+- Fill chest with all ore types
+- Explode 50 TNT
+- Dig through bedrock to void
+- Build 3x3x3 obsidian room
+- Find and break mob spawner
 
-**1. 🔄 Hunter Swapping**  
-Hunters can swap control too
+#### ⚔️ Combat & Mob Challenges
+- Kill 50 hostile mobs
+- Kill 10 zombies with golden sword
+- Kill 5 creepers without explosions
+- Get killed by baby zombie
+- Kill skeleton with its own arrow
+- Survive 5 creeper explosions
+- Kill enderman with water
+- Tame wolf and have it kill 10 sheep
+- Kill witch with splash potions
+- Find and kill spider jockey
 
-**2. ✨ Swap Power-Ups**  
-Random potion effects on swap
+#### 🔥 Nether Challenges
+- Bridge across lava lake
+- Collect 16 glowstone dust
+- Kill ghast by reflecting fireball
+- Loot Nether fortress chest
+- Collect 10 magma cream
+- Trade 16 gold with piglins
+- Kill 20 piglins
+- Ride strider across lava ocean
+- Brew fire resistance potion
+- Get killed by wither skeleton
 
-**3. 💪 "Last Stand" Mode**  
-Final runner gets strength boost
+#### 🏗️ Crafting & Building
+- Craft full diamond armor set
+- Build 50-block high tower
+- Build automatic redstone farm
+- Craft and place 10 paintings
+- Build 2 nether portals in overworld
+- Enchanting table with 15 bookshelves
+- Create 5 infinite water sources
+- Build house with 5 rooms
+- Craft 100 items total
+- Create 3x3 map wall
 
-**4. 🎒 Custom Kits**  
-Define starting equipment
+#### 🌾 Food & Farming
+- Breed 20 animals
+- Cook 64 pieces of meat
+- Harvest 100 wheat
+- Create bee farm with 3 hives
+- Tame 10 wolves
+- Collect every flower type
+- Craft and place cake
+- Eat 25 different foods
+- Get poisoned 5 times
+- Achieve max saturation with golden carrots
 
-**5. 🔥 "Hot Potato" Mode**  
-Damage-triggered swaps
+#### 🚂 Transportation Challenges
+- Travel 1000 blocks from spawn
+- Ride minecart 500 blocks
+- Fly 1000 blocks with elytra
+- Cross ocean by boat
+- Ride pig 100 blocks
+- Build 50-block ice road
+- Jump 5 blocks high on horse
+- Swim 500 blocks
+- Create 30-block bubble elevator
+- Travel 100 blocks with ender pearls
 
-</td>
-<td>
+#### 📦 Collection Challenges
+- Collect 64 bones
+- Collect 32 ender pearls
+- Find a music disc
+- Reach level 30 experience
+- Fill entire inventory with unique items
+- Collect 64 string
+- Collect 32 gunpowder
+- Collect every dye color
+- Find 2 saddles
+- Find Totem of Undying
 
-**6. 📊 Advanced Stats**  
-Detailed end-game statistics
+#### 💎 Trading & Villager Challenges
+- Trade with 5 different villagers
+- Max out a villager's trade
+- Cure zombie villager
+- Build and spawn iron golem
+- Defeat a raid
+- Collect 64 emeralds
+- Build villager breeder
+- Transport villager 500 blocks
+- Get Hero of the Village
+- Trade for enchanted book
 
-**7. 🌍 Shrinking Border**  
-World border forces action
-
-**8. 💰 Bounty System**  
-Special rewards for targets
-
-**9. ⚡ Sudden Death**  
-End teleport to final battle
-
-**10. 🧭 Compass Jamming**  
-Temporary hunter confusion
-
-</td>
-</tr>
-</table>
-
-</div>
+#### 🎪 Unique & Special Challenges
+- Sleep in bed 10 times
+- Die 5 different ways
+- Watch sunset from Y=100
+- Create 10 snow golems
+- Throw diamond in lava
+- Drown with Respiration III
+- Kill yourself with own TNT
+- Travel 10000 blocks one direction
+- Take 50 hearts damage without dying
+- Place 1000 blocks
 
 </details>
 
+### ✨ Task Master Features
+
+| Feature | Description |
+|:--|:--|
+| **🎲 100+ Pre-Built Tasks** | Extensive task library inspired by Dream's challenges |
+| **➕ Custom Task Creator** | Add your own tasks via GUI or config file |
+| **🕵️ Secret Objectives** | Tasks hidden from other players to maintain mystery |
+| **📊 Task Balancing** | All tasks designed for similar completion times |
+| **💡 Optional Hints** | Configurable hint system after time delays |
+| **🎭 Strategic Deception** | Hide your true objective while sabotaging others |
+| **🏆 Instant Victory** | First to complete their task wins immediately |
+
 ---
 
-## 🎛️ Multi-Runner Control Features
+## 🎮 All Game Modes
+
+<table>
+  <tr>
+    <td width="33%" valign="top">
+      <h3>🏹 Speedrunners vs Hunters</h3>
+      <p>The classic chase. Speedrunners must defeat the Ender Dragon while being hunted. Control swaps between runners at intervals.</p>
+      <ul>
+        <li>🔄 Periodic control swaps</li>
+        <li>🧭 Compass tracking</li>
+        <li>⚔️ Intense PvP</li>
+        <li>🎯 Goal: Defeat Ender Dragon</li>
+      </ul>
+    </td>
+    <td width="33%" valign="top">
+      <h3>🎛️ Multi-Runner Control</h3>
+      <p>Pure cooperation. Multiple players share control of one character in a queue system to beat the game together.</p>
+      <ul>
+        <li>🔄 Queue-based swaps</li>
+        <li>🤝 Shared body & inventory</li>
+        <li>👥 No PvP, pure co-op</li>
+        <li>🎯 Goal: Beat the game as one</li>
+      </ul>
+    </td>
+    <td width="33%" valign="top">
+      <h3>🎯 Task Master <span style="color: #FF6B35;">(BETA)</span></h3>
+      <p>Strategic competition. Complete your secret task while sharing control and preventing others from completing theirs.</p>
+      <ul>
+        <li>🎲 100+ included tasks</li>
+        <li>➕ Custom task support</li>
+        <li>🕵️ Hidden objectives</li>
+        <li>🎯 Goal: Complete your task first</li>
+      </ul>
+    </td>
+  </tr>
+</table>
+
+---
+
+## ✨ Universal Features
+
+| Feature | Description |
+|:--|:--|
+| **🖥️ Full GUI Control** | Manage teams, settings, and custom tasks from intuitive interface |
+| **🔄 Customizable Swaps** | Set intervals, randomization, grace periods, and jitter |
+| **🛡️ Safe Swap System** | Prevents swapping into dangerous situations |
+| **🎤 Discord Support** | Auto-mute inactive players for clear communication |
+| **➕ Custom Content** | Add your own tasks and modify gameplay via GUI or config |
+
+---
+
+## 🚀 Quick Start
 
 <div align="center">
 
-| 🎛️ **Feature** | 📝 **Description** |
-|:---|:---|
-| **🔄 Queue Management** | Fair rotation system for any number of runners |
-| **📊 Queue HUD** | Active sees countdown; others see queue position |
-| **🌍 Cross-World Cages** | Robust cage system works in all dimensions |
-| **⏲️ Smart Timing** | Grace periods, disconnect pausing, jitter options |
-| **🎯 Victory Condition** | Dragon death triggers donation link broadcast |
-| **🛠️ Freeze Modes** | EFFECTS, SPECTATOR, LIMBO, or CAGE options |
+| Step | Action | Details |
+|:---:|:---|:---|
+| **1** | 📥 **Download** | Get `SpeedrunnerSwap-*.jar` from releases |
+| **2** | 📁 **Install** | Place in server's `plugins/` directory |
+| **3** | 🔄 **Restart** | Start server to generate configs |
+| **4** | ⚙️ **Configure** | Choose mode in `config.yml` |
+| **5** | 🎮 **Play!** | Use `/swap gui` to start! |
 
 </div>
-
----
-
-## ⚙️ Configuration
-
-Edit `plugins/SpeedrunnerSwap/config.yml` after first run.
-
-### **Game Mode Settings**
-```yaml
-game_mode: "HUNTERS"  # HUNTERS or CONTROL
-```
-
-### **Common Settings**
-```yaml
-swap:
-  interval: 60
-  randomize: false
-  grace_period_ticks: 60
-safe_swap:
-  enabled: true
-  scan_radius: 5
-```
-
-### **Hunter Mode Specific**
-```yaml
-hunters:
-  tracking_enabled: true
-  pvp_enabled: true
-  compass_updates: true
-```
-
-### **Control Mode Specific**
-```yaml
-freeze_mode: "CAGE"  # EFFECTS, SPECTATOR, LIMBO, CAGE
-cage:
-  auto_rebuild: true
-  chunk_preload: true
-```
 
 ---
 
 ## 📝 Commands
 
-<div align="center">
+| Command | Description | Modes |
+|:--|:--|:--|
+| `/swap gui` | Open management GUI (includes custom task creator) | All |
+| `/swap start` | Start the game | All |
+| `/swap stop` | End current game | All |
+| `/swap mode <mode>` | Switch game mode | All |
+| `/swap tasks add <task>` | Add custom task via command | Task Master |
+| `/swap tasks list` | View all available tasks | Task Master |
+| `/swap tasks reload` | Reload tasks from config | Task Master |
+| `/swap task <player>` | View player's secret task (admin) | Task Master |
 
-| Command | Description | Hunter Mode | Control Mode |
-|:--|:--|:---:|:---:|
-| `/swap start` | Start the game | ✅ | ✅ |
-| `/swap stop` | End the current game | ✅ | ✅ |
-| `/swap gui` | Open management interface | ✅ | ✅ |
-| `/swap status` | Show game status | ✅ | ✅ |
-| `/swap mode <hunters\|control>` | Switch game mode | ✅ | ✅ |
-| `/swap setrunners <p1> [p2] ...` | Set runner team | ✅ | ✅ |
-| `/swap sethunters <p1> [p2] ...` | Set hunter team | ✅ | ❌ |
-| `/swap shuffle` | Shuffle queue order | ❌ | ✅ |
-
-**Permissions:** `speedrunnerswap.command` (default: op), `speedrunnerswap.admin` (default: op)
-
-</div>
+**Permission:** `speedrunnerswap.admin` (default: op)
 
 ---
 
-## 🛠️ Installation
+## ⚙️ Configuration
 
-<div align="center">
+```yaml
+# Active mode: "HUNTERS", "CONTROL", or "TASKMASTER"
+game_mode: "TASKMASTER"
+
+# Swap settings
+swap:
+  interval_seconds: 60
+  randomize: false
+  grace_period_ticks: 60
+
+# Task Master settings (BETA)
+taskmaster:
+  hints_enabled: true
+  hint_delay_minutes: 10
+  hide_inventories: true
   
-| Step | Action | Details |
-|:---:|:---|:---|
-| **1** | 📥 **Download** | Get latest `speedrunnerswap-*.jar` |
-| **2** | 📁 **Install** | Place in `plugins/` directory |
-| **3** | 🔄 **Restart** | Restart your server |
-| **4** | ⚙️ **Configure** | Choose mode in `config.yml` |
-| **5** | 🎮 **Play** | Use `/swap gui` or commands to start |
+  # Add custom tasks here or via GUI
+  custom_tasks:
+    - "Build a house with exactly 100 blocks"
+    - "Die while holding a cake"
+    # Add as many as you want!
+  
+  # Task categories to include
+  enabled_categories:
+    - "special_tasks"
+    - "underground_tasks"
+    - "combat_tasks"
+    - "nether_tasks"
+    - "building_tasks"
+    - "farming_tasks"
+    - "transport_tasks"
+    - "collection_tasks"
+    - "trading_tasks"
+    - "unique_tasks"
+    - "custom_tasks"  # Your custom tasks
+```
 
-</div>
+---
 
-**Requirements:** Paper 1.21.8+ recommended; Spigot 1.21.x supported with fallbacks.
+## 🎨 Creating Custom Tasks
+
+### Via GUI (Easiest)
+1. Open `/swap gui`
+2. Navigate to Task Master settings
+3. Click "Custom Tasks"
+4. Add your own challenges!
+
+### Via Config
+Add tasks directly to `custom_tasks:` in config.yml
+
+### Via Command
+Use `/swap tasks add <your task description>`
+
+**Task Design Tips:**
+- Make tasks that take 10-30 minutes to complete
+- Include specific requirements (exact numbers, specific items)
+- Create tasks that can be sabotaged by others
+- Design objectives that require strategy and planning
 
 ---
 
-## 🧱 Technical Notes
-
-### **Hunter Mode**
-- Compass tracking updates every 3 seconds
-- PvP mechanics handle elimination
-- Spectator mode for eliminated players
-- GUI-based team management
-
-### **Control Mode**  
-- Cages work across all dimensions (Overworld/Nether/End)
-- Chunk preloading prevents generation issues
-- Safe Y calculation per world environment
-- Automatic cage rebuilding on world changes
-
----
+<div align="center">
 
 ## 🙌 Credits & Support
 
-<div align="center">
+**Inspired by Dream, Sapnap & GeorgeNotFound's legendary videos**
 
-**🎬 Inspired by:** Dream's Speedrunner Swap & Sapnap's Multi-Runner videos  
-**👨‍💻 Developed by:** muj3b
+**Developed by muj3b**
 
 [![Donate](https://img.shields.io/badge/💖_Donate-Support_Development-ff69b4?style=for-the-badge)](https://donate.stripe.com/8x29AT0H58K03judnR0Ba01)
 
 ---
 
-### 🎉 **Ready for the Ultimate Challenge?** 🚀
+### 🎉 Experience Dream's Challenges Today! 🎉
 
-*Two game modes, endless possibilities. Download now and choose your adventure!*
+**100+ tasks included • Custom task support • Three game modes • Endless possibilities**
+
+*Task Master mode is in BETA - Report issues and suggest new tasks on our Discord!*
 
 </div>
