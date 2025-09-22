@@ -979,7 +979,12 @@ public class GuiListener implements Listener {
         if (item == null || !item.hasItemMeta()) return null;
 
         PersistentDataContainer container = item.getItemMeta().getPersistentDataContainer();
-        // Primary key used by current GUI
+        // Prefer compact key used by newer GUIs
+        NamespacedKey btnKey = new NamespacedKey(plugin, "btn");
+        if (container.has(btnKey, PersistentDataType.STRING)) {
+            return container.get(btnKey, PersistentDataType.STRING);
+        }
+        // Primary key used by current/older GUIs
         NamespacedKey sswKey = new NamespacedKey(plugin, "ssw_button_id");
         if (container.has(sswKey, PersistentDataType.STRING)) {
             return container.get(sswKey, PersistentDataType.STRING);
@@ -1052,8 +1057,8 @@ public class GuiListener implements Listener {
         // Assign a player by clicking their head, using current selected team
         if (clicked.getType() == Material.PLAYER_HEAD && clicked.getItemMeta() != null) {
             String targetName = com.example.speedrunnerswap.utils.GuiCompat.getDisplayName(clicked.getItemMeta());
-            // Strip all color codes and formatting
-            try { targetName = org.bukkit.ChatColor.stripColor(targetName); } catch (Throwable ignored) {}
+            // Strip all color codes and formatting without deprecated ChatColor API
+            try { targetName = com.example.speedrunnerswap.utils.TextUtil.stripColors(targetName); } catch (Throwable ignored) {}
             if (targetName != null) targetName = targetName.trim();
             Player target = Bukkit.getPlayerExact(targetName);
             if (target == null) {

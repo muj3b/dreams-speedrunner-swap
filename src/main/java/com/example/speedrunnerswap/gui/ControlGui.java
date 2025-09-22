@@ -72,7 +72,7 @@ public class ControlGui {
             inv.setItem(12, button(Material.GRAY_WOOL, "pause", "Pause", List.of("§7Game not running")));
         }
         inv.setItem(14, button(Material.NETHER_STAR, "shuffle", "§d§lShuffle Queue", List.of("§7Randomize runner order")));
-        inv.setItem(16, namedWithId(Material.PLAYER_HEAD, "§b§lManage Runners", List.of("§7Select/deselect participants"), "manage_runners"));
+        inv.setItem(16, button(Material.PLAYER_HEAD, "runner_selector", "§b§lManage Runners", List.of("§7Select/deselect participants")));
 
         // Row 3: Interval and timing
         boolean randomize = plugin.getConfigManager().isSwapRandomized();
@@ -237,24 +237,6 @@ public class ControlGui {
         return it;
     }
     
-    // Enhanced method with button ID support for better click handling
-    private ItemStack namedWithId(Material mat, String name, List<String> loreText, String buttonId) {
-        ItemStack it = new ItemStack(mat);
-        ItemMeta im = it.getItemMeta();
-        com.example.speedrunnerswap.utils.GuiCompat.setDisplayName(im, name);
-        if (loreText != null && !loreText.isEmpty()) {
-            com.example.speedrunnerswap.utils.GuiCompat.setLore(im, loreText);
-        }
-        
-        // Add button ID for better click handling
-        if (buttonId != null && !buttonId.isEmpty()) {
-            org.bukkit.NamespacedKey key = new org.bukkit.NamespacedKey(plugin, "ssw_button_id");
-            im.getPersistentDataContainer().set(key, org.bukkit.persistence.PersistentDataType.STRING, buttonId);
-        }
-        
-        it.setItemMeta(im);
-        return it;
-    }
     
     // Team Coordination Menu - New feature for enhanced cooperation
     public void openTeamCoordinationMenu(Player player) {

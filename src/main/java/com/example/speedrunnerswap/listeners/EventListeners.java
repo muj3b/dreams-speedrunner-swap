@@ -1,7 +1,6 @@
 package com.example.speedrunnerswap.listeners;
 
 import com.example.speedrunnerswap.SpeedrunnerSwap;
-import com.example.speedrunnerswap.utils.BukkitCompat;
 import org.bukkit.event.player.AsyncPlayerChatEvent;
 import io.papermc.paper.event.player.AsyncChatEvent;
 import org.bukkit.Material;

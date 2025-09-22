@@ -1706,11 +1706,11 @@ public class GuiManager {
         ItemStack item = createItem(material, name, lore);
         ItemMeta meta = item.getItemMeta();
         if (meta != null) {
-            meta.getPersistentDataContainer().set(
-                new org.bukkit.NamespacedKey(plugin, BUTTON_ID_KEY),
-                org.bukkit.persistence.PersistentDataType.STRING,
-                buttonId
-            );
+            org.bukkit.persistence.PersistentDataContainer pdc = meta.getPersistentDataContainer();
+            // New compact key used by updated listeners
+            pdc.set(new org.bukkit.NamespacedKey(plugin, "btn"), org.bukkit.persistence.PersistentDataType.STRING, buttonId);
+            // Legacy key maintained for backward compatibility
+            pdc.set(new org.bukkit.NamespacedKey(plugin, BUTTON_ID_KEY), org.bukkit.persistence.PersistentDataType.STRING, buttonId);
             item.setItemMeta(meta);
         }
         return item;
@@ -1718,10 +1718,10 @@ public class GuiManager {
 
     public String getButtonId(ItemStack item) {
         if (item != null && item.hasItemMeta()) {
-            return item.getItemMeta().getPersistentDataContainer().get(
-                new org.bukkit.NamespacedKey(plugin, BUTTON_ID_KEY),
-                org.bukkit.persistence.PersistentDataType.STRING
-            );
+            org.bukkit.persistence.PersistentDataContainer pdc = item.getItemMeta().getPersistentDataContainer();
+            String id = pdc.get(new org.bukkit.NamespacedKey(plugin, "btn"), org.bukkit.persistence.PersistentDataType.STRING);
+            if (id != null && !id.isEmpty()) return id;
+            return pdc.get(new org.bukkit.NamespacedKey(plugin, BUTTON_ID_KEY), org.bukkit.persistence.PersistentDataType.STRING);
         }
         return null;
     }

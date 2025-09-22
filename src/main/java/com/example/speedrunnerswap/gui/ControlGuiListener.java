@@ -71,14 +71,14 @@ public class ControlGuiListener implements Listener {
         // Fallback: infer from display name
         String name = com.example.speedrunnerswap.utils.GuiCompat.getDisplayName(im);
         if (name == null) return null;
-        String plain = org.bukkit.ChatColor.stripColor(name).toLowerCase(java.util.Locale.ROOT);
+        String plain = com.example.speedrunnerswap.utils.TextUtil.stripColors(name).toLowerCase(java.util.Locale.ROOT);
         if (plain.contains("back")) return "back";
         if (plain.contains("start")) return "start";
         if (plain.contains("stop")) return "stop";
         if (plain.contains("pause")) return "pause";
         if (plain.contains("resume")) return "resume";
         if (plain.contains("about")) return "about";
-        if (plain.contains("runner") && plain.contains("select")) return "manage_runners";
+        if (plain.contains("runner") && plain.contains("select")) return "runner_selector";
         return null;
     }
 
@@ -230,6 +230,14 @@ public class ControlGuiListener implements Listener {
                     new ControlGui(plugin).openMainMenu(player);
                     return;
                 }
+                case "about" -> {
+                    try {
+                        new com.example.speedrunnerswap.gui.AboutGui().openFor(player);
+                    } catch (Throwable t) {
+                        player.sendMessage("§cAbout screen failed to open.");
+                    }
+                    return;
+                }
                 case "shuffle" -> {
                     if (plugin.getGameManager().shuffleQueue()) {
                         player.sendMessage("§aShuffled runner queue successfully.");
@@ -239,7 +247,7 @@ public class ControlGuiListener implements Listener {
                     new ControlGui(plugin).openMainMenu(player);
                     return;
                 }
-                case "manage_runners" -> {
+                case "manage_runners", "runner_selector" -> {
                     plugin.getLogger().info("Processing manage_runners button");
                     Set<String> initial = new HashSet<>(plugin.getConfigManager().getRunnerNames());
                     setPendingSelection(player.getUniqueId(), initial);

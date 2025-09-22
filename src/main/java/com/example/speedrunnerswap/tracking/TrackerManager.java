@@ -113,6 +113,8 @@ public class TrackerManager {
     private void updateHunterCompass(Player hunter, Player activeRunner) {
         if (hunter == null || activeRunner == null) return;
         if (!hunter.isOnline()) return;
+        // If tracking is jammed, skip updating targets temporarily
+        if (isJammed) return;
 
         org.bukkit.World hw = hunter.getWorld();
         org.bukkit.World rw = activeRunner.getWorld();
