@@ -488,8 +488,4 @@ public class TaskManagerMode {
         taskPool.add(def.id());
     }
 
-    @SuppressWarnings("unused")
-    private static String nice(String id) {
-        return id.toLowerCase().replace('_',' ').replace("wither skeleton", "witherskeleton");
-    }
 }

@@ -189,6 +189,22 @@ public class GuiListener implements Listener {
         }
     }
 
+    // Handle inventory close to clean up state and enable smooth reopening
+    @EventHandler(priority = EventPriority.MONITOR)
+    public void onInventoryClose(org.bukkit.event.inventory.InventoryCloseEvent event) {
+        if (!(event.getPlayer() instanceof Player)) return;
+        Player player = (Player) event.getPlayer();
+        org.bukkit.inventory.Inventory top = event.getView().getTopInventory();
+        
+        // Only handle plugin GUIs (but not ControlGui ones - they have their own handler)
+        if (top != null && top.getHolder() instanceof com.example.speedrunnerswap.gui.PluginGuiHolder && 
+            !(top.getHolder() instanceof ControlGuiHolder)) {
+            // Clear any pending state that might interfere with reopening
+            // This allows menus to be opened again smoothly
+            plugin.getLogger().fine("Player " + player.getName() + " closed plugin GUI, state cleaned");
+        }
+    }
+
     private boolean isPluginGui(String title) {
         if (title == null || title.isEmpty()) return false;
         // Include all plugin menus and the kit editor

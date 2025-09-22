@@ -25,10 +25,34 @@ public class GuiManager {
     }
 
     // Always schedule inventory opens to the next tick to avoid re-entrancy issues
+    // Track pending opens to prevent race conditions
+    private final java.util.Set<java.util.UUID> pendingOpens = java.util.Collections.synchronizedSet(new java.util.HashSet<>());
+    
     private void openInventorySoon(org.bukkit.entity.Player player, org.bukkit.inventory.Inventory inv) {
         if (player == null || inv == null) return;
+        
+        // Prevent overlapping opens for the same player
+        java.util.UUID uuid = player.getUniqueId();
+        if (pendingOpens.contains(uuid)) return;
+        
+        pendingOpens.add(uuid);
         plugin.getServer().getScheduler().runTask(plugin, () -> {
-            if (player.isOnline()) player.openInventory(inv);
+            try {
+                if (player.isOnline()) {
+                    // Give a 1-tick delay to ensure previous inventory is fully closed
+                    plugin.getServer().getScheduler().runTaskLater(plugin, () -> {
+                        if (player.isOnline()) {
+                            player.openInventory(inv);
+                        }
+                        pendingOpens.remove(uuid);
+                    }, 1L);
+                } else {
+                    pendingOpens.remove(uuid);
+                }
+            } catch (Exception e) {
+                pendingOpens.remove(uuid);
+                plugin.getLogger().warning("Failed to open inventory for " + player.getName() + ": " + e.getMessage());
+            }
         });
     }
 
@@ -1452,33 +1476,6 @@ public class GuiManager {
         }
     }
     
-    @SuppressWarnings("unused")
-    private List<String> getStatusLore() {
-        List<String> lore = new ArrayList<>();
-        
-        lore.add("§7Game Running: " + (plugin.getGameManager().isGameRunning() ? "§aYes" : "§cNo"));
-        lore.add("§7Game Paused: " + (plugin.getGameManager().isGamePaused() ? "§eYes" : "§aNo"));
-        
-        if (plugin.getGameManager().isGameRunning()) {
-            Player activeRunner = plugin.getGameManager().getActiveRunner();
-            lore.add("§7Active Runner: §f" + (activeRunner != null ? activeRunner.getName() : "None"));
-            lore.add("§7Next Swap: §f" + plugin.getGameManager().getTimeUntilNextSwap() + "s");
-            
-            lore.add("");
-            lore.add("§bRunners:");
-            for (Player runner : plugin.getGameManager().getRunners()) {
-                lore.add("§7- §f" + runner.getName());
-            }
-            
-            lore.add("");
-            lore.add("§cHunters:");
-            for (Player hunter : plugin.getGameManager().getHunters()) {
-                lore.add("§7- §f" + hunter.getName());
-            }
-        }
-        
-        return lore;
-    }
     
     // Advanced Config Browser
     public void openAdvancedConfigMenu(Player player, String path, int page) {

@@ -43,9 +43,12 @@ public class AboutGui {
         inv.setItem(8, head);
 
         // Schedule open to next tick for safety across servers
-        Bukkit.getScheduler().runTask(SpeedrunnerSwap.getInstance(), () -> {
-            if (player.isOnline()) player.openInventory(inv);
-        });
+        // Add a slight delay to prevent race conditions with other GUI operations
+        Bukkit.getScheduler().runTaskLater(SpeedrunnerSwap.getInstance(), () -> {
+            if (player.isOnline()) {
+                player.openInventory(inv);
+            }
+        }, 2L);
     }
 
     public static String getTitle() {

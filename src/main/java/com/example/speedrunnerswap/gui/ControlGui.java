@@ -117,10 +117,34 @@ public class ControlGui {
     }
 
     // Always schedule inventory opens to the next tick to avoid re-entrancy issues
+    // Track pending opens to prevent race conditions
+    private final java.util.Set<java.util.UUID> pendingOpens = java.util.Collections.synchronizedSet(new java.util.HashSet<>());
+    
     private void openInventorySoon(Player player, Inventory inv) {
         if (player == null || inv == null) return;
+        
+        // Prevent overlapping opens for the same player
+        java.util.UUID uuid = player.getUniqueId();
+        if (pendingOpens.contains(uuid)) return;
+        
+        pendingOpens.add(uuid);
         plugin.getServer().getScheduler().runTask(plugin, () -> {
-            if (player.isOnline()) player.openInventory(inv);
+            try {
+                if (player.isOnline()) {
+                    // Give a 1-tick delay to ensure previous inventory is fully closed
+                    plugin.getServer().getScheduler().runTaskLater(plugin, () -> {
+                        if (player.isOnline()) {
+                            player.openInventory(inv);
+                        }
+                        pendingOpens.remove(uuid);
+                    }, 1L);
+                } else {
+                    pendingOpens.remove(uuid);
+                }
+            } catch (Exception e) {
+                pendingOpens.remove(uuid);
+                plugin.getLogger().warning("Failed to open Sapnap inventory for " + player.getName() + ": " + e.getMessage());
+            }
         });
     }
 

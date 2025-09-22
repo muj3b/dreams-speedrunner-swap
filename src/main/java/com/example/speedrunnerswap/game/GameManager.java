@@ -85,7 +85,8 @@ public class GameManager {
                     gameRunning = true;
                     gamePaused = false;
                     activeRunnerIndex = 0;
-                    activeRunner = runners.get(activeRunnerIndex);                saveAllPlayerStates();
+                    activeRunner = runners.get(activeRunnerIndex);
+                    saveAllPlayerStates();
                 
                 if (plugin.getConfigManager().isKitsEnabled()) {
                     for (Player player : runners) {

@@ -36,10 +36,6 @@ public class TaskEventListener implements Listener {
         return plugin.getCurrentMode() == SpeedrunnerSwap.SwapMode.TASK && plugin.getGameManager().isGameRunning();
     }
 
-    @SuppressWarnings("unused")
-    private boolean hasTask(Player p, String id) {
-        return plugin.getTaskManagerMode().getAssignedTask(p) != null && plugin.getTaskManagerMode().getAssignedTask(p).equals(id);
-    }
 
     private String getTask(Player p) { return plugin.getTaskManagerMode().getAssignedTask(p); }
 
