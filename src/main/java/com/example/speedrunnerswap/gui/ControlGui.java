@@ -41,6 +41,7 @@ public class ControlGui {
 
         // Top row
         inv.setItem(0, button(Material.ARROW, "back", "§7§lBack", List.of("§7Return to mode selector")));
+        inv.setItem(8, button(Material.BOOK, "about", "§b§lAbout", List.of("§7Info + donate link")));
         List<String> statusLore = new ArrayList<>();
         statusLore.add("§7Runners: §b" + runnerCount);
         statusLore.add("§7Status: " + (running ? (paused ? "§ePaused" : "§aRunning") : "§cNot Running"));
@@ -90,6 +91,20 @@ public class ControlGui {
 
         boolean betaToggle = plugin.getConfigManager().isBetaIntervalEnabled();
         inv.setItem(23, named(betaToggle ? Material.REDSTONE_TORCH : Material.LEVER, "Experimental Intervals: " + (betaToggle ? "ON" : "OFF"), List.of("§7Allow <30s and >max intervals")));
+
+        // Task Manager summary (only shown in Task mode)
+        if (plugin.getCurrentMode() == SpeedrunnerSwap.SwapMode.TASK) {
+            com.example.speedrunnerswap.task.TaskManagerMode tmm = plugin.getTaskManagerMode();
+            com.example.speedrunnerswap.task.TaskDifficulty diff = tmm != null ? tmm.getDifficultyFilter() : com.example.speedrunnerswap.task.TaskDifficulty.MEDIUM;
+            int enabledCount = (tmm != null) ? tmm.getCandidateCount() : 0;
+            List<String> taskLore = new ArrayList<>();
+            taskLore.add("§7Difficulty: §e" + diff.name());
+            taskLore.add("§7Enabled tasks: §a" + enabledCount);
+            taskLore.add("§7Click for task commands help");
+            inv.setItem(24, button(Material.TARGET, "task_info", "§6§lTask Manager", taskLore));
+            inv.setItem(25, button(Material.ARROW, "task_diff_up", "§a§lDifficulty ▲", List.of("§7Increase difficulty")));
+            inv.setItem(26, button(Material.ARROW, "task_diff_down", "§c§lDifficulty ▼", List.of("§7Decrease difficulty")));
+        }
 
         // Row 4: Safety and mode
         String freeze = plugin.getConfigManager().getFreezeMode();

@@ -38,6 +38,8 @@ public final class SpeedrunnerSwap extends JavaPlugin {
     private KitConfigManager kitConfigManager;
     private DragonManager dragonManager;
     private ChatInputHandler chatInputHandler;
+    // Task configurations (tasks.yml)
+    private com.example.speedrunnerswap.task.TaskConfigManager taskConfigManager;
     // Task Manager mode
     private com.example.speedrunnerswap.task.TaskManagerMode taskManagerMode;
     // Mode selection (Dream = runners+hunters, Sapnap = runners only, Task Manager = runners only with secret tasks)
@@ -63,7 +65,8 @@ public final class SpeedrunnerSwap extends JavaPlugin {
         this.dragonManager = new DragonManager(this);
         this.chatInputHandler = new ChatInputHandler(this);
         
-        // Initialize Task Manager mode
+        // Initialize Task config and Task Manager mode
+        this.taskConfigManager = new com.example.speedrunnerswap.task.TaskConfigManager(this);
         this.taskManagerMode = new com.example.speedrunnerswap.task.TaskManagerMode(this);
         
         // Validate config consistency
@@ -210,6 +213,10 @@ public final class SpeedrunnerSwap extends JavaPlugin {
 
     public DragonManager getDragonManager() {
         return dragonManager;
+    }
+
+    public com.example.speedrunnerswap.task.TaskConfigManager getTaskConfigManager() {
+        return taskConfigManager;
     }
 
     private void validatePowerUpConfig() {

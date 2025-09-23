@@ -55,6 +55,8 @@ public class GameManager {
         this.playerStates = new HashMap<>();
     }
     
+    // shuffleQueue() is implemented later in this class
+    
     public boolean startGame() {
         if (gameRunning) {
             return false;

@@ -27,6 +27,8 @@ public class ChatInputHandler implements Listener {
     
     public ChatInputHandler(SpeedrunnerSwap plugin) {
         this.plugin = plugin;
+        // Try to register Paper's AsyncChatEvent handler via reflection (no compile-time dependency)
+        registerPaperAsyncChatHook();
     }
     
     public void expectTaskId(Player player) {
@@ -60,51 +62,113 @@ public class ChatInputHandler implements Listener {
         activeInputs.put(player.getUniqueId(), st);
     }
     
-@SuppressWarnings("deprecation")
-@EventHandler
-public void onChat(AsyncPlayerChatEvent event) {
+    @SuppressWarnings("deprecation")
+    @EventHandler
+    public void onChat(AsyncPlayerChatEvent event) {
         Player player = event.getPlayer();
         UUID uuid = player.getUniqueId();
-        
         if (!activeInputs.containsKey(uuid)) return;
         event.setCancelled(true);
-
-        InputState state = activeInputs.remove(uuid);
         String msg = event.getMessage();
+        // Defer to main thread and share logic with Paper event
+        plugin.getServer().getScheduler().runTask(plugin, () -> handleInput(player, msg));
+    }
 
-        plugin.getServer().getScheduler().runTask(plugin, () -> {
-            switch (state.type) {
-                case TASK_ID -> {
-                    expectTaskDescription(player, msg.trim());
-                    player.sendMessage("§6Enter a §bdescription §6for task §e" + msg.trim());
-                }
-                case TASK_DESCRIPTION -> {
-                    String id = state.taskId != null ? state.taskId.trim() : ("custom_" + System.currentTimeMillis());
-                    java.util.List<String> list = plugin.getConfig().getStringList("task_manager.custom_tasks");
-                    list.add(msg.trim());
-                    plugin.getConfig().set("task_manager.custom_tasks", list);
-                    plugin.saveConfig();
-                    player.sendMessage("§aAdded custom task §e" + id + "§a: §f" + msg.trim());
-                }
-                case DONATION_URL -> {
-                    plugin.getConfig().set("donation.url", msg.trim());
-                    plugin.saveConfig();
-                    player.sendMessage("§aUpdated donation URL.");
-                }
-                case CONFIG_STRING -> {
-                    plugin.getConfig().set(state.configPath, msg.trim());
-                    plugin.saveConfig();
-                    player.sendMessage("§aUpdated §e" + state.configPath + "§a.");
-                }
-                case CONFIG_LIST_ADD -> {
-                    java.util.List<String> l = plugin.getConfig().getStringList(state.configPath);
-                    l.add(msg.trim());
-                    plugin.getConfig().set(state.configPath, l);
-                    plugin.saveConfig();
-                    player.sendMessage("§aAppended to §e" + state.configPath + "§a.");
-                }
+    /** Shared input handling used by both legacy and Paper chat events (executed on main thread). */
+    private void handleInput(Player player, String rawMessage) {
+        UUID uuid = player.getUniqueId();
+        InputState state = activeInputs.remove(uuid);
+        if (state == null) return;
+        String msg = rawMessage == null ? "" : rawMessage.trim();
+        switch (state.type) {
+            case TASK_ID -> {
+                expectTaskDescription(player, msg);
+                player.sendMessage("§6Enter a §bdescription §6for task §e" + msg);
             }
-        });
+            case TASK_DESCRIPTION -> {
+                String id = state.taskId != null ? state.taskId.trim() : ("custom_" + System.currentTimeMillis());
+                java.util.List<String> list = plugin.getConfig().getStringList("task_manager.custom_tasks");
+                list.add(msg);
+                plugin.getConfig().set("task_manager.custom_tasks", list);
+                plugin.saveConfig();
+                player.sendMessage("§aAdded custom task §e" + id + "§a: §f" + msg);
+            }
+            case DONATION_URL -> {
+                plugin.getConfig().set("donation.url", msg);
+                plugin.saveConfig();
+                player.sendMessage("§aUpdated donation URL.");
+            }
+            case CONFIG_STRING -> {
+                plugin.getConfig().set(state.configPath, msg);
+                plugin.saveConfig();
+                player.sendMessage("§aUpdated §e" + state.configPath + "§a.");
+            }
+            case CONFIG_LIST_ADD -> {
+                java.util.List<String> l = plugin.getConfig().getStringList(state.configPath);
+                l.add(msg);
+                plugin.getConfig().set(state.configPath, l);
+                plugin.saveConfig();
+                player.sendMessage("§aAppended to §e" + state.configPath + "§a.");
+            }
+        }
+    }
+
+    /** Register Paper's AsyncChatEvent using reflection for cross-platform support. */
+    @SuppressWarnings({"unchecked"})
+    private void registerPaperAsyncChatHook() {
+        try {
+            final Class<?> asyncChatCls = Class.forName("io.papermc.paper.event.player.AsyncChatEvent");
+            // Create an EventExecutor that extracts player and message via reflection
+            org.bukkit.plugin.EventExecutor exec = (listener, event) -> {
+                if (!asyncChatCls.isInstance(event)) return;
+                Object ev = event;
+                org.bukkit.entity.Player playerTmp;
+                String msgTmp;
+                try {
+                    java.lang.reflect.Method getPlayer = asyncChatCls.getMethod("getPlayer");
+                    playerTmp = (org.bukkit.entity.Player) getPlayer.invoke(ev);
+                } catch (Throwable t) {
+                    return; // can't proceed
+                }
+                try {
+                    // message() returns net.kyori.adventure.text.Component
+                    java.lang.reflect.Method messageM = asyncChatCls.getMethod("message");
+                    Object component = messageM.invoke(ev);
+                    // Reflectively serialize to plain text to avoid compile dependency
+                    Class<?> serCls = Class.forName("net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer");
+                    java.lang.reflect.Method plainText = serCls.getMethod("plainText");
+                    Object serializer = plainText.invoke(null);
+                    java.lang.reflect.Method serialize = serializer.getClass().getMethod("serialize", Class.forName("net.kyori.adventure.text.Component"));
+                    Object s = serialize.invoke(serializer, component);
+                    msgTmp = s != null ? String.valueOf(s) : "";
+                } catch (Throwable t) {
+                    msgTmp = ""; // fallback
+                }
+                final org.bukkit.entity.Player player = playerTmp;
+                final String msg = msgTmp;
+                // Cancel the Paper chat event
+                try {
+                    java.lang.reflect.Method setCancelled = asyncChatCls.getMethod("setCancelled", boolean.class);
+                    setCancelled.invoke(ev, true);
+                } catch (Throwable ignored) {}
+                // Delegate to main thread shared handler
+                plugin.getServer().getScheduler().runTask(plugin, () -> handleInput(player, msg));
+            };
+            // Register the event executor
+            plugin.getServer().getPluginManager().registerEvent(
+                (Class<? extends org.bukkit.event.Event>) asyncChatCls,
+                this,
+                org.bukkit.event.EventPriority.NORMAL,
+                exec,
+                plugin,
+                true
+            );
+            plugin.getLogger().info("Paper AsyncChatEvent hook enabled.");
+        } catch (ClassNotFoundException e) {
+            // Not running on Paper (or older versions) - nothing to do
+        } catch (Throwable t) {
+            plugin.getLogger().warning("Failed to enable Paper AsyncChatEvent hook: " + t.getMessage());
+        }
     }
     
     // Removed unused handler methods after inlining logic in onChat() to reduce lints.

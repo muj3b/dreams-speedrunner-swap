@@ -490,11 +490,17 @@ public class ConfigManager {
     public com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode getDefaultMode() {
         String m = config.getString("game.default_mode", "dream");
         if (m == null) m = "dream";
-        return "sapnap".equalsIgnoreCase(m) ? com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode.SAPNAP : com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode.DREAM;
+        if ("sapnap".equalsIgnoreCase(m)) return com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode.SAPNAP;
+        if ("task".equalsIgnoreCase(m) || "taskmanager".equalsIgnoreCase(m)) return com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode.TASK;
+        return com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode.DREAM;
     }
 
     public void setDefaultMode(com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode mode) {
-        String v = mode == com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode.SAPNAP ? "sapnap" : "dream";
+        String v = switch (mode) {
+            case SAPNAP -> "sapnap";
+            case TASK -> "task";
+            default -> "dream";
+        };
         config.set("game.default_mode", v);
         plugin.saveConfig();
     }

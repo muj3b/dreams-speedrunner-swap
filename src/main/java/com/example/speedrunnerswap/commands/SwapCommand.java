@@ -21,6 +21,50 @@ public class SwapCommand implements CommandExecutor, TabCompleter {
     public SwapCommand(SpeedrunnerSwap plugin) {
         this.plugin = plugin;
     }
+
+    private boolean handleInterval(CommandSender sender, String[] rest) {
+        if (!sender.hasPermission("speedrunnerswap.admin")) { sender.sendMessage("§cYou do not have permission to run this."); return true; }
+        if (rest.length < 1) { sender.sendMessage("§cUsage: /swap interval <seconds>"); return false; }
+        try {
+            int sec = Integer.parseInt(rest[0]);
+            plugin.getConfigManager().setSwapInterval(sec);
+            plugin.getGameManager().refreshSwapSchedule();
+            sender.sendMessage("§aSwap interval set to §f"+plugin.getConfigManager().getSwapInterval()+"s");
+            return true;
+        } catch (NumberFormatException nfe) {
+            sender.sendMessage("§cInvalid number: " + rest[0]);
+            return false;
+        }
+    }
+
+    private boolean handleRandomize(CommandSender sender, String[] rest) {
+        if (!sender.hasPermission("speedrunnerswap.admin")) { sender.sendMessage("§cYou do not have permission to run this."); return true; }
+        if (rest.length < 1) { sender.sendMessage("§cUsage: /swap randomize <on|off>"); return false; }
+        String opt = rest[0].toLowerCase();
+        boolean val = opt.startsWith("on") || opt.equals("true");
+        if (!(opt.equals("on") || opt.equals("off") || opt.equals("true") || opt.equals("false"))) {
+            sender.sendMessage("§cUsage: /swap randomize <on|off>");
+            return false;
+        }
+        plugin.getConfigManager().setSwapRandomized(val);
+        plugin.getGameManager().refreshSwapSchedule();
+        sender.sendMessage("§eRandomized swaps: " + (val ? "§aON" : "§cOFF"));
+        return true;
+    }
+
+    private boolean handleHelp(CommandSender sender) {
+        sender.sendMessage("§6§lSpeedrunnerSwap Help");
+        sender.sendMessage("§e/swap gui §7Open menu");
+        sender.sendMessage("§e/swap start|stop|pause|resume §7Control game");
+        sender.sendMessage("§e/swap interval <seconds> §7Set base swap interval");
+        sender.sendMessage("§e/swap randomize <on|off> §7Toggle randomized swaps");
+        sender.sendMessage("§e/swap mode <dream|sapnap|task> §7Set mode");
+        sender.sendMessage("§e/swap tasks list §7List tasks with difficulty + enabled");
+        sender.sendMessage("§e/swap tasks enable|disable <id> §7Toggle a task");
+        sender.sendMessage("§e/swap tasks difficulty <easy|medium|hard> §7Set difficulty pool");
+        sender.sendMessage("§e/swap tasks reload §7Reload tasks.yml");
+        return true;
+    }
     
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
@@ -60,6 +104,12 @@ public class SwapCommand implements CommandExecutor, TabCompleter {
                     return handleTasks(sender, Arrays.copyOfRange(args, 1, args.length));
                 case "complete":
                     return handleTaskComplete(sender, Arrays.copyOfRange(args, 1, args.length));
+                case "interval":
+                    return handleInterval(sender, Arrays.copyOfRange(args, 1, args.length));
+                case "randomize":
+                    return handleRandomize(sender, Arrays.copyOfRange(args, 1, args.length));
+                case "help":
+                    return handleHelp(sender);
                 default:
                     sender.sendMessage("§cUnknown subcommand. Use /swap for help.");
                     return false;
@@ -371,7 +421,7 @@ public class SwapCommand implements CommandExecutor, TabCompleter {
             return false;
         }
         if (rest.length == 0) {
-            sender.sendMessage("§eUsage: /swap tasks <list|reroll|endwhenoneleft <on|off|toggle>|reload>");
+            sender.sendMessage("§eUsage: /swap tasks <list|enable <id>|disable <id>|difficulty <easy|medium|hard>|reload|reroll|endwhenoneleft <on|off|toggle>>");
             return true;
         }
         String sub = rest[0].toLowerCase();
@@ -379,21 +429,42 @@ public class SwapCommand implements CommandExecutor, TabCompleter {
             case "list": {
                 var tmm = plugin.getTaskManagerMode();
                 if (tmm == null) { sender.sendMessage("§cTask Manager not initialized."); return false; }
-                var map = tmm.getAssignments();
-                if (map.isEmpty()) {
-                    sender.sendMessage("§7No task assignments.");
-                    return true;
+                var defs = tmm.getAllDefinitions();
+                if (defs.isEmpty()) { sender.sendMessage("§7No tasks defined."); return true; }
+                sender.sendMessage("§6Tasks (id §7|§f difficulty §7|§f enabled):");
+                int shown = 0;
+                for (var e : defs.entrySet()) {
+                    var d = e.getValue();
+                    sender.sendMessage("§e"+d.id()+" §7| §f"+(d.difficulty()!=null?d.difficulty().name():"MEDIUM")+" §7| §f"+(d.enabled()?"true":"false"));
+                    if (++shown >= 50) { sender.sendMessage("§7… (showing first 50)"); break; }
                 }
-                sender.sendMessage("§6Task Assignments:");
-                for (var e : map.entrySet()) {
-                    java.util.UUID uuid = e.getKey();
-                    String taskId = e.getValue();
-                    String name = plugin.getServer().getOfflinePlayer(uuid).getName();
-                    if (name == null) name = uuid.toString().substring(0, 8);
-                    var def = tmm.getTask(taskId);
-                    String desc = def != null ? def.description() : taskId;
-                    sender.sendMessage("§e" + name + "§7: §f" + desc + " (§8"+taskId+"§7)");
+                sender.sendMessage("§7Difficulty filter: §f"+tmm.getDifficultyFilter().name()+"§7 | Eligible now: §a"+tmm.getCandidateCount());
+                return true;
+            }
+            case "enable":
+            case "disable": {
+                if (rest.length < 2) { sender.sendMessage("§cUsage: /swap tasks "+sub+" <id>"); return false; }
+                String id = rest[1];
+                var tmm = plugin.getTaskManagerMode();
+                if (tmm == null) { sender.sendMessage("§cTask Manager not initialized."); return false; }
+                boolean ok = tmm.setTaskEnabled(id, sub.equals("enable"));
+                if (!ok) { sender.sendMessage("§cUnknown task id: "+id); return false; }
+                sender.sendMessage("§aTask '"+id+"' " + (sub.equals("enable")?"enabled":"disabled") + ".");
+                return true;
+            }
+            case "difficulty": {
+                if (rest.length < 2) { sender.sendMessage("§cUsage: /swap tasks difficulty <easy|medium|hard>"); return false; }
+                String lvl = rest[1].toLowerCase();
+                com.example.speedrunnerswap.task.TaskDifficulty d;
+                switch (lvl) {
+                    case "easy" -> d = com.example.speedrunnerswap.task.TaskDifficulty.EASY;
+                    case "hard" -> d = com.example.speedrunnerswap.task.TaskDifficulty.HARD;
+                    default -> d = com.example.speedrunnerswap.task.TaskDifficulty.MEDIUM;
                 }
+                var tmm = plugin.getTaskManagerMode();
+                if (tmm == null) { sender.sendMessage("§cTask Manager not initialized."); return false; }
+                tmm.setDifficultyFilter(d);
+                sender.sendMessage("§aTask difficulty filter set to §f"+d.name());
                 return true;
             }
             case "reroll": {
@@ -435,12 +506,13 @@ public class SwapCommand implements CommandExecutor, TabCompleter {
             case "reload": {
                 var tmm = plugin.getTaskManagerMode();
                 if (tmm == null) { sender.sendMessage("§cTask Manager not initialized."); return false; }
-                tmm.reloadTasks();
-                sender.sendMessage("§a[Task Manager] Tasks reloaded from config without restarting!");
+                try { plugin.getTaskConfigManager().reloadConfig(); } catch (Throwable ignored) {}
+                tmm.reloadTasksFromFile();
+                sender.sendMessage("§a[Task Manager] tasks.yml reloaded without restart!");
                 return true;
             }
             default:
-                sender.sendMessage("§cUnknown tasks subcommand. Use list|reroll|endwhenoneleft|reload");
+                sender.sendMessage("§cUnknown tasks subcommand. Use list|enable|disable|difficulty|reroll|endwhenoneleft|reload");
                 return false;
         }
     }
@@ -468,7 +540,7 @@ public class SwapCommand implements CommandExecutor, TabCompleter {
         
         if (args.length == 1) {
             // Subcommands (canonical names only)
-            List<String> subCommands = Arrays.asList("start", "stop", "pause", "resume", "status", "creator", "setrunners", "sethunters", "reload", "gui", "mode", "clearteams", "tasks", "complete");
+            List<String> subCommands = Arrays.asList("start", "stop", "pause", "resume", "status", "creator", "setrunners", "sethunters", "reload", "gui", "mode", "clearteams", "tasks", "complete", "interval", "randomize", "help");
             for (String subCommand : subCommands) {
                 if (subCommand.startsWith(args[0].toLowerCase())) {
                     completions.add(subCommand);
@@ -494,6 +566,19 @@ public class SwapCommand implements CommandExecutor, TabCompleter {
             } else if (args[0].equalsIgnoreCase("mode") && args.length == 3 && "default".startsWith(args[1].toLowerCase())) {
                 for (String opt : new String[]{"dream", "sapnap"}) {
                     if (opt.startsWith(args[2].toLowerCase())) completions.add(opt);
+                }
+            } else if (args[0].equalsIgnoreCase("randomize") && args.length == 2) {
+                for (String opt : new String[]{"on","off"}) if (opt.startsWith(args[1].toLowerCase())) completions.add(opt);
+            } else if (args[0].equalsIgnoreCase("tasks")) {
+                if (args.length == 2) {
+                    for (String opt : new String[]{"list","enable","disable","difficulty","reload","reroll","endwhenoneleft"}) if (opt.startsWith(args[1].toLowerCase())) completions.add(opt);
+                } else if (args.length == 3 && (args[1].equalsIgnoreCase("enable") || args[1].equalsIgnoreCase("disable"))) {
+                    try {
+                        var defs = plugin.getTaskManagerMode().getAllDefinitions();
+                        for (String id : defs.keySet()) if (id.toLowerCase().startsWith(args[2].toLowerCase())) completions.add(id);
+                    } catch (Throwable ignored) {}
+                } else if (args.length == 3 && args[1].equalsIgnoreCase("difficulty")) {
+                    for (String lvl : new String[]{"easy","medium","hard"}) if (lvl.startsWith(args[2].toLowerCase())) completions.add(lvl);
                 }
             }
         }

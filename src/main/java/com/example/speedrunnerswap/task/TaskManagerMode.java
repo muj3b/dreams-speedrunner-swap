@@ -22,13 +22,38 @@ public class TaskManagerMode {
 
     // Task registry: id -> definition
     private final Map<String, TaskDefinition> registry = new LinkedHashMap<>();
-    private final List<String> taskPool = new ArrayList<>();
+    // Difficulty filter and progression gates
+    private TaskDifficulty difficultyFilter = TaskDifficulty.MEDIUM;
+    private boolean netherReached = false;
+    private boolean endReached = false;
 
     public TaskManagerMode(SpeedrunnerSwap plugin) {
         this.plugin = plugin;
         loadTasks();
+        // Load difficulty filter from config (default MEDIUM)
+        try {
+            String diff = plugin.getConfig().getString("task_manager.difficulty", "MEDIUM");
+            this.difficultyFilter = TaskDifficulty.valueOf(diff.toUpperCase());
+        } catch (Throwable ignored) {}
         // Load any persisted runtime assignments (if present)
         loadAssignmentsFromConfig();
+    }
+
+    /** Heuristic category inference for built-in tasks to support gating. */
+    private void postProcessDefinitions() {
+        for (var e : new java.util.ArrayList<>(registry.entrySet())) {
+            TaskDefinition d = e.getValue();
+            java.util.List<String> cats = d.categories();
+            if (cats == null || cats.isEmpty()) {
+                java.util.List<String> inferred = new java.util.ArrayList<>();
+                String s = (d.id() + " " + d.description()).toLowerCase(java.util.Locale.ROOT);
+                if (s.contains("nether")) inferred.add("nether");
+                if (s.contains(" ender ") || s.contains(" the end") || s.contains(" end ") || s.contains("dragon") || s.contains("shulker") || s.contains("elytra")) inferred.add("end");
+                if (inferred.isEmpty()) inferred.add("overworld");
+                TaskDefinition nd = new TaskDefinition(d.id(), d.description(), d.type(), d.params(), d.difficulty()!=null?d.difficulty():TaskDifficulty.MEDIUM, inferred, d.enabled());
+                registry.put(e.getKey(), nd);
+            }
+        }
     }
 
     public String getAssignedTask(Player p) {
@@ -37,8 +62,17 @@ public class TaskManagerMode {
 
     public void assignAndAnnounceTasks(List<Player> players) {
         assignments.clear();
+        // Build candidate pool with current filter and gates
+        List<String> candidates = getCandidateTaskIds();
+        if (candidates.isEmpty()) {
+            // Fallback: use all enabled tasks regardless of gating
+            candidates = registry.values().stream()
+                    .filter(TaskDefinition::enabled)
+                    .map(TaskDefinition::id)
+                    .toList();
+        }
         // Build a randomized selection without duplicates (wrap if more players than tasks)
-        List<String> shuffled = new ArrayList<>(taskPool);
+        List<String> shuffled = new ArrayList<>(candidates);
         Collections.shuffle(shuffled, new Random());
         int idx = 0;
         for (Player p : players) {
@@ -139,24 +173,24 @@ public class TaskManagerMode {
         return lastBedExploderPerWorld.get(worldName);
     }
     
-    /** Load tasks from config and built-in defaults */
+    /** Load tasks from tasks.yml and built-in defaults */
     private void loadTasks() {
         registry.clear();
-        taskPool.clear();
-        
-        // Load built-in tasks if enabled
-        if (plugin.getConfig().getBoolean("task_manager.include_default_tasks", true)) {
+        // First attempt to load from tasks.yml if available
+        boolean loadedFromFile = loadFromTasksYml();
+        // If none loaded, optionally include built-in defaults
+        if (!loadedFromFile && plugin.getConfig().getBoolean("task_manager.include_default_tasks", true)) {
             registerDefaults();
         }
-        
-        // Load custom tasks from config
+        // Also load custom tasks from config for backward compatibility
         loadCustomTasks();
-        
         // Ensure we have at least some tasks
         if (registry.isEmpty()) {
             plugin.getLogger().warning("No tasks loaded! Loading default tasks as fallback.");
             registerDefaults();
         }
+        // Post-process to infer categories for gating if not provided
+        postProcessDefinitions();
     }
     
     /** Load custom tasks from config */
@@ -222,7 +256,6 @@ public class TaskManagerMode {
         if (removed) {
             // Remove from registry
             registry.remove(id);
-            taskPool.remove(id);
             
             // Save config
             plugin.getConfig().set("task_manager.custom_tasks", customTasks);
@@ -485,7 +518,124 @@ public class TaskManagerMode {
 
     private void register(TaskDefinition def) {
         registry.put(def.id(), def);
-        taskPool.add(def.id());
+    }
+
+    /**
+     * Load tasks from tasks.yml if present. Returns true if any tasks were loaded.
+     */
+    private boolean loadFromTasksYml() {
+        try {
+            var tcfg = plugin.getTaskConfigManager();
+            if (tcfg == null) return false;
+            org.bukkit.configuration.file.FileConfiguration cfg = tcfg.getConfig();
+            java.util.List<?> list = cfg.getList("tasks");
+            if (list == null) return false;
+            int count = 0;
+            for (Object o : list) {
+                if (!(o instanceof java.util.Map<?,?> m)) continue;
+                String id = String.valueOf(m.get("id"));
+                if (id == null || id.equals("null")) continue;
+                String desc = m.containsKey("description") ? String.valueOf(m.get("description")) : id;
+                String typeStr = m.containsKey("type") ? String.valueOf(m.get("type")) : "COMPLEX_TASK";
+                TaskType type;
+                try { type = TaskType.valueOf(typeStr.toUpperCase()); } catch (Throwable t) { type = TaskType.COMPLEX_TASK; }
+                java.util.List<String> params = new java.util.ArrayList<>();
+                Object p = m.get("params");
+                if (p instanceof java.util.List<?> lp) for (Object e : lp) params.add(String.valueOf(e));
+                String diffStr = m.containsKey("difficulty") ? String.valueOf(m.get("difficulty")) : "MEDIUM";
+                TaskDifficulty diff;
+                try { diff = TaskDifficulty.valueOf(diffStr.toUpperCase()); } catch (Throwable t) { diff = TaskDifficulty.MEDIUM; }
+                java.util.List<String> cats = new java.util.ArrayList<>();
+                Object c = m.get("categories");
+                if (c instanceof java.util.List<?> lc) for (Object e : lc) cats.add(String.valueOf(e).toLowerCase());
+                boolean enabled = Boolean.parseBoolean(String.valueOf(m.containsKey("enabled") ? m.get("enabled") : "true"));
+                register(new TaskDefinition(id, desc, type, params, diff, cats, enabled));
+                count++;
+            }
+            return count > 0;
+        } catch (Throwable t) {
+            plugin.getLogger().warning("Failed to load tasks.yml: " + t.getMessage());
+            return false;
+        }
+    }
+
+    /** Return current difficulty filter. */
+    public TaskDifficulty getDifficultyFilter() { return difficultyFilter; }
+
+    /** Set and persist difficulty filter. */
+    public void setDifficultyFilter(TaskDifficulty d) {
+        if (d == null) d = TaskDifficulty.MEDIUM;
+        this.difficultyFilter = d;
+        try {
+            plugin.getConfig().set("task_manager.difficulty", d.name());
+            plugin.saveConfig();
+        } catch (Throwable ignored) {}
+    }
+
+    /** Mark progression flags. */
+    public void notifyEnteredNether() { this.netherReached = true; }
+    public void notifyEnteredEnd() { this.endReached = true; }
+    public void resetProgressGates() { this.netherReached = false; this.endReached = false; }
+
+    /** Candidate tasks matching enabled + difficulty + gating. */
+    public java.util.List<String> getCandidateTaskIds() {
+        java.util.List<String> out = new java.util.ArrayList<>();
+        for (TaskDefinition d : registry.values()) {
+            if (!d.enabled()) continue;
+            if (d.difficulty() != null && d.difficulty().ordinal() != difficultyFilter.ordinal()) {
+                // Exact-match filter for now per request (E/M/H buckets)
+                if (d.difficulty() != difficultyFilter) continue;
+            }
+            java.util.List<String> cats = d.categories() != null ? d.categories() : java.util.List.of();
+            boolean needsNether = cats.stream().anyMatch(s -> s.equalsIgnoreCase("nether"));
+            boolean needsEnd = cats.stream().anyMatch(s -> s.equalsIgnoreCase("end"));
+            if (needsEnd && !endReached) continue;
+            if (needsNether && !netherReached) continue;
+            out.add(d.id());
+        }
+        return out;
+    }
+
+    public int getCandidateCount() { return getCandidateTaskIds().size(); }
+
+    /** Enable/disable a task and persist to tasks.yml if present. */
+    public boolean setTaskEnabled(String id, boolean enabled) {
+        TaskDefinition d = registry.get(id);
+        if (d == null) return false;
+        registry.put(id, new TaskDefinition(d.id(), d.description(), d.type(), d.params(), d.difficulty(), d.categories(), enabled));
+        try {
+            var tcfg = plugin.getTaskConfigManager();
+            if (tcfg != null) {
+                var cfg = tcfg.getConfig();
+                java.util.List<?> list = cfg.getList("tasks");
+                if (list != null) {
+                    for (int i = 0; i < list.size(); i++) {
+                        Object o = list.get(i);
+                        if (o instanceof java.util.Map<?,?>) {
+                            @SuppressWarnings("unchecked")
+                            java.util.Map<String, Object> mm = (java.util.Map<String, Object>) o;
+                            if (id.equals(String.valueOf(mm.get("id")))) {
+                                mm.put("enabled", enabled);
+                            }
+                        }
+                    }
+                    cfg.set("tasks", list);
+                    tcfg.saveConfig();
+                }
+            }
+        } catch (Throwable ignored) {}
+        return true;
+    }
+
+    /** Reload only from tasks.yml, preserving defaults if file absent. */
+    public void reloadTasksFromFile() {
+        plugin.getTaskConfigManager().reloadConfig();
+        loadTasks();
+    }
+
+    /** Expose a read-only view of task definitions for admin commands. */
+    public java.util.Map<String, TaskDefinition> getAllDefinitions() {
+        return java.util.Collections.unmodifiableMap(registry);
     }
 
 }

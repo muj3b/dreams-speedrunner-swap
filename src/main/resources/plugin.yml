@@ -25,3 +25,6 @@ permissions:
   speedrunnerswap.admin:
     default: op
     description: Full control over Speedrunner Swap plugin features
+  speedrunnerswap.command:
+    default: op
+    description: General access to view status/GUI where allowed

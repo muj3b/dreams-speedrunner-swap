@@ -147,8 +147,13 @@ public class TaskEventListener implements Listener {
         if (!isTaskMode()) return;
         Player p = event.getPlayer();
         String id = getTask(p);
-        if (id == null) return;
         World.Environment env = p.getWorld().getEnvironment();
+        // Update gating flags whenever any runner enters Nether/End
+        try {
+            if (env == World.Environment.NETHER) plugin.getTaskManagerMode().notifyEnteredNether();
+            if (env == World.Environment.THE_END) plugin.getTaskManagerMode().notifyEnteredEnd();
+        } catch (Throwable ignored) {}
+        if (id == null) return;
         if (id.equals("enter_nether") && env == World.Environment.NETHER) plugin.getTaskManagerMode().complete(p);
         if (id.equals("enter_end") && env == World.Environment.THE_END) plugin.getTaskManagerMode().complete(p);
     }

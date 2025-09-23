@@ -40,7 +40,7 @@ public class ControlGuiListener implements Listener {
             return;
         }
         if (type == org.bukkit.Material.PLAYER_HEAD && name != null && name.contains("Creator")) {
-            String url = plugin.getConfig().getString("donation.url", "https://buymeacoffee.com/muj3b");
+            String url = plugin.getConfig().getString("donation.url", "https://donate.stripe.com/8x29AT0H58K03judnR0Ba01");
             player.sendMessage("§6Support the creator: §b" + url);
             player.sendMessage("§7Copy or click the link above in chat.");
         }
@@ -79,6 +79,9 @@ public class ControlGuiListener implements Listener {
         if (plain.contains("resume")) return "resume";
         if (plain.contains("about")) return "about";
         if (plain.contains("runner") && plain.contains("select")) return "runner_selector";
+        if (plain.contains("task") && plain.contains("info")) return "task_info";
+        if (plain.contains("difficulty") && (plain.contains("up") || plain.contains("▲"))) return "task_diff_up";
+        if (plain.contains("difficulty") && (plain.contains("down") || plain.contains("▼"))) return "task_diff_down";
         return null;
     }
 
@@ -185,7 +188,7 @@ public class ControlGuiListener implements Listener {
         if (buttonId != null) {
             plugin.getLogger().fine("Found button ID: " + buttonId);
             switch (buttonId) {
-                case "back" -> { plugin.getGuiManager().openModeSelector(player); return; }
+                case "back" -> { new ControlGui(plugin).openMainMenu(player); return; }
                 case "start" -> {
                     if (!running) {
                         plugin.setCurrentMode(SpeedrunnerSwap.SwapMode.SAPNAP);
@@ -236,6 +239,39 @@ public class ControlGuiListener implements Listener {
                     } catch (Throwable t) {
                         player.sendMessage("§cAbout screen failed to open.");
                     }
+                    return;
+                }
+                case "task_info" -> {
+                    player.sendMessage("§6[Task Manager] Use these commands:");
+                    player.sendMessage("§e/swap tasks list §7- show tasks with difficulty + enabled");
+                    player.sendMessage("§e/swap tasks enable <ID> §7- enable a task");
+                    player.sendMessage("§e/swap tasks disable <ID> §7- disable a task");
+                    player.sendMessage("§e/swap tasks difficulty <easy|medium|hard> §7- set difficulty pool");
+                    player.sendMessage("§e/swap tasks reload §7- reload tasks.yml");
+                    return;
+                }
+                case "task_diff_up" -> {
+                    try {
+                        var tmm = plugin.getTaskManagerMode();
+                        if (tmm != null) {
+                            var next = tmm.getDifficultyFilter().next();
+                            tmm.setDifficultyFilter(next);
+                            player.sendMessage("§eDifficulty set to §a" + next.name());
+                        }
+                    } catch (Throwable ignored) {}
+                    new ControlGui(plugin).openMainMenu(player);
+                    return;
+                }
+                case "task_diff_down" -> {
+                    try {
+                        var tmm = plugin.getTaskManagerMode();
+                        if (tmm != null) {
+                            var prev = tmm.getDifficultyFilter().prev();
+                            tmm.setDifficultyFilter(prev);
+                            player.sendMessage("§eDifficulty set to §a" + prev.name());
+                        }
+                    } catch (Throwable ignored) {}
+                    new ControlGui(plugin).openMainMenu(player);
                     return;
                 }
                 case "shuffle" -> {
