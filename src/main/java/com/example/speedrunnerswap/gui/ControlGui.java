@@ -18,6 +18,36 @@ public class ControlGui {
         this.plugin = plugin;
     }
 
+    // Simple in-GUI statistics view to keep users inside Control GUI flow
+    public void openStatsMenu(Player player) {
+        int size = 45;
+        String title = "§9§lStatistics";
+        Inventory inv = com.example.speedrunnerswap.utils.GuiCompat.createInventory(new ControlGuiHolder(ControlGuiHolder.Type.STATS), size, title);
+
+        // Filler
+        ItemStack filler = new ItemStack(Material.LIGHT_BLUE_STAINED_GLASS_PANE);
+        ItemMeta fm = filler.getItemMeta();
+        com.example.speedrunnerswap.utils.GuiCompat.setDisplayName(fm, " ");
+        filler.setItemMeta(fm);
+        for (int i = 0; i < inv.getSize(); i++) inv.setItem(i, filler);
+
+        // Back
+        inv.setItem(0, button(Material.ARROW, "back", "§7§lBack", List.of("§7Return to control menu")));
+
+        // Basic stats pulled from GameManager
+        boolean running = plugin.getGameManager().isGameRunning();
+        List<String> lore = new ArrayList<>();
+        lore.add("§7Running: " + (running ? "§aYes" : "§cNo"));
+        if (running) {
+            Player active = plugin.getGameManager().getActiveRunner();
+            lore.add("§7Active: §e" + (active != null ? active.getName() : "None"));
+            lore.add("§7Next swap: §e" + plugin.getGameManager().getTimeUntilNextSwap() + "s");
+        }
+        inv.setItem(22, named(Material.PAPER, "§b§lSession Overview", lore));
+
+        openInventorySoon(player, inv);
+    }
+
     public void openMainMenu(Player player) {
         boolean running = plugin.getGameManager().isGameRunning();
         List<Player> runners = plugin.getGameManager().getRunners();
@@ -128,6 +158,9 @@ public class ControlGui {
         inv.setItem(32, named(Material.WRITABLE_BOOK, "Save as Mode Default", List.of("§7Set current interval as default")));
         inv.setItem(33, named(Material.BARRIER, "Reset Interval", List.of("§7Reset to this mode's default")));
 
+        // Row 5: Utilities
+        inv.setItem(34, button(Material.SPYGLASS, "statistics", "§9§lStatistics", List.of("§7View session stats")));
+
         openInventorySoon(player, inv);
     }
 
@@ -140,7 +173,11 @@ public class ControlGui {
         
         // Prevent overlapping opens for the same player
         java.util.UUID uuid = player.getUniqueId();
-        if (pendingOpens.contains(uuid)) return;
+        if (pendingOpens.contains(uuid)) {
+            // Requeue shortly so rapid Back -> Next clicks are not dropped
+            plugin.getServer().getScheduler().runTaskLater(plugin, () -> openInventorySoon(player, inv), 2L);
+            return;
+        }
         
         pendingOpens.add(uuid);
         plugin.getServer().getScheduler().runTask(plugin, () -> {
@@ -217,12 +254,12 @@ public class ControlGui {
             idx++;
         }
 
-        // Back to main
-        inv.setItem(size - 8, named(Material.ARROW, "§7§lBack", List.of("§7Return to control menu")));
+        // Back to main (PDC-tagged)
+        inv.setItem(size - 8, button(Material.ARROW, "back", "§7§lBack", List.of("§7Return to control menu")));
 
-        // Save / Cancel buttons
-        inv.setItem(size - 6, named(Material.EMERALD_BLOCK, "Save", List.of("Apply selected runners")));
-        inv.setItem(size - 4, named(Material.BARRIER, "Cancel", List.of("Discard changes")));
+        // Save / Cancel buttons (PDC-tagged)
+        inv.setItem(size - 6, button(Material.EMERALD_BLOCK, "save_selection", "Save", List.of("Apply selected runners")));
+        inv.setItem(size - 4, button(Material.BARRIER, "cancel_selection", "Cancel", List.of("Discard changes")));
 
         openInventorySoon(player, inv);
     }

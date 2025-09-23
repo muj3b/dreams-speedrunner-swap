@@ -29,6 +29,18 @@ public class ControlGuiListener implements Listener {
     public static Set<String> getPendingSelection(java.util.UUID uuid) {
         return pendingRunnerSelections.get(uuid);
     }
+
+    private void handleStatsClick(Player player, ItemStack clicked) {
+        if (clicked == null || !clicked.hasItemMeta()) return;
+        String id = getButtonId(clicked);
+        if ("back".equals(id)) { new ControlGui(plugin).openMainMenu(player); return; }
+        // Fallback: allow arrow named Back
+        Material type = clicked.getType();
+        String name = com.example.speedrunnerswap.utils.GuiCompat.getDisplayName(clicked.getItemMeta());
+        if (type == Material.ARROW || (name != null && name.contains("Back"))) {
+            new ControlGui(plugin).openMainMenu(player);
+        }
+    }
     
     // About screen interactions: Back and donation link
     private void handleAboutClick(Player player, ItemStack clicked) {
@@ -100,6 +112,10 @@ public class ControlGuiListener implements Listener {
     private boolean isAbout(Inventory inv) {
         return inv != null && inv.getHolder() instanceof ControlGuiHolder holder && holder.getType() == ControlGuiHolder.Type.ABOUT;
     }
+    
+    private boolean isStats(Inventory inv) {
+        return inv != null && inv.getHolder() instanceof ControlGuiHolder holder && holder.getType() == ControlGuiHolder.Type.STATS;
+    }
 
     @EventHandler(priority = EventPriority.HIGHEST)
     public void onInventoryClick(InventoryClickEvent event) {
@@ -108,7 +124,7 @@ public class ControlGuiListener implements Listener {
         if (top == null) return;
         
         // Check if this is one of our GUI inventories
-        if (!isMain(top) && !isRunnerSelector(top) && !isCoordination(top) && !isAbout(top)) return;
+        if (!isMain(top) && !isRunnerSelector(top) && !isCoordination(top) && !isAbout(top) && !isStats(top)) return;
         
         // ALWAYS cancel the event to prevent item movement
         event.setCancelled(true);
@@ -135,6 +151,8 @@ public class ControlGuiListener implements Listener {
             handleCoordinationClick(player, clicked);
         } else if (isAbout(top)) {
             handleAboutClick(player, clicked);
+        } else if (isStats(top)) {
+            handleStatsClick(player, clicked);
         }
     }
 
@@ -145,7 +163,7 @@ public class ControlGuiListener implements Listener {
         if (top == null) return;
         
         // Check if this is one of our GUI inventories
-        if (!isMain(top) && !isRunnerSelector(top) && !isCoordination(top)) return;
+        if (!isMain(top) && !isRunnerSelector(top) && !isCoordination(top) && !isStats(top)) return;
         
         // ALWAYS cancel drag events in our GUIs
         event.setCancelled(true);
@@ -158,8 +176,8 @@ public class ControlGuiListener implements Listener {
         Inventory destination = event.getDestination();
         
         // Block any item movement from/to our GUIs
-        if ((source != null && (isMain(source) || isRunnerSelector(source) || isCoordination(source) || isAbout(source))) ||
-            (destination != null && (isMain(destination) || isRunnerSelector(destination) || isCoordination(destination) || isAbout(destination)))) {
+        if ((source != null && (isMain(source) || isRunnerSelector(source) || isCoordination(source) || isAbout(source) || isStats(source))) ||
+            (destination != null && (isMain(destination) || isRunnerSelector(destination) || isCoordination(destination) || isAbout(destination) || isStats(destination)))) {
             event.setCancelled(true);
         }
     }
@@ -288,6 +306,10 @@ public class ControlGuiListener implements Listener {
                     Set<String> initial = new HashSet<>(plugin.getConfigManager().getRunnerNames());
                     setPendingSelection(player.getUniqueId(), initial);
                     new ControlGui(plugin).openRunnerSelector(player);
+                    return;
+                }
+                case "statistics" -> {
+                    new ControlGui(plugin).openStatsMenu(player);
                     return;
                 }
             }
@@ -630,6 +652,32 @@ public class ControlGuiListener implements Listener {
         // In Sapnap mode, runner selection is allowed (no hunters). Do not early-return here.
 
         Material type = clicked.getType();
+        // Prefer PDC-tagged button ids first
+        String id = getButtonId(clicked);
+        if (id != null) {
+            switch (id) {
+                case "back" -> { new ControlGui(plugin).openMainMenu(player); return; }
+                case "cancel_selection" -> {
+                    pendingRunnerSelections.remove(player.getUniqueId());
+                    new ControlGui(plugin).openMainMenu(player);
+                    return;
+                }
+                case "save_selection" -> {
+                    Set<String> sel = pendingRunnerSelections.remove(player.getUniqueId());
+                    if (sel == null) sel = new HashSet<>();
+                    plugin.getConfigManager().setRunnerNames(new ArrayList<>(sel));
+                    List<Player> players = new ArrayList<>();
+                    for (String name : sel) {
+                        Player p = Bukkit.getPlayerExact(name);
+                        if (p != null && p.isOnline()) players.add(p);
+                    }
+                    plugin.getGameManager().setRunners(players);
+                    player.sendMessage("§aRunners set: §f" + String.join(", ", sel));
+                    new ControlGui(plugin).openMainMenu(player);
+                    return;
+                }
+            }
+        }
         // Bottom row buttons
         if (rawSlot >= size - 9) {
             if (type == Material.BARRIER) {

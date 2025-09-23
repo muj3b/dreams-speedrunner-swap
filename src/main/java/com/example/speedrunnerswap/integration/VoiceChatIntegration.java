@@ -26,7 +26,8 @@ public class VoiceChatIntegration {
      * @return true if the plugin is detected, false otherwise
      */
     private boolean checkForVoiceChatPlugin() {
-        return plugin.getServer().getPluginManager().getPlugin("SimpleVoiceChat") != null;
+        var pm = plugin.getServer().getPluginManager();
+        return pm.getPlugin("SimpleVoiceChat") != null || pm.getPlugin("voicechat") != null;
     }
     
     /**

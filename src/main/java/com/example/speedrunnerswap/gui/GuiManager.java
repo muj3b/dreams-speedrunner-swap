@@ -33,7 +33,11 @@ public class GuiManager {
         
         // Prevent overlapping opens for the same player
         java.util.UUID uuid = player.getUniqueId();
-        if (pendingOpens.contains(uuid)) return;
+        if (pendingOpens.contains(uuid)) {
+            // Requeue shortly so rapid Back -> Next clicks are not dropped
+            plugin.getServer().getScheduler().runTaskLater(plugin, () -> openInventorySoon(player, inv), 2L);
+            return;
+        }
         
         pendingOpens.add(uuid);
         plugin.getServer().getScheduler().runTask(plugin, () -> {
