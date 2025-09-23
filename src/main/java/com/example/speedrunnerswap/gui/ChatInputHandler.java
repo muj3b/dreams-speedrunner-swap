@@ -5,6 +5,8 @@ import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.player.AsyncPlayerChatEvent;
+import org.bukkit.event.player.PlayerQuitEvent;
+import org.bukkit.event.player.PlayerKickEvent;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -72,6 +74,17 @@ public class ChatInputHandler implements Listener {
         String msg = event.getMessage();
         // Defer to main thread and share logic with Paper event
         plugin.getServer().getScheduler().runTask(plugin, () -> handleInput(player, msg));
+    }
+
+    // Clear any pending chat prompts when a player disconnects to prevent stale state
+    @EventHandler
+    public void onQuit(PlayerQuitEvent event) {
+        activeInputs.remove(event.getPlayer().getUniqueId());
+    }
+
+    @EventHandler
+    public void onKick(PlayerKickEvent event) {
+        activeInputs.remove(event.getPlayer().getUniqueId());
     }
 
     /** Shared input handling used by both legacy and Paper chat events (executed on main thread). */

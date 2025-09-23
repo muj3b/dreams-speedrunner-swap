@@ -15,6 +15,9 @@ description: |
   - Compass tracking system
 website: https://github.com/muj3b/minecraft-speedrunner-swap-plugin
 
+# Ensure we load after voice chat plugins if present
+softdepend: [SimpleVoiceChat, voicechat]
+
 commands:
   swap:
     description: Control Speedrunner Swap

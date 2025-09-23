@@ -45,7 +45,7 @@ public class ControlGui {
         }
         inv.setItem(22, named(Material.PAPER, "§b§lSession Overview", lore));
 
-        openInventorySoon(player, inv);
+        plugin.getGuiManager().openInventorySoon(player, inv);
     }
 
     public void openMainMenu(Player player) {
@@ -156,48 +156,11 @@ public class ControlGui {
         inv.setItem(31, named(applyDefault ? Material.NOTE_BLOCK : Material.GRAY_DYE, "Apply Mode Default on Switch: " + (applyDefault ? "Yes" : "No"), List.of("§7Apply mode default interval on switch")));
 
         inv.setItem(32, named(Material.WRITABLE_BOOK, "Save as Mode Default", List.of("§7Set current interval as default")));
-        inv.setItem(33, named(Material.BARRIER, "Reset Interval", List.of("§7Reset to this mode's default")));
 
         // Row 5: Utilities
         inv.setItem(34, button(Material.SPYGLASS, "statistics", "§9§lStatistics", List.of("§7View session stats")));
 
-        openInventorySoon(player, inv);
-    }
-
-    // Always schedule inventory opens to the next tick to avoid re-entrancy issues
-    // Track pending opens to prevent race conditions
-    private final java.util.Set<java.util.UUID> pendingOpens = java.util.Collections.synchronizedSet(new java.util.HashSet<>());
-    
-    private void openInventorySoon(Player player, Inventory inv) {
-        if (player == null || inv == null) return;
-        
-        // Prevent overlapping opens for the same player
-        java.util.UUID uuid = player.getUniqueId();
-        if (pendingOpens.contains(uuid)) {
-            // Requeue shortly so rapid Back -> Next clicks are not dropped
-            plugin.getServer().getScheduler().runTaskLater(plugin, () -> openInventorySoon(player, inv), 2L);
-            return;
-        }
-        
-        pendingOpens.add(uuid);
-        plugin.getServer().getScheduler().runTask(plugin, () -> {
-            try {
-                if (player.isOnline()) {
-                    // Give a 1-tick delay to ensure previous inventory is fully closed
-                    plugin.getServer().getScheduler().runTaskLater(plugin, () -> {
-                        if (player.isOnline()) {
-                            player.openInventory(inv);
-                        }
-                        pendingOpens.remove(uuid);
-                    }, 1L);
-                } else {
-                    pendingOpens.remove(uuid);
-                }
-            } catch (Exception e) {
-                pendingOpens.remove(uuid);
-                plugin.getLogger().warning("Failed to open Sapnap inventory for " + player.getName() + ": " + e.getMessage());
-            }
-        });
+        plugin.getGuiManager().openInventorySoon(player, inv);
     }
 
     // Border filler similar to GuiManager
@@ -261,7 +224,7 @@ public class ControlGui {
         inv.setItem(size - 6, button(Material.EMERALD_BLOCK, "save_selection", "Save", List.of("Apply selected runners")));
         inv.setItem(size - 4, button(Material.BARRIER, "cancel_selection", "Cancel", List.of("Discard changes")));
 
-        openInventorySoon(player, inv);
+        plugin.getGuiManager().openInventorySoon(player, inv);
     }
 
     private ItemStack named(Material mat, String name, List<String> loreText) {
@@ -420,6 +383,6 @@ public class ControlGui {
         emergencyLore.add("§7   • Leave signs at key locations");
         emergencyLore.add("§7   • Follow predetermined protocols");
         inv.setItem(16, named(Material.REDSTONE_TORCH, "§c§lEmergency Protocols", emergencyLore));
-        openInventorySoon(player, inv);
+        plugin.getGuiManager().openInventorySoon(player, inv);
     }
 }

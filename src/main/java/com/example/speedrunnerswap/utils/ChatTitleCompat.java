@@ -5,6 +5,7 @@ import net.kyori.adventure.text.event.ClickEvent;
 import net.kyori.adventure.text.event.HoverEvent;
 import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.format.TextDecoration;
+import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
 import net.kyori.adventure.title.Title;
 import org.bukkit.entity.Player;
 
@@ -33,7 +34,8 @@ public final class ChatTitleCompat {
 
     public static void sendMessage(Player player, String message) {
         try {
-            player.sendMessage(Component.text(message));
+            Component parsed = LegacyComponentSerializer.legacySection().deserialize(message);
+            player.sendMessage(parsed);
         } catch (Throwable ignored) {
             player.sendMessage(message);
         }

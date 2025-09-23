@@ -2,7 +2,6 @@ package com.example.speedrunnerswap.listeners;
 
 import com.example.speedrunnerswap.SpeedrunnerSwap;
 import org.bukkit.event.player.AsyncPlayerChatEvent;
-import io.papermc.paper.event.player.AsyncChatEvent;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
@@ -26,6 +25,19 @@ public class EventListeners implements Listener {
     
     public EventListeners(SpeedrunnerSwap plugin) {
         this.plugin = plugin;
+        // Register Paper chat guard without compile-time dependency
+        registerPaperChatGuard();
+    }
+
+    // Cleanup tracker caches after other listeners have run
+    @org.bukkit.event.EventHandler(priority = org.bukkit.event.EventPriority.MONITOR)
+    public void onQuitMonitor(org.bukkit.event.player.PlayerQuitEvent event) {
+        try { plugin.getTrackerManager().cleanupPlayer(event.getPlayer().getUniqueId()); } catch (Throwable ignored) {}
+    }
+
+    @org.bukkit.event.EventHandler(priority = org.bukkit.event.EventPriority.MONITOR)
+    public void onKickMonitor(org.bukkit.event.player.PlayerKickEvent event) {
+        try { plugin.getTrackerManager().cleanupPlayer(event.getPlayer().getUniqueId()); } catch (Throwable ignored) {}
     }
 
     // Cross-version safe title extractor (reflection; no compile-time kyori dependency)
@@ -70,6 +82,57 @@ public class EventListeners implements Listener {
         } catch (Throwable ignored) {}
 
         return "";
+    }
+    
+    /**
+     * Register a Paper AsyncChatEvent hook reflectively so we can cancel
+     * inactive runner chat without a compile-time Paper dependency.
+     */
+    @SuppressWarnings("unchecked")
+    private void registerPaperChatGuard() {
+        try {
+            final Class<?> asyncChatCls = Class.forName("io.papermc.paper.event.player.AsyncChatEvent");
+            org.bukkit.plugin.EventExecutor exec = (listener, event) -> {
+                if (!asyncChatCls.isInstance(event)) return;
+                Object ev = event;
+                org.bukkit.entity.Player player;
+                try {
+                    java.lang.reflect.Method getPlayer = asyncChatCls.getMethod("getPlayer");
+                    player = (org.bukkit.entity.Player) getPlayer.invoke(ev);
+                } catch (Throwable t) { return; }
+
+                boolean shouldBlock = false;
+                try {
+                    if (plugin.getGameManager().isGameRunning() &&
+                        plugin.getGameManager().isRunner(player) &&
+                        plugin.getGameManager().getActiveRunner() != player) {
+                        shouldBlock = true;
+                    }
+                } catch (Throwable ignored) {}
+
+                if (shouldBlock) {
+                    try {
+                        java.lang.reflect.Method setCancelled = asyncChatCls.getMethod("setCancelled", boolean.class);
+                        setCancelled.invoke(ev, true);
+                    } catch (Throwable ignored) {}
+                    plugin.getServer().getScheduler().runTask(plugin, () -> {
+                        try { player.sendMessage("§c[SpeedrunnerSwap] You cannot chat while inactive."); } catch (Throwable ignored) {}
+                    });
+                }
+            };
+            plugin.getServer().getPluginManager().registerEvent(
+                (Class<? extends org.bukkit.event.Event>) asyncChatCls,
+                this,
+                org.bukkit.event.EventPriority.HIGHEST,
+                exec,
+                plugin,
+                true
+            );
+        } catch (ClassNotFoundException e) {
+            // Not Paper; nothing to do.
+        } catch (Throwable t) {
+            plugin.getLogger().warning("Failed to hook Paper chat guard: " + t.getMessage());
+        }
     }
     
     @EventHandler
@@ -336,20 +399,7 @@ public class EventListeners implements Listener {
 
     // GUI clicks are exclusively handled by GuiListener to avoid duplication.
 
-    @EventHandler(priority = EventPriority.HIGHEST)
-    public void onPlayerChat(AsyncChatEvent event) {
-        Player player = event.getPlayer();
-        
-        // If the player is an inactive runner, cancel their chat messages
-        if (plugin.getGameManager().isGameRunning() && 
-            plugin.getGameManager().isRunner(player) && 
-            plugin.getGameManager().getActiveRunner() != player) {
-            
-            // Only send message to the player
-            player.sendMessage("§c[SpeedrunnerSwap] You cannot chat while inactive.");
-            event.setCancelled(true);
-        }
-    }
+    // Paper chat guard is registered reflectively in registerPaperChatGuard()
 
     // Fallback for servers where Paper's AsyncChatEvent may not fire
     @SuppressWarnings("deprecation")

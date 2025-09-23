@@ -15,7 +15,6 @@ public class TrackerManager {
     
     private final SpeedrunnerSwap plugin;
     private volatile BukkitTask trackerTask;
-    private volatile BukkitTask particleTask;
     private boolean isJammed = false;
     private final Object taskLock = new Object();
     // Cache last known compass slot to avoid full scans each update
@@ -25,6 +24,15 @@ public class TrackerManager {
     
     public TrackerManager(SpeedrunnerSwap plugin) {
         this.plugin = plugin;
+    }
+
+    /**
+     * Cleanup per-player caches when they leave the server.
+     */
+    public void cleanupPlayer(java.util.UUID id) {
+        if (id == null) return;
+        compassSlotCache.remove(id);
+        endHintNotifiedOnce.remove(id);
     }
     
     /**
@@ -66,10 +74,6 @@ public class TrackerManager {
             if (trackerTask != null) {
                 trackerTask.cancel();
                 trackerTask = null;
-            }
-            if (particleTask != null) {
-                particleTask.cancel();
-                particleTask = null;
             }
         }
     }

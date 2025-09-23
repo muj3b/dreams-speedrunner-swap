@@ -42,13 +42,25 @@ public class AboutGui {
         head.setItemMeta(meta);
         inv.setItem(8, head);
 
-        // Schedule open to next tick for safety across servers
-        // Add a slight delay to prevent race conditions with other GUI operations
-        Bukkit.getScheduler().runTaskLater(SpeedrunnerSwap.getInstance(), () -> {
-            if (player.isOnline()) {
-                player.openInventory(inv);
-            }
-        }, 2L);
+        // Real Back arrow (slot 0), PDC-tagged
+        ItemStack back = new ItemStack(Material.ARROW);
+        ItemMeta bm = back.getItemMeta();
+        GuiCompat.setDisplayName(bm, "§7§lBack");
+        java.util.List<String> blore = new java.util.ArrayList<>();
+        blore.add("§7Return to control menu");
+        GuiCompat.setLore(bm, blore);
+        try {
+            bm.getPersistentDataContainer().set(
+                new org.bukkit.NamespacedKey(SpeedrunnerSwap.getInstance(), "btn"),
+                org.bukkit.persistence.PersistentDataType.STRING,
+                "back"
+            );
+        } catch (Throwable ignored) {}
+        back.setItemMeta(bm);
+        inv.setItem(0, back);
+
+        // Use centralized opener to avoid dead-GUI edge cases
+        SpeedrunnerSwap.getInstance().getGuiManager().openInventorySoon(player, inv);
     }
 
     public static String getTitle() {

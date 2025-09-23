@@ -28,7 +28,7 @@ public class GuiManager {
     // Track pending opens to prevent race conditions
     private final java.util.Set<java.util.UUID> pendingOpens = java.util.Collections.synchronizedSet(new java.util.HashSet<>());
     
-    private void openInventorySoon(org.bukkit.entity.Player player, org.bukkit.inventory.Inventory inv) {
+    public void openInventorySoon(org.bukkit.entity.Player player, org.bukkit.inventory.Inventory inv) {
         if (player == null || inv == null) return;
         
         // Prevent overlapping opens for the same player

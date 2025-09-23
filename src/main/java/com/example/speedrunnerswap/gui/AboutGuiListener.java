@@ -30,9 +30,23 @@ public class AboutGuiListener implements Listener {
         event.setCancelled(true); // purely informational
 
         ItemStack item = event.getCurrentItem();
-        if (item == null || item.getType() != Material.PLAYER_HEAD) return;
+        if (item == null || !item.hasItemMeta()) return;
 
-        // Click on the creator head posts a clickable donate link
+        // Route Back via PDC btn=back or arrow
+        String btnId = null;
+        try {
+            btnId = item.getItemMeta().getPersistentDataContainer().get(
+                new org.bukkit.NamespacedKey(plugin, "btn"),
+                org.bukkit.persistence.PersistentDataType.STRING
+            );
+        } catch (Throwable ignored) {}
+        if (item.getType() == Material.ARROW || "back".equals(btnId)) {
+            new ControlGui(plugin).openMainMenu(player);
+            return;
+        }
+
+        // Donation link on head click
+        if (item.getType() != Material.PLAYER_HEAD) return;
         String donateUrl = plugin.getConfig().getString("donation.url", "https://donate.stripe.com/8x29AT0H58K03judnR0Ba01");
         ChatTitleCompat.sendMessage(player, "§6§lControlSwap created by muj3b");
         ChatTitleCompat.sendClickableUrl(player, "§d§l❤ Donate: §r", donateUrl);

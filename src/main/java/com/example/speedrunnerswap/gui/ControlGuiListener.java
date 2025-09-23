@@ -9,6 +9,7 @@ import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.inventory.InventoryClickEvent;
+import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 
@@ -42,24 +43,10 @@ public class ControlGuiListener implements Listener {
         }
     }
     
-    // About screen interactions: Back and donation link
-    private void handleAboutClick(Player player, ItemStack clicked) {
-        if (clicked == null || !clicked.hasItemMeta()) return;
-        org.bukkit.Material type = clicked.getType();
-        String name = com.example.speedrunnerswap.utils.GuiCompat.getDisplayName(clicked.getItemMeta());
-        if (type == org.bukkit.Material.ARROW || (name != null && name.contains("Back"))) {
-            new ControlGui(plugin).openMainMenu(player);
-            return;
-        }
-        if (type == org.bukkit.Material.PLAYER_HEAD && name != null && name.contains("Creator")) {
-            String url = plugin.getConfig().getString("donation.url", "https://donate.stripe.com/8x29AT0H58K03judnR0Ba01");
-            player.sendMessage("§6Support the creator: §b" + url);
-            player.sendMessage("§7Copy or click the link above in chat.");
-        }
-    }
+    // About screen clicks are handled exclusively by AboutGuiListener.
 
     public static void setPendingSelection(java.util.UUID uuid, Set<String> sel) {
-        if (sel == null) pendingRunnerSelections.remove(uuid); else pendingRunnerSelections.put(uuid, sel);
+        if (sel == null || sel.isEmpty()) pendingRunnerSelections.remove(uuid); else pendingRunnerSelections.put(uuid, sel);
     }
 
     public ControlGuiListener(SpeedrunnerSwap plugin) {
@@ -149,8 +136,6 @@ public class ControlGuiListener implements Listener {
             handleRunnerSelectorClick(player, clicked, event.getRawSlot(), top.getSize());
         } else if (isCoordination(top)) {
             handleCoordinationClick(player, clicked);
-        } else if (isAbout(top)) {
-            handleAboutClick(player, clicked);
         } else if (isStats(top)) {
             handleStatsClick(player, clicked);
         }
@@ -163,7 +148,7 @@ public class ControlGuiListener implements Listener {
         if (top == null) return;
         
         // Check if this is one of our GUI inventories
-        if (!isMain(top) && !isRunnerSelector(top) && !isCoordination(top) && !isStats(top)) return;
+        if (!isMain(top) && !isRunnerSelector(top) && !isCoordination(top) && !isStats(top) && !isAbout(top)) return;
         
         // ALWAYS cancel drag events in our GUIs
         event.setCancelled(true);
@@ -193,6 +178,13 @@ public class ControlGuiListener implements Listener {
         }
     }
 
+    // Also clear any pending selection if the player disconnects while selector is open or pending
+    @EventHandler
+    public void onQuit(PlayerQuitEvent event) {
+        java.util.UUID id = event.getPlayer().getUniqueId();
+        pendingRunnerSelections.remove(id);
+    }
+
     private void handleMainClick(Player player, ItemStack clicked) {
         Material type = clicked.getType();
         boolean running = plugin.getGameManager().isGameRunning();
@@ -206,7 +198,7 @@ public class ControlGuiListener implements Listener {
         if (buttonId != null) {
             plugin.getLogger().fine("Found button ID: " + buttonId);
             switch (buttonId) {
-                case "back" -> { new ControlGui(plugin).openMainMenu(player); return; }
+                case "back" -> { plugin.getGuiManager().openModeSelector(player); return; }
                 case "start" -> {
                     if (!running) {
                         plugin.setCurrentMode(SpeedrunnerSwap.SwapMode.SAPNAP);

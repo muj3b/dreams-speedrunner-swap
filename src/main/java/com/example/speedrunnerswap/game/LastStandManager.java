@@ -23,7 +23,7 @@ public class LastStandManager {
         // Load and validate configuration
         plugin.getConfig().addDefault("last_stand.strength_amplifier", 1);
         plugin.getConfig().addDefault("last_stand.speed_amplifier", 1);
-        plugin.getConfig().addDefault("last_stand.duration", 300); // 15 seconds
+        plugin.getConfig().addDefault("last_stand.duration", 300); // 5 minutes
         plugin.saveConfig();
     }
 
