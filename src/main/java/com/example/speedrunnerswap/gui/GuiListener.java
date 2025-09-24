@@ -912,11 +912,7 @@ public class GuiListener implements Listener {
                 }
                 case "set_spawn_here": {
                     org.bukkit.Location loc = player.getLocation();
-                    plugin.getConfig().set("spawn.world", loc.getWorld().getName());
-                    plugin.getConfig().set("spawn.x", loc.getX());
-                    plugin.getConfig().set("spawn.y", loc.getY());
-                    plugin.getConfig().set("spawn.z", loc.getZ());
-                    plugin.saveConfig();
+                    plugin.getConfigManager().setGlobalSpawn(loc, true);
                     player.sendMessage("§aSpawn location updated.");
                     break;
                 }

@@ -319,6 +319,51 @@ public class ConfigManager {
         return new org.bukkit.Location(world, x, y, z);
     }
 
+    public boolean isForceGlobalSpawn() {
+        return config.getBoolean("spawn.force_global", true);
+    }
+
+    public void setForceGlobalSpawn(boolean force) {
+        config.set("spawn.force_global", force);
+        plugin.saveConfig();
+    }
+
+
+    public void setGlobalSpawn(org.bukkit.Location location, boolean propagate) {
+        if (location == null || location.getWorld() == null) {
+            return;
+        }
+        config.set("spawn.world", location.getWorld().getName());
+        config.set("spawn.x", location.getX());
+        config.set("spawn.y", location.getY());
+        config.set("spawn.z", location.getZ());
+        plugin.saveConfig();
+
+        if (!propagate) {
+            return;
+        }
+
+        for (Player online : plugin.getServer().getOnlinePlayers()) {
+            applyRespawnLocation(online, location);
+        }
+    }
+
+    public void applyRespawnLocation(Player player, org.bukkit.Location location) {
+        if (player == null || location == null || location.getWorld() == null) {
+            return;
+        }
+
+        try {
+            Player.class.getMethod("setRespawnLocation", org.bukkit.Location.class, boolean.class)
+                    .invoke(player, location, true);
+            return;
+        } catch (Throwable ignored) {}
+
+        try {
+            player.setBedSpawnLocation(location, true);
+        } catch (Throwable ignored) {}
+    }
+
 
 
 

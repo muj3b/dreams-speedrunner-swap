@@ -584,12 +584,22 @@ public class GameManager {
                 player.setInvulnerable(false);
                 
                 PlayerStateUtil.applyPlayerState(player, state);
-                
-                Location loc = state.getLocation();
-                if (loc != null && !loc.getBlock().getType().isSolid()) {
-                    player.teleport(loc);
-                } else {
-                    player.teleport(plugin.getConfigManager().getSpawnLocation());
+
+                Location target = null;
+                boolean forceGlobalSpawn = plugin.getConfigManager().isForceGlobalSpawn();
+                if (!forceGlobalSpawn) {
+                    Location saved = state.getLocation();
+                    if (saved != null && !saved.getBlock().getType().isSolid()) {
+                        target = saved;
+                    }
+                }
+
+                if (target == null) {
+                    target = plugin.getConfigManager().getSpawnLocation();
+                }
+
+                player.teleport(target);
+                if (target.equals(plugin.getConfigManager().getSpawnLocation())) {
                     player.setGameMode(GameMode.SURVIVAL);
                     player.getInventory().clear();
                 }
