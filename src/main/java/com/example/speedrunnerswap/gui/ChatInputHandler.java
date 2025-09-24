@@ -117,11 +117,24 @@ public class ChatInputHandler implements Listener {
                 player.sendMessage("§aUpdated §e" + state.configPath + "§a.");
             }
             case CONFIG_LIST_ADD -> {
-                java.util.List<String> l = plugin.getConfig().getStringList(state.configPath);
-                l.add(msg);
-                plugin.getConfig().set(state.configPath, l);
+                String value = msg;
+                if ("safe_swap.dangerous_blocks".equalsIgnoreCase(state.configPath)) {
+                    value = msg.toUpperCase(java.util.Locale.ROOT).trim();
+                    org.bukkit.Material material = org.bukkit.Material.matchMaterial(value);
+                    if (material == null) {
+                        player.sendMessage("§cUnknown block '" + msg + "'. Addition cancelled.");
+                        return;
+                    }
+                    value = material.name();
+                }
+                java.util.List<String> list = plugin.getConfig().getStringList(state.configPath);
+                list.add(value);
+                plugin.getConfig().set(state.configPath, list);
                 plugin.saveConfig();
                 player.sendMessage("§aAppended to §e" + state.configPath + "§a.");
+                if ("safe_swap.dangerous_blocks".equalsIgnoreCase(state.configPath)) {
+                    plugin.getGuiManager().openDangerousBlocksMenu(player);
+                }
             }
         }
     }

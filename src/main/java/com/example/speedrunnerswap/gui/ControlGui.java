@@ -265,20 +265,20 @@ public class ControlGui {
         for (int i = 0; i < inv.getSize(); i++) inv.setItem(i, filler);
         
         // Back button
-        inv.setItem(0, named(Material.ARROW, "§7§lBack", List.of("§7Return to main menu")));
+        inv.setItem(0, button(Material.ARROW, "back", "§7§lBack", List.of("§7Return to main menu")));
         
         // Quick communication tools
-        inv.setItem(10, named(Material.BELL, "§6§lBroadcast Location", 
-            List.of("§7Share your current coordinates", "§7with all team members", "§7Click to announce position")));
-        
-        inv.setItem(11, named(Material.CHEST, "§6§lInventory Status", 
-            List.of("§7Share key items in inventory", "§7Shows tools, food, resources", "§7Click to broadcast status")));
-        
-        inv.setItem(12, named(Material.REDSTONE_TORCH, "§c§lEmergency Pause", 
-            List.of("§7Request immediate game pause", "§7Use for urgent situations", "§7Will notify all runners")));
-        
-        inv.setItem(13, named(Material.ENDER_EYE, "§d§lMark Waypoint", 
-            List.of("§7Set a team waypoint here", "§7All runners will see direction", "§7Great for meeting points")));
+        inv.setItem(10, button(Material.BELL, "coord_broadcast", "§6§lBroadcast Location",
+            List.of("§7Share your current coordinates", "§7with all team members")));
+
+        inv.setItem(11, button(Material.CHEST, "coord_inventory", "§6§lInventory Status",
+            List.of("§7Share key inventory highlights")));
+
+        inv.setItem(12, button(Material.REDSTONE_TORCH, "coord_emergency_pause", "§c§lEmergency Pause",
+            List.of("§7Request immediate game pause")));
+
+        inv.setItem(13, button(Material.ENDER_EYE, "coord_waypoint", "§d§lMark Waypoint",
+            List.of("§7Set a temporary team waypoint")));
         
         // Team status overview
         boolean gameRunning = plugin.getGameManager().isGameRunning();

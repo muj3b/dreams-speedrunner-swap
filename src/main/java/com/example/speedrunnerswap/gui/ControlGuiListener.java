@@ -81,6 +81,7 @@ public class ControlGuiListener implements Listener {
         if (plain.contains("task") && plain.contains("info")) return "task_info";
         if (plain.contains("difficulty") && (plain.contains("up") || plain.contains("▲"))) return "task_diff_up";
         if (plain.contains("difficulty") && (plain.contains("down") || plain.contains("▼"))) return "task_diff_down";
+        if (plain.contains("coordination")) return "coordination";
         return null;
     }
 
@@ -304,6 +305,10 @@ public class ControlGuiListener implements Listener {
                     new ControlGui(plugin).openStatsMenu(player);
                     return;
                 }
+                case "coordination" -> {
+                    new ControlGui(plugin).openTeamCoordinationMenu(player);
+                    return;
+                }
             }
         }
 
@@ -385,84 +390,6 @@ public class ControlGuiListener implements Listener {
             }
         }
 
-        if (type == Material.BOOK) {
-            String name = com.example.speedrunnerswap.utils.GuiCompat.getDisplayName(clicked.getItemMeta());
-            if (name != null && name.contains("Cooperation Tips")) {
-                // Show extended cooperation tips in chat
-                player.sendMessage("§6=== §e§lSapnap Mode Cooperation Tips §6===");
-                player.sendMessage("§b1. Communication is Key!§7 Use voice chat or text to coordinate");
-                player.sendMessage("§b2. Share Everything!§7 Leave items for teammates in shared chests");
-                player.sendMessage("§b3. Plan Ahead!§7 Discuss strategies while inactive");
-                player.sendMessage("§b4. Stay Informed!§7 Active runner should narrate their actions");
-                player.sendMessage("§b5. Resource Management!§7 Don't waste materials when time is limited");
-                player.sendMessage("§b6. Safe Locations!§7 Try to swap in secure areas");
-                player.sendMessage("§b7. Emergency Protocols!§7 Agree on what to do in dangerous situations");
-                player.sendMessage("§b8. Goal Coordination!§7 Work together toward the Ender Dragon!");
-                player.sendMessage("§6========================================");
-                return;
-            }
-        }
-
-        // Save current as this mode's default
-        if (type == Material.WRITABLE_BOOK) {
-            String name = com.example.speedrunnerswap.utils.GuiCompat.getDisplayName(clicked.getItemMeta());
-            if ("Save as Mode Default".equals(name)) {
-                int curr = plugin.getConfigManager().getSwapInterval();
-                plugin.getConfigManager().setModeDefaultInterval(plugin.getCurrentMode(), curr);
-                player.sendMessage("§aSaved " + curr + "s as default for this mode.");
-                new ControlGui(plugin).openMainMenu(player);
-                return;
-            }
-        }
-
-        if (type == Material.GOLDEN_SWORD) {
-            String name = com.example.speedrunnerswap.utils.GuiCompat.getDisplayName(clicked.getItemMeta());
-            if (name != null && name.contains("Quick Actions")) {
-                // Open quick actions menu or perform instant action
-                handleQuickActions(player);
-                return;
-            }
-        }
-        
-        if (type == Material.ENCHANTED_BOOK) {
-            String name = com.example.speedrunnerswap.utils.GuiCompat.getDisplayName(clicked.getItemMeta());
-            if (name != null && name.contains("Live Analytics")) {
-                // Show detailed analytics in chat
-                showDetailedAnalytics(player);
-                return;
-            } else if (name != null && name.contains("Smart Help")) {
-                // Show context-sensitive help
-                showSmartHelp(player);
-                return;
-            }
-        }
-        
-        if (type == Material.BARRIER) {
-            String name = com.example.speedrunnerswap.utils.GuiCompat.getDisplayName(clicked.getItemMeta());
-            if (name != null && name.contains("Performance Alert")) {
-                // Show optimization tips
-                showOptimizationTips(player);
-                return;
-            }
-        }
-        
-        if (type == Material.COMPASS) {
-            String name = com.example.speedrunnerswap.utils.GuiCompat.getDisplayName(clicked.getItemMeta());
-            if (name != null && name.contains("Team Coordination")) {
-                new ControlGui(plugin).openTeamCoordinationMenu(player);
-                return;
-            }
-        }
-        
-        if (type == Material.REDSTONE) {
-            String name = com.example.speedrunnerswap.utils.GuiCompat.getDisplayName(clicked.getItemMeta());
-            if (name != null && name.contains("Advanced Settings")) {
-                // Open the comprehensive advanced settings menu
-                plugin.getGuiManager().openSettingsMenu(player);
-                return;
-            }
-        }
-
         if (type == Material.CLOCK) {
             String name = com.example.speedrunnerswap.utils.GuiCompat.getDisplayName(clicked.getItemMeta());
             if (name != null && name.contains("Game Status")) {
@@ -485,7 +412,7 @@ public class ControlGuiListener implements Listener {
             }
         }
 
-        if (type == Material.ARMOR_STAND || type == Material.ENDER_EYE || type == Material.ENDER_PEARL || type == Material.BEDROCK || type == Material.POTION) {
+        if (type == Material.ENDER_EYE || type == Material.ENDER_PEARL || type == Material.BEDROCK || type == Material.POTION) {
             String name = com.example.speedrunnerswap.utils.GuiCompat.getDisplayName(clicked.getItemMeta());
             if (name != null && name.contains("Inactive State:")) {
                 // Cycle freeze mode EFFECTS -> SPECTATOR -> LIMBO -> CAGE -> EFFECTS
@@ -546,17 +473,6 @@ public class ControlGuiListener implements Listener {
         }
 
         // Reset interval to mode default
-        if (type == Material.BARRIER) {
-            String name = com.example.speedrunnerswap.utils.GuiCompat.getDisplayName(clicked.getItemMeta());
-            if ("Reset Interval".equals(name)) {
-                plugin.getConfigManager().applyModeDefaultInterval(plugin.getCurrentMode());
-                plugin.getGameManager().refreshSwapSchedule();
-                player.sendMessage("§eInterval reset to mode default.");
-                new ControlGui(plugin).openMainMenu(player);
-                return;
-            }
-        }
-
         if (type == Material.ARROW) {
             String name = com.example.speedrunnerswap.utils.GuiCompat.getDisplayName(clicked.getItemMeta());
             
@@ -744,316 +660,113 @@ public class ControlGuiListener implements Listener {
     }
     
     private void handleCoordinationClick(Player player, ItemStack clicked) {
-        Material type = clicked.getType();
-        
-        if (type == Material.ARROW) {
-            // Back to main menu
+        String id = getButtonId(clicked);
+        if ("back".equals(id)) {
             new ControlGui(plugin).openMainMenu(player);
             return;
         }
-        
-        if (type == Material.BELL) {
-            // Broadcast location with enhanced error handling
-            String name = com.example.speedrunnerswap.utils.GuiCompat.getDisplayName(clicked.getItemMeta());
-            if (name != null && name.contains("Broadcast Location")) {
-                try {
-                    String location = String.format("%d, %d, %d in %s", 
-                        (int) player.getLocation().getX(),
-                        (int) player.getLocation().getY(), 
-                        (int) player.getLocation().getZ(),
-                        player.getWorld().getName());
-                    
-                    String message = "§6[§eTeam§6] §b" + player.getName() + "§7 is at: §f" + location;
-                    
-                    // Broadcast to all runners with null checks
-                    List<Player> runners = plugin.getGameManager().getRunners();
-                    int broadcastCount = 0;
-                    if (runners != null) {
-                        for (Player runner : runners) {
-                            if (runner != null && runner.isOnline()) {
-                                runner.sendMessage(message);
-                                broadcastCount++;
-                            }
-                        }
-                    }
-                    
-                    player.sendMessage("§aLocation broadcasted to " + broadcastCount + " team members!");
-                } catch (Exception e) {
-                    player.sendMessage("§cError broadcasting location. Please try again.");
-                }
-                return;
-            }
-        }
-        
-        if (type == Material.CHEST) {
-            // Share inventory status
-            String name = com.example.speedrunnerswap.utils.GuiCompat.getDisplayName(clicked.getItemMeta());
-            if (name != null && name.contains("Inventory Status")) {
-                List<String> importantItems = new ArrayList<>();
-                
-                // Check for key items
-                for (ItemStack item : player.getInventory().getContents()) {
-                    if (item == null || item.getType() == Material.AIR) continue;
-                    
-                    Material mat = item.getType();
-                    int amount = item.getAmount();
-                    
-                    // Tools, weapons, food, and important items
-                    if (mat.name().contains("SWORD") || mat.name().contains("AXE") || 
-                        mat.name().contains("PICKAXE") || mat.name().contains("SHOVEL") ||
-                        mat == Material.BOW || mat == Material.CROSSBOW ||
-                        mat == Material.BREAD || mat == Material.COOKED_BEEF ||
-                        mat == Material.ENDER_PEARL || mat == Material.BLAZE_ROD ||
-                        mat == Material.DIAMOND || mat == Material.EMERALD ||
-                        mat == Material.IRON_INGOT || mat == Material.GOLD_INGOT) {
-                        
-                        String itemName = mat.name().toLowerCase().replace("_", " ");
-                        importantItems.add(amount + "x " + itemName);
-                    }
-                }
-                
-                String statusMsg;
-                if (importantItems.isEmpty()) {
-                    statusMsg = "§6[§eTeam§6] §b" + player.getName() + "§7 has no important items";
-                } else {
-                    statusMsg = "§6[§eTeam§6] §b" + player.getName() + "§7 has: §f" + String.join(", ", importantItems);
-                }
-                
-                // Broadcast to all runners
-                List<Player> runners = plugin.getGameManager().getRunners();
-                if (runners != null) {
-                    for (Player runner : runners) {
-                        if (runner != null && runner.isOnline()) {
-                            runner.sendMessage(statusMsg);
-                        }
-                    }
-                }
-                
-                player.sendMessage("§aInventory status shared with team!");
-                return;
-            }
-        }
-        
-        if (type == Material.REDSTONE_TORCH) {
-            // Emergency pause request
-            String name = com.example.speedrunnerswap.utils.GuiCompat.getDisplayName(clicked.getItemMeta());
-            if (name != null && name.contains("Emergency Pause")) {
-                if (plugin.getGameManager().isGameRunning() && !plugin.getGameManager().isGamePaused()) {
-                    plugin.getGameManager().pauseGame();
-                    
-                    String pauseMsg = "§c[§lEMERGENCY§c] §6" + player.getName() + "§e requested emergency pause!";
-                    
-                    // Notify all runners
-                    List<Player> runners = plugin.getGameManager().getRunners();
-                    if (runners != null) {
-                        for (Player runner : runners) {
-                            if (runner != null && runner.isOnline()) {
-                                runner.sendMessage(pauseMsg);
-                                // Cross-platform title display
-                                BukkitCompat.showTitle(
-                                    runner,
-                                    "§c§lEMERGENCY PAUSE",
-                                    "§6Requested by " + player.getName(),
-                                    10, 40, 10
-                                );
-                            }
-                        }
-                    }
-                    
-                    player.sendMessage("§aGame paused! Emergency pause activated.");
-                } else {
-                    player.sendMessage("§cGame is not running or already paused!");
-                }
-                return;
-            }
-        }
-        
-        if (type == Material.ENDER_EYE) {
-            // Mark waypoint (placeholder - requires more complex implementation)
-            String name = com.example.speedrunnerswap.utils.GuiCompat.getDisplayName(clicked.getItemMeta());
-            if (name != null && name.contains("Mark Waypoint")) {
-                // For now, just broadcast the location as a waypoint
-                String location = String.format("%d, %d, %d", 
-                    (int) player.getLocation().getX(),
-                    (int) player.getLocation().getY(), 
-                    (int) player.getLocation().getZ());
-                
-                String waypointMsg = "§d[§lWAYPOINT§d] §b" + player.getName() + "§7 marked: §f" + location + "§7 - Check your compass!";
-                
-                // Broadcast to all runners
-                List<Player> runners = plugin.getGameManager().getRunners();
-                if (runners != null) {
-                    for (Player runner : runners) {
-                        if (runner != null && runner.isOnline()) {
-                            runner.sendMessage(waypointMsg);
-                        }
-                    }
-                }
-                
-                player.sendMessage("§aWaypoint marked and shared with team!");
-                return;
-            }
-        }
-    }
-    
-    // Quick Actions Handler - Lightning fast team coordination with enhanced error handling
-    private void handleQuickActions(Player player) {
-        if (!plugin.getGameManager().isGameRunning()) {
-            player.sendMessage("§cQuick actions only available during active games!");
+        if ("coord_broadcast".equals(id)) {
+            broadcastLocation(player);
             return;
         }
-        
+        if ("coord_inventory".equals(id)) {
+            shareInventorySummary(player);
+            return;
+        }
+        if ("coord_emergency_pause".equals(id)) {
+            handleEmergencyPause(player);
+            return;
+        }
+        if ("coord_waypoint".equals(id)) {
+            markWaypoint(player);
+        }
+    }
+
+    private void broadcastLocation(Player player) {
         try {
-            // Instant location broadcast with enhanced information
-            String location = String.format("%d, %d, %d in %s", 
+            String location = String.format("%d, %d, %d in %s",
                 (int) player.getLocation().getX(),
-                (int) player.getLocation().getY(), 
+                (int) player.getLocation().getY(),
                 (int) player.getLocation().getZ(),
                 player.getWorld().getName());
-            
-            // Enhanced status information
-            double health = Math.round(player.getHealth() * 10.0) / 10.0; // Round to 1 decimal
-            int food = player.getFoodLevel();
-            String gamemode = player.getGameMode().name().toLowerCase();
-            
-            String quickMsg = "§e[§lQUICK§e] §b" + player.getName() + "§7: §f" + location + 
-                             "§7 | Health: §c" + health + "/20 §7| Food: §6" + food + "/20 §7| Mode: §d" + gamemode;
-            
-            // Broadcast to all runners with error handling
+            String message = "§6[§eTeam§6] §b" + player.getName() + "§7 is at: §f" + location;
+            int broadcastCount = 0;
             List<Player> runners = plugin.getGameManager().getRunners();
-            if (runners != null && !runners.isEmpty()) {
+            if (runners != null) {
                 for (Player runner : runners) {
                     if (runner != null && runner.isOnline()) {
-                        runner.sendMessage(quickMsg);
+                        runner.sendMessage(message);
+                        broadcastCount++;
                     }
                 }
             }
-            
-            player.sendMessage("§a⚡ Quick status broadcasted to " + (runners != null ? runners.size() : 0) + " runners!");
-            
-            // Send title notification to active runner if different
-            Player activeRunner = plugin.getGameManager().getActiveRunner();
-            if (activeRunner != null && !activeRunner.equals(player) && activeRunner.isOnline()) {
-                BukkitCompat.showTitle(
-                    activeRunner,
-                    "§e§lTEAM UPDATE",
-                    "§b" + player.getName() + "§7 shared location",
-                    5, 30, 5
-                );
-            }
+            player.sendMessage("§aLocation broadcasted to " + broadcastCount + " team members!");
         } catch (Exception e) {
-            player.sendMessage("§cError sending quick update. Please try again.");
-            // Log error for debugging if needed
+            player.sendMessage("§cError broadcasting location. Please try again.");
         }
     }
-    
-    // Detailed Analytics Display
-    private void showDetailedAnalytics(Player player) {
-        if (!plugin.getGameManager().isGameRunning()) {
-            player.sendMessage("§cAnalytics only available during active games!");
-            return;
+
+    private void shareInventorySummary(Player player) {
+        List<String> importantItems = new ArrayList<>();
+        for (ItemStack item : player.getInventory().getContents()) {
+            if (item == null || item.getType() == Material.AIR) continue;
+            Material mat = item.getType();
+            int amount = item.getAmount();
+            if (mat.name().contains("SWORD") || mat.name().contains("AXE") || mat.name().contains("PICKAXE") || mat.name().contains("SHOVEL") ||
+                mat == Material.BOW || mat == Material.CROSSBOW || mat == Material.BREAD || mat == Material.COOKED_BEEF ||
+                mat == Material.ENDER_PEARL || mat == Material.BLAZE_ROD || mat == Material.DIAMOND || mat == Material.EMERALD ||
+                mat == Material.IRON_INGOT || mat == Material.GOLD_INGOT) {
+                String itemName = mat.name().toLowerCase().replace("_", " ");
+                importantItems.add(amount + "x " + itemName);
+            }
         }
-        
-        player.sendMessage("§6========== §b§lDETAILED ANALYTICS §6==========");
-        
-        // Game state info
-        Player activeRunner = plugin.getGameManager().getActiveRunner();
+        String statusMsg = importantItems.isEmpty()
+            ? "§6[§eTeam§6] §b" + player.getName() + "§7 has no important items"
+            : "§6[§eTeam§6] §b" + player.getName() + "§7 has: §f" + String.join(", ", importantItems);
         List<Player> runners = plugin.getGameManager().getRunners();
-        int timeLeft = plugin.getGameManager().getTimeUntilNextSwap();
-        
-        player.sendMessage("§e§lGame Status:");
-        player.sendMessage("§7  Active Runner: §b" + (activeRunner != null ? activeRunner.getName() : "None"));
-        player.sendMessage("§7  Total Runners: §e" + (runners != null ? runners.size() : 0));
-        player.sendMessage("§7  Next Swap: §e" + timeLeft + "s");
-        player.sendMessage("§7  Game Paused: §f" + plugin.getGameManager().isGamePaused());
-        
-        if (timeLeft <= 15) {
-            player.sendMessage("§c§lSwap Imminent - Immediate Actions:");
-            player.sendMessage("§7  ⚡ Finish current objective quickly!");
-            player.sendMessage("§7  ⚡ Move to safe location if possible");
-            player.sendMessage("§7  ⚡ Communicate handoff plans");
-            player.sendMessage("§7  ⚡ Prepare next runner via voice chat");
-            player.sendMessage("§7  ⚡ Use emergency pause if in danger");
+        if (runners != null) {
+            for (Player runner : runners) {
+                if (runner != null && runner.isOnline()) {
+                    runner.sendMessage(statusMsg);
+                }
+            }
+        }
+        player.sendMessage("§aInventory status shared with team!");
+    }
+
+    private void handleEmergencyPause(Player player) {
+        if (plugin.getGameManager().isGameRunning() && !plugin.getGameManager().isGamePaused()) {
+            plugin.getGameManager().pauseGame();
+            String pauseMsg = "§c[§lEMERGENCY§c] §6" + player.getName() + "§e requested emergency pause!";
+            List<Player> runners = plugin.getGameManager().getRunners();
+            if (runners != null) {
+                for (Player runner : runners) {
+                    if (runner != null && runner.isOnline()) {
+                        runner.sendMessage(pauseMsg);
+                        BukkitCompat.showTitle(runner, "§c§lEMERGENCY PAUSE", "§6Requested by " + player.getName(), 10, 40, 10);
+                    }
+                }
+            }
+            player.sendMessage("§aGame paused! Emergency pause activated.");
         } else {
-            player.sendMessage("§a§lGame Active - Cooperation Tips:");
-            player.sendMessage("§7  ✓ Use Quick Actions for instant communication");
-            player.sendMessage("§7  ✓ Monitor Live Analytics for performance");
-            player.sendMessage("§7  ✓ Share locations and inventory status");
-            player.sendMessage("§7  ✓ Mark waypoints for important locations");
-            player.sendMessage("§7  ✓ Active runner should narrate actions");
-            player.sendMessage("§7  ✓ Waiting runners should plan ahead");
+            player.sendMessage("§cGame is not running or already paused!");
         }
     }
 
-    // Smart context-aware help
-    private void showSmartHelp(Player player) {
-        boolean running = plugin.getGameManager().isGameRunning();
-        boolean paused = plugin.getGameManager().isGamePaused();
-        int timeLeft = plugin.getGameManager().getTimeUntilNextSwap();
-
-        player.sendMessage("§6========== §e§lSMART HELP §6==========");
-        if (!running) {
-            player.sendMessage("§aGetting Started:");
-            player.sendMessage("§7  ✓ Select runners via Manage Runners");
-            player.sendMessage("§7  ✓ Adjust interval with ±5s arrows");
-            player.sendMessage("§7  ✓ Configure freeze mode and safe swaps");
-            player.sendMessage("§7  ✓ Click §aStart Game§7 when ready");
-        } else if (paused) {
-            player.sendMessage("§eGame Paused:");
-            player.sendMessage("§7  ✓ Discuss next objectives");
-            player.sendMessage("§7  ✓ Use coordination hub to share info");
-            player.sendMessage("§7  ✓ Click §aResume§7 when ready");
-        } else {
-            if (timeLeft <= 15) {
-                player.sendMessage("§cSwap Imminent:");
-                player.sendMessage("§7  ⚡ Prepare handoff and move to safety");
-            } else {
-                player.sendMessage("§aActive Play Tips:");
-                player.sendMessage("§7  ✓ Use Quick Actions for instant updates");
-                player.sendMessage("§7  ✓ Monitor Live Analytics and Performance Alerts");
-                player.sendMessage("§7  ✓ Use coordination tools for teamwork");
+    private void markWaypoint(Player player) {
+        String location = String.format("%d, %d, %d",
+            (int) player.getLocation().getX(),
+            (int) player.getLocation().getY(),
+            (int) player.getLocation().getZ());
+        String waypointMsg = "§d[§lWAYPOINT§d] §b" + player.getName() + "§7 marked: §f" + location + "§7 - Check your compass!";
+        List<Player> runners = plugin.getGameManager().getRunners();
+        if (runners != null) {
+            for (Player runner : runners) {
+                if (runner != null && runner.isOnline()) {
+                    runner.sendMessage(waypointMsg);
+                }
             }
         }
-        player.sendMessage("§6================================");
-    }
-
-    // Optimization tips with TPS/memory awareness
-    private void showOptimizationTips(Player player) {
-        player.sendMessage("§6========== §c§lOPTIMIZATION TIPS §6==========");
-        try {
-            Double tps = BukkitCompat.getServerTPS();
-            Runtime runtime = Runtime.getRuntime();
-            long maxMemory = runtime.maxMemory() / 1024 / 1024;
-            long usedMemory = (runtime.totalMemory() - runtime.freeMemory()) / 1024 / 1024;
-            int memoryPercent = (int) ((usedMemory * 100) / maxMemory);
-
-            player.sendMessage("§7Current Performance:");
-            player.sendMessage("§7  TPS: §f" + (tps != null ? String.format("%.2f", tps) : "N/A"));
-            player.sendMessage("§7  Memory: §f" + usedMemory + "/" + maxMemory + "MB (" + memoryPercent + "%)");
-
-            if (tps != null && tps < 18.0) {
-                player.sendMessage("§eServer TPS low:");
-                player.sendMessage("§7  ⚠ §cReduce team size (remove 1-2 runners)");
-                player.sendMessage("§7  ⚠ §cIncrease swap interval (60s+ recommended)");
-                player.sendMessage("§7  ⚠ §cConsider pausing temporarily");
-            }
-            if (memoryPercent > 85) {
-                player.sendMessage("§eHigh memory usage:");
-                player.sendMessage("§7  ⚠ §cReduce render distance (8-12 chunks)");
-                player.sendMessage("§7  ⚠ §cClose unnecessary applications");
-                player.sendMessage("§7  ⚠ §cRestart server if possible");
-            }
-        } catch (Exception e) {
-            player.sendMessage("§7  Performance metrics unavailable");
-        }
-
-        player.sendMessage("");
-        player.sendMessage("§eGeneral Recommendations:");
-        player.sendMessage("§7  1. Keep team size between 2-4 players");
-        player.sendMessage("§7  2. Use 45-60s swap intervals for stability");
-        player.sendMessage("§7  3. Enable Safe Swaps to prevent lag spikes");
-        player.sendMessage("§7  4. Prefer SPECTATOR freeze mode for performance");
-        player.sendMessage("§7  5. Restart sessions if problems persist");
-        player.sendMessage("§6" + "=".repeat(44));
+        player.sendMessage("§aWaypoint marked and shared with team!");
     }
 }

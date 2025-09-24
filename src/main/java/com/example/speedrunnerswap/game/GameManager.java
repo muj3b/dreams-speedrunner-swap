@@ -948,16 +948,7 @@ public class GameManager {
 
         Player nextRunner = runners.get(activeRunnerIndex);
         Player previousRunner = activeRunner;
-
-        // Handle single-runner scenario gracefully: just refresh timers/powerups
-        if (previousRunner != null && previousRunner.equals(nextRunner)) {
-            // Keep the same active runner; just reschedule next swap and apply optional power-up
-            scheduleNextSwap();
-            if (plugin.getConfigManager().isPowerUpsEnabled()) {
-                applyRandomPowerUp(nextRunner);
-            }
-            return;
-        }
+        boolean sameRunner = previousRunner != null && previousRunner.equals(nextRunner);
 
         activeRunner = nextRunner;
 
@@ -973,7 +964,7 @@ public class GameManager {
             }, gracePeriodTicks);
         }
 
-        if (previousRunner != null && previousRunner.isOnline()) {
+        if (!sameRunner && previousRunner != null && previousRunner.isOnline()) {
             // Capture full state (includes potion effects, XP, etc.) from the previous runner
             com.example.speedrunnerswap.models.PlayerState prevState = PlayerStateUtil.capturePlayerState(previousRunner);
 
@@ -1004,7 +995,7 @@ public class GameManager {
             previousRunner.getInventory().setArmorContents(new ItemStack[]{});
             previousRunner.getInventory().setItemInOffHand(null);
             previousRunner.updateInventory();
-        } else {
+        } else if (previousRunner == null || !previousRunner.isOnline()) {
             // First-time activation (no previous runner). If kits enabled, give runner kit.
             if (plugin.getConfigManager().isKitsEnabled()) {
                 nextRunner.getInventory().clear();

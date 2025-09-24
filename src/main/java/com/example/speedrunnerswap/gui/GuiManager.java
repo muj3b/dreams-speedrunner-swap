@@ -13,12 +13,15 @@ import java.util.logging.Level;
 import org.bukkit.enchantments.Enchantment;
 
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
+import java.util.Locale;
 
 public class GuiManager {
     
     private final SpeedrunnerSwap plugin;
     private final String BACK_BUTTON_TITLE = "§c§lBack to Main Menu";
+    private enum EffectCategory { GOOD, BAD }
     
     public GuiManager(SpeedrunnerSwap plugin) {
         this.plugin = plugin;
@@ -243,85 +246,92 @@ public class GuiManager {
         Inventory inv = com.example.speedrunnerswap.utils.GuiCompat.createInventory(null, 54, "§6§lDangerous Blocks");
         ItemStack filler = createItem(Material.BLACK_STAINED_GLASS_PANE, " ");
         fillBorder(inv, filler);
-        inv.setItem(0, createItem(Material.ARROW, "§7§lBack", List.of("§7Return to settings")));
-        java.util.Set<org.bukkit.Material> set = plugin.getConfigManager().getDangerousBlocks();
+        inv.setItem(0, createGuiButton(Material.ARROW, "§7§lBack", List.of("§7Return to Settings"), "back_settings"));
+        java.util.List<org.bukkit.Material> materials = new java.util.ArrayList<>(plugin.getConfigManager().getDangerousBlocks());
+        materials.sort(Comparator.comparing(Enum::name));
         int slot = 10;
-        for (org.bukkit.Material mat : org.bukkit.Material.values()) {
-            if (slot >= 44) break; // show a subset to avoid overflow
-            if (!set.contains(mat)) continue; // only show configured ones to keep concise
-            ItemStack it = createItem(mat, "§e" + mat.name(), List.of("§7Click to remove from list"));
+        for (org.bukkit.Material mat : materials) {
+            if (slot >= 44) break;
+            ItemStack it = createGuiButton(mat, "§e" + mat.name(),
+                    List.of("§7Click to remove from list"),
+                    "dangerous_block_remove:" + mat.name());
             inv.setItem(slot++, it);
         }
-        // Hint to add more via config for now
-        inv.setItem(49, createItem(Material.PAPER, "§7Note", List.of("§7To add new blocks, use config.yml", "§7GUI supports removal quickly")));
+        inv.setItem(49, createGuiButton(Material.PAPER, "§7Currently Tracked",
+                List.of("§7These blocks are avoided during safe swaps"), "noop"));
+        inv.setItem(51, createGuiButton(Material.LAVA_BUCKET, "§eSuggested", List.of("§7Consider adding other hazards"), "noop"));
+        inv.setItem(52, createGuiButton(Material.EMERALD, "§a§lAdd Block", List.of("§7Click to add via chat"), "dangerous_block_add"));
+        inv.setItem(53, createGuiButton(Material.BARRIER, BACK_BUTTON_TITLE, List.of("§7Return to Dream menu"), "back_dream_menu"));
         openInventorySoon(player, inv);
     }
     
     public void openPositiveEffectsMenu(Player player) {
         Inventory inventory = com.example.speedrunnerswap.utils.GuiCompat.createInventory(null, 36, "§a§lPositive Effects");
-        
-        // Border-only filler for cleaner look
+
         ItemStack filler = createItem(Material.BLACK_STAINED_GLASS_PANE, " ");
         fillBorder(inventory, filler);
 
-        // Add all available positive effects
-        List<ItemStack> effectItems = new ArrayList<>();
-        effectItems.add(createEffectItem(Material.POTION, "Speed", "SPEED"));
-        effectItems.add(createEffectItem(Material.POTION, "Jump Boost", "JUMP"));
-        effectItems.add(createEffectItem(Material.POTION, "Strength", "INCREASE_DAMAGE"));
-        effectItems.add(createEffectItem(Material.POTION, "Regeneration", "REGENERATION"));
-        effectItems.add(createEffectItem(Material.POTION, "Resistance", "DAMAGE_RESISTANCE"));
-        effectItems.add(createEffectItem(Material.POTION, "Fire Resistance", "FIRE_RESISTANCE"));
-        effectItems.add(createEffectItem(Material.POTION, "Water Breathing", "WATER_BREATHING"));
-        effectItems.add(createEffectItem(Material.POTION, "Night Vision", "NIGHT_VISION"));
+        inventory.setItem(0, createGuiButton(Material.ARROW, "§7§lBack", List.of("§7Return to Power-ups"), "back_power_ups"));
 
-        for (int i = 0; i < effectItems.size(); i++) {
-            inventory.setItem(10 + i, effectItems.get(i));
+        ItemStack[] effectItems = new ItemStack[] {
+            createEffectItem(Material.POTION, "Speed", "SPEED", EffectCategory.GOOD),
+            createEffectItem(Material.POTION, "Jump Boost", "JUMP", EffectCategory.GOOD),
+            createEffectItem(Material.POTION, "Strength", "INCREASE_DAMAGE", EffectCategory.GOOD),
+            createEffectItem(Material.POTION, "Regeneration", "REGENERATION", EffectCategory.GOOD),
+            createEffectItem(Material.POTION, "Resistance", "DAMAGE_RESISTANCE", EffectCategory.GOOD),
+            createEffectItem(Material.POTION, "Fire Resistance", "FIRE_RESISTANCE", EffectCategory.GOOD),
+            createEffectItem(Material.POTION, "Water Breathing", "WATER_BREATHING", EffectCategory.GOOD),
+            createEffectItem(Material.POTION, "Night Vision", "NIGHT_VISION", EffectCategory.GOOD)
+        };
+
+        for (int i = 0; i < effectItems.length; i++) {
+            inventory.setItem(10 + i, effectItems[i]);
         }
 
-        // Back button
-        inventory.setItem(35, createItem(Material.BARRIER, BACK_BUTTON_TITLE));
+        inventory.setItem(35, createGuiButton(Material.BARRIER, BACK_BUTTON_TITLE, List.of("§7Return to Dream menu"), "back_dream_menu"));
 
         openInventorySoon(player, inventory);
     }
 
     public void openNegativeEffectsMenu(Player player) {
         Inventory inventory = com.example.speedrunnerswap.utils.GuiCompat.createInventory(null, 36, "§c§lNegative Effects");
-        
-        // Border-only filler for cleaner look
+
         ItemStack filler = createItem(Material.BLACK_STAINED_GLASS_PANE, " ");
         fillBorder(inventory, filler);
 
-        // Add all available negative effects
-        List<ItemStack> effectItems = new ArrayList<>();
-        effectItems.add(createEffectItem(Material.POTION, "Slowness", "SLOW"));
-        effectItems.add(createEffectItem(Material.POTION, "Weakness", "WEAKNESS"));
-        effectItems.add(createEffectItem(Material.POTION, "Poison", "POISON"));
-        effectItems.add(createEffectItem(Material.POTION, "Blindness", "BLINDNESS"));
-        effectItems.add(createEffectItem(Material.POTION, "Hunger", "HUNGER"));
-        effectItems.add(createEffectItem(Material.POTION, "Mining Fatigue", "SLOW_DIGGING"));
-        effectItems.add(createEffectItem(Material.POTION, "Nausea", "CONFUSION"));
-        effectItems.add(createEffectItem(Material.POTION, "Glowing", "GLOWING"));
+        inventory.setItem(0, createGuiButton(Material.ARROW, "§7§lBack", List.of("§7Return to Power-ups"), "back_power_ups"));
 
-        for (int i = 0; i < effectItems.size(); i++) {
-            inventory.setItem(10 + i, effectItems.get(i));
+        ItemStack[] effectItems = new ItemStack[] {
+            createEffectItem(Material.POTION, "Slowness", "SLOW", EffectCategory.BAD),
+            createEffectItem(Material.POTION, "Weakness", "WEAKNESS", EffectCategory.BAD),
+            createEffectItem(Material.POTION, "Poison", "POISON", EffectCategory.BAD),
+            createEffectItem(Material.POTION, "Blindness", "BLINDNESS", EffectCategory.BAD),
+            createEffectItem(Material.POTION, "Hunger", "HUNGER", EffectCategory.BAD),
+            createEffectItem(Material.POTION, "Mining Fatigue", "SLOW_DIGGING", EffectCategory.BAD),
+            createEffectItem(Material.POTION, "Nausea", "CONFUSION", EffectCategory.BAD),
+            createEffectItem(Material.POTION, "Glowing", "GLOWING", EffectCategory.BAD)
+        };
+
+        for (int i = 0; i < effectItems.length; i++) {
+            inventory.setItem(10 + i, effectItems[i]);
         }
 
-        // Back button
-        inventory.setItem(35, createItem(Material.BARRIER, BACK_BUTTON_TITLE));
+        inventory.setItem(35, createGuiButton(Material.BARRIER, BACK_BUTTON_TITLE, List.of("§7Return to Dream menu"), "back_dream_menu"));
 
         openInventorySoon(player, inventory);
     }
 
-    public ItemStack createEffectItem(Material material, String displayName, String effectId) {
+    public ItemStack createEffectItem(Material material, String displayName, String effectId, EffectCategory category) {
         List<String> lore = new ArrayList<>();
         lore.add("§7Effect ID: §f" + effectId);
         lore.add("§7Click to toggle this effect");
-        boolean isEnabled = plugin.getConfig().getStringList("power_ups.good_effects").contains(effectId) ||
-                          plugin.getConfig().getStringList("power_ups.bad_effects").contains(effectId);
+        String path = category == EffectCategory.GOOD ? "power_ups.good_effects" : "power_ups.bad_effects";
+        List<String> enabled = plugin.getConfig().getStringList(path);
+        boolean isEnabled = enabled.contains(effectId);
         lore.add(isEnabled ? "§aCurrently enabled" : "§cCurrently disabled");
-        
-        return createItem(material, "§e§l" + displayName, lore);
+
+        String id = "effect_toggle:" + category.name().toLowerCase(Locale.ROOT) + ":" + effectId.toUpperCase(Locale.ROOT);
+        return createGuiButton(material, "§e§l" + displayName, lore, id);
     }
 
     public void openPowerUpsMenu(Player player) {
@@ -336,10 +346,11 @@ public class GuiManager {
         boolean powerUpsEnabled = plugin.getConfigManager().isPowerUpsEnabled();
         powerUpToggleLore.add("§7Current status: " + (powerUpsEnabled ? "§aEnabled" : "§cDisabled"));
         powerUpToggleLore.add("§7Click to toggle");
-        ItemStack toggleItem = createItem(
+        ItemStack toggleItem = createGuiButton(
             powerUpsEnabled ? Material.LIME_DYE : Material.GRAY_DYE,
             "§e§lToggle Power-ups",
-            powerUpToggleLore
+            powerUpToggleLore,
+            "toggle_powerups"
         );
         inventory.setItem(4, toggleItem);
 
@@ -351,7 +362,7 @@ public class GuiManager {
         }
         positiveEffectsLore.add("");
         positiveEffectsLore.add("§7Click to modify");
-        ItemStack goodEffectsItem = createItem(Material.SPLASH_POTION, "§a§lPositive Effects", positiveEffectsLore);
+        ItemStack goodEffectsItem = createGuiButton(Material.SPLASH_POTION, "§a§lPositive Effects", positiveEffectsLore, "open_effects_good");
         inventory.setItem(11, goodEffectsItem);
 
         // Negative effects section (detailed list)
@@ -362,7 +373,7 @@ public class GuiManager {
         }
         negativeEffectsLore.add("");
         negativeEffectsLore.add("§7Click to modify");
-        ItemStack badEffectsItem = createItem(Material.LINGERING_POTION, "§c§lNegative Effects", negativeEffectsLore);
+        ItemStack badEffectsItem = createGuiButton(Material.LINGERING_POTION, "§c§lNegative Effects", negativeEffectsLore, "open_effects_bad");
         inventory.setItem(15, badEffectsItem);
 
         // Duration settings
@@ -375,11 +386,11 @@ public class GuiManager {
         durationLore.add("§7Level: §e" + minLvl + "-" + maxLvl);
         durationLore.add("");
         durationLore.add("§7Click to modify timings");
-        ItemStack durationItem = createItem(Material.CLOCK, "§6§lEffect Durations", durationLore);
+        ItemStack durationItem = createGuiButton(Material.CLOCK, "§6§lEffect Durations", durationLore, "open_powerup_durations");
         inventory.setItem(22, durationItem);
 
         // Back button
-        inventory.setItem(31, createItem(Material.BARRIER, BACK_BUTTON_TITLE));
+        inventory.setItem(31, createGuiButton(Material.BARRIER, BACK_BUTTON_TITLE, List.of("§7Return to Dream menu"), "back_dream_menu"));
 
         openInventorySoon(player, inventory);
     }
@@ -389,7 +400,7 @@ public class GuiManager {
         ItemStack filler = createItem(Material.GRAY_STAINED_GLASS_PANE, " ");
         fillBorder(inv, filler);
 
-        ItemStack back = createItem(Material.ARROW, "§7§lBack", List.of("§7Return to power-ups"));
+        ItemStack back = createGuiButton(Material.ARROW, "§7§lBack", List.of("§7Return to Power-ups"), "back_power_ups");
         inv.setItem(0, back);
 
         int minSec = plugin.getConfigManager().getPowerUpsMinSeconds();
@@ -397,10 +408,10 @@ public class GuiManager {
         int minLvl = plugin.getConfigManager().getPowerUpsMinLevel();
         int maxLvl = plugin.getConfigManager().getPowerUpsMaxLevel();
 
-        ItemStack minDur = createItem(Material.CLOCK, "§e§lMin Duration (s)", List.of("§7Current: §f" + minSec, "§7Left/Right: ±5"));
-        ItemStack maxDur = createItem(Material.CLOCK, "§e§lMax Duration (s)", List.of("§7Current: §f" + maxSec, "§7Left/Right: ±5"));
-        ItemStack minLvlItem = createItem(Material.EXPERIENCE_BOTTLE, "§e§lMin Level", List.of("§7Current: §f" + minLvl, "§7Left/Right: ±1"));
-        ItemStack maxLvlItem = createItem(Material.EXPERIENCE_BOTTLE, "§e§lMax Level", List.of("§7Current: §f" + maxLvl, "§7Left/Right: ±1"));
+        ItemStack minDur = createGuiButton(Material.CLOCK, "§e§lMin Duration (s)", List.of("§7Current: §f" + minSec, "§7Left/Right: ±5"), "powerup_duration_min_seconds");
+        ItemStack maxDur = createGuiButton(Material.CLOCK, "§e§lMax Duration (s)", List.of("§7Current: §f" + maxSec, "§7Left/Right: ±5"), "powerup_duration_max_seconds");
+        ItemStack minLvlItem = createGuiButton(Material.EXPERIENCE_BOTTLE, "§e§lMin Level", List.of("§7Current: §f" + minLvl, "§7Left/Right: ±1"), "powerup_level_min");
+        ItemStack maxLvlItem = createGuiButton(Material.EXPERIENCE_BOTTLE, "§e§lMax Level", List.of("§7Current: §f" + maxLvl, "§7Left/Right: ±1"), "powerup_level_max");
 
         inv.setItem(10, minDur);
         inv.setItem(12, maxDur);
@@ -422,10 +433,11 @@ public class GuiManager {
         List<String> toggleLore = new ArrayList<>();
         toggleLore.add("§7Current status: " + (isEnabled ? "§aEnabled" : "§cDisabled"));
         toggleLore.add("§7Click to toggle");
-        ItemStack toggleItem = createItem(
+        ItemStack toggleItem = createGuiButton(
             isEnabled ? Material.LIME_DYE : Material.GRAY_DYE,
             "§e§lToggle World Border",
-            toggleLore
+            toggleLore,
+            "world_border_toggle"
         );
         inventory.setItem(4, toggleItem);
 
@@ -437,7 +449,7 @@ public class GuiManager {
         initialSizeLore.add("§7Right-click: §c-100 blocks");
         initialSizeLore.add("§7Shift + Left-click: §a+500 blocks");
         initialSizeLore.add("§7Shift + Right-click: §c-500 blocks");
-        ItemStack initialSizeItem = createItem(Material.GRASS_BLOCK, "§a§lInitial Border Size", initialSizeLore);
+        ItemStack initialSizeItem = createGuiButton(Material.GRASS_BLOCK, "§a§lInitial Border Size", initialSizeLore, "world_border_initial");
         inventory.setItem(11, initialSizeItem);
 
         // Final size setting
@@ -448,7 +460,7 @@ public class GuiManager {
         finalSizeLore.add("§7Right-click: §c-50 blocks");
         finalSizeLore.add("§7Shift + Left-click: §a+100 blocks");
         finalSizeLore.add("§7Shift + Right-click: §c-100 blocks");
-        ItemStack finalSizeItem = createItem(Material.BEDROCK, "§c§lFinal Border Size", finalSizeLore);
+        ItemStack finalSizeItem = createGuiButton(Material.BEDROCK, "§c§lFinal Border Size", finalSizeLore, "world_border_final");
         inventory.setItem(13, finalSizeItem);
 
         // Shrink duration setting
@@ -459,21 +471,22 @@ public class GuiManager {
         durationLore.add("§7Right-click: §c-5 minutes");
         durationLore.add("§7Shift + Left-click: §a+15 minutes");
         durationLore.add("§7Shift + Right-click: §c-15 minutes");
-        ItemStack durationItem = createItem(Material.CLOCK, "§6§lShrink Duration", durationLore);
+        ItemStack durationItem = createGuiButton(Material.CLOCK, "§6§lShrink Duration", durationLore, "world_border_shrink");
         inventory.setItem(15, durationItem);
 
         // Warning settings
         int warningDistance = plugin.getConfig().getInt("world_border.warning_distance", 50);
+        int warningInterval = plugin.getConfig().getInt("world_border.warning_interval", 300);
         List<String> warningLore = new ArrayList<>();
         warningLore.add("§7Warning distance: §e" + warningDistance + " blocks");
-        warningLore.add("§7Warning interval: §e" + 
-            plugin.getConfig().getInt("world_border.warning_interval", 300) + " seconds");
-        warningLore.add("§7Click to modify warnings");
-        ItemStack warningItem = createItem(Material.BELL, "§e§lWarning Settings", warningLore);
+        warningLore.add("§7Warning interval: §e" + warningInterval + " seconds");
+        warningLore.add("§7Left/Right: distance ±10 (±50 shift)");
+        warningLore.add("§7Shift modifies interval ±30s");
+        ItemStack warningItem = createGuiButton(Material.BELL, "§e§lWarning Settings", warningLore, "world_border_warning");
         inventory.setItem(22, warningItem);
 
         // Back button
-        inventory.setItem(26, createItem(Material.BARRIER, BACK_BUTTON_TITLE));
+        inventory.setItem(26, createGuiButton(Material.BARRIER, BACK_BUTTON_TITLE, List.of("§7Return to Dream menu"), "back_dream_menu"));
 
         openInventorySoon(player, inventory);
     }
@@ -1407,42 +1420,44 @@ public class GuiManager {
         try { hunterCount = plugin.getGameManager().getHunters().size(); } catch (Throwable ignored) {}
 
         // Start / Stop
+        int base = 0;
+
         if (!running) {
             List<String> startLore = new ArrayList<>();
             if (plugin.getCurrentMode() == com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode.DREAM) {
                 if (runnerCount == 0 || hunterCount == 0) {
                     startLore.add("§cNeed both runners and hunters!");
                     startLore.add("§cRunners: " + runnerCount + ", Hunters: " + hunterCount);
-                    inventory.setItem(10, createItem(Material.GRAY_CONCRETE, "§c§lCannot Start", startLore));
+                    inventory.setItem(base + 1, createItem(Material.GRAY_CONCRETE, "§c§lCannot Start", startLore));
                 } else {
                     startLore.add("§7Ready: §b" + runnerCount + " runners§7, §c" + hunterCount + " hunters");
                     startLore.add("§7Swap interval: §e" + plugin.getConfigManager().getSwapInterval() + "s");
-                    inventory.setItem(10, createGuiButton(Material.LIME_CONCRETE, "§a§lStart Game", startLore, "start_game"));
+                    inventory.setItem(base + 1, createGuiButton(Material.LIME_CONCRETE, "§a§lStart Game", startLore, "start_game"));
                 }
             } else {
                 if (runnerCount < 1) {
                     startLore.add("§cNeed at least 1 runner!");
-                    inventory.setItem(10, createItem(Material.GRAY_CONCRETE, "§c§lCannot Start", startLore));
+                    inventory.setItem(base + 1, createItem(Material.GRAY_CONCRETE, "§c§lCannot Start", startLore));
                 } else {
                     startLore.add("§7Ready: §b" + runnerCount + " runners");
                     startLore.add("§7Swap interval: §e" + plugin.getConfigManager().getSwapInterval() + "s");
-                    inventory.setItem(10, createGuiButton(Material.LIME_CONCRETE, "§a§lStart Game", startLore, "start_game"));
+                    inventory.setItem(base + 1, createGuiButton(Material.LIME_CONCRETE, "§a§lStart Game", startLore, "start_game"));
                 }
             }
         } else {
             List<String> stopLore = new ArrayList<>();
             stopLore.add("§7End the current game");
             stopLore.add("§7Status: " + (paused ? "§ePaused" : "§aRunning"));
-            inventory.setItem(10, createGuiButton(Material.RED_CONCRETE, "§c§lStop Game", stopLore, "stop_game"));
+            inventory.setItem(base + 1, createGuiButton(Material.RED_CONCRETE, "§c§lStop Game", stopLore, "stop_game"));
         }
 
         // Pause / Resume
         if (running && !paused) {
-            inventory.setItem(11, createGuiButton(Material.YELLOW_CONCRETE, "§e§lPause", List.of("§7Temporarily pause the game"), "pause_game"));
+            inventory.setItem(base + 2, createGuiButton(Material.YELLOW_CONCRETE, "§e§lPause", List.of("§7Temporarily pause the game"), "pause_game"));
         } else if (running) {
-            inventory.setItem(11, createGuiButton(Material.ORANGE_CONCRETE, "§a§lResume", List.of("§7Resume the game"), "resume_game"));
+            inventory.setItem(base + 2, createGuiButton(Material.ORANGE_CONCRETE, "§a§lResume", List.of("§7Resume the game"), "resume_game"));
         } else {
-            inventory.setItem(11, createItem(Material.GRAY_CONCRETE, "§7Pause", List.of("§7Game not running")));
+            inventory.setItem(base + 2, createItem(Material.GRAY_CONCRETE, "§7Pause", List.of("§7Game not running")));
         }
 
         // Status
@@ -1459,7 +1474,7 @@ public class GuiManager {
                 status.add("§7Next Swap: §e" + plugin.getGameManager().getTimeUntilNextSwap() + "s");
             } catch (Throwable ignored) {}
         }
-        inventory.setItem(13, createItem(Material.CLOCK, "§6§lGame Status", status));
+        inventory.setItem(base + 4, createItem(Material.CLOCK, "§6§lGame Status", status));
     }
 
     // Visual utility: fill only the outer border of an inventory with a filler item
@@ -1976,8 +1991,6 @@ public class GuiManager {
         // Last Stand settings
         boolean lastStandEnabled = plugin.getConfig().getBoolean("last_stand.enabled", false);
         int healthThreshold = plugin.getConfig().getInt("last_stand.health_threshold", 4);
-        int duration = plugin.getConfig().getInt("last_stand.duration", 30);
-        
         ItemStack enableToggle = createGuiButton(
             lastStandEnabled ? Material.TOTEM_OF_UNDYING : Material.BARRIER,
             "§c§lLast Stand: " + (lastStandEnabled ? "§aEnabled" : "§cDisabled"),
@@ -1993,10 +2006,13 @@ public class GuiManager {
             "last_stand_threshold");
         inventory.setItem(13, threshold);
         
+        int durationTicks = plugin.getConfigManager().getLastStandDuration();
         ItemStack durationItem = createGuiButton(Material.CLOCK, "§c§lDuration",
-            List.of("§7Current: §f" + duration + " seconds", 
-                    "§7Left click: +5 seconds",
-                    "§7Right click: -5 seconds"),
+            List.of("§7Current: §f" + (durationTicks / 20) + " seconds",
+                    "§7Left click: +1 second",
+                    "§7Shift + Left: +5 seconds",
+                    "§7Right click: -1 second",
+                    "§7Shift + Right: -5 seconds"),
             "last_stand_duration");
         inventory.setItem(15, durationItem);
         
@@ -2029,10 +2045,10 @@ public class GuiManager {
             List.of("§7Return to Settings"), "back_settings"));
         
         // Compass settings
-        boolean compassEnabled = plugin.getConfig().getBoolean("compass.enabled", true);
-        int updateInterval = plugin.getConfig().getInt("compass.update_interval", 20);
-        int trackingRange = plugin.getConfig().getInt("compass.tracking_range", 100);
-        boolean showDistance = plugin.getConfig().getBoolean("compass.show_distance", true);
+        boolean compassEnabled = plugin.getConfig().getBoolean("tracker.enabled", true);
+        int updateInterval = plugin.getConfig().getInt("tracker.update_ticks", 20);
+        int trackingRange = plugin.getConfig().getInt("tracker.max_distance", 1000);
+        boolean showDistance = plugin.getConfig().getBoolean("tracker.show_distance", true);
         
         ItemStack enableToggle = createGuiButton(
             compassEnabled ? Material.COMPASS : Material.BARRIER,
@@ -2047,7 +2063,9 @@ public class GuiManager {
         inventory.setItem(13, updateRate);
         
         ItemStack range = createGuiButton(Material.SPYGLASS, "§b§lTracking Range",
-            List.of("§7Current: §f" + trackingRange + " blocks", "§7Left/Right click: ±10"),
+            List.of("§7Current: §f" + trackingRange + " blocks",
+                    "§7Left/Right click: ±10",
+                    "§7Shift + Left/Right: ±50"),
             "compass_range");
         inventory.setItem(15, range);
         

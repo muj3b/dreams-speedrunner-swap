@@ -273,6 +273,11 @@ public class GuiListener implements Listener {
                 case "task_settings" -> { guiManager.openTaskSettingsMenu(player); return; }
                 case "dream_settings" -> { guiManager.openDreamSettingsMenu(player); return; }
                 case "advanced_config_root" -> { guiManager.openAdvancedConfigMenu(player, "", 0); return; }
+                case "back_power_ups" -> { guiManager.openPowerUpsMenu(player); return; }
+                case "open_effects_good" -> { guiManager.openPositiveEffectsMenu(player); return; }
+                case "open_effects_bad" -> { guiManager.openNegativeEffectsMenu(player); return; }
+                case "open_powerup_durations" -> { guiManager.openPowerUpDurationsMenu(player); return; }
+                case "back_dream_menu" -> { guiManager.openDreamMenu(player); return; }
                 case "direct_dream_menu" -> {
                     // Direct access to Dream mode main menu
                     plugin.setCurrentMode(com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode.DREAM);
@@ -1104,28 +1109,21 @@ public class GuiListener implements Listener {
         ItemStack clicked = event.getCurrentItem();
         if (clicked == null || !clicked.hasItemMeta()) return;
 
-        String name = com.example.speedrunnerswap.utils.GuiCompat.getDisplayName(clicked.getItemMeta());
+        String buttonId = getButtonId(clicked);
+        if (buttonId == null) return;
 
-        if ("§e§lToggle Power-ups".equals(name)) {
-            boolean current = plugin.getConfigManager().isPowerUpsEnabled();
-            plugin.getConfigManager().setPowerUpsEnabled(!current);
-            guiManager.openPowerUpsMenu(player);
-            return;
+        switch (buttonId) {
+            case "toggle_powerups" -> {
+                boolean current = plugin.getConfigManager().isPowerUpsEnabled();
+                plugin.getConfigManager().setPowerUpsEnabled(!current);
+                guiManager.openPowerUpsMenu(player);
+            }
+            case "open_effects_good" -> guiManager.openPositiveEffectsMenu(player);
+            case "open_effects_bad" -> guiManager.openNegativeEffectsMenu(player);
+            case "open_powerup_durations" -> guiManager.openPowerUpDurationsMenu(player);
+            case "back_dream_menu" -> guiManager.openDreamMenu(player);
+            default -> {}
         }
-
-        if (name != null && name.contains("Positive Effects")) {
-            guiManager.openPositiveEffectsMenu(player);
-            return;
-        }
-        if (name != null && name.contains("Negative Effects")) {
-            guiManager.openNegativeEffectsMenu(player);
-            return;
-        }
-        if (name != null && name.contains("Effect Durations")) {
-            guiManager.openPowerUpDurationsMenu(player);
-            return;
-        }
-        // Other clicks: ignore safely
     }
 
     // Recognize and handle clicks inside the Power-up Durations menu
@@ -1146,48 +1144,16 @@ public class GuiListener implements Listener {
         Player player = (Player) event.getWhoClicked();
         ItemStack clicked = event.getCurrentItem();
         if (clicked == null || !clicked.hasItemMeta()) return;
-        String name = com.example.speedrunnerswap.utils.GuiCompat.getDisplayName(clicked.getItemMeta());
+        String id = getButtonId(clicked);
+        if (id == null) return;
 
-        boolean changed = false;
-        switch (name) {
-            case "§e§lMin Duration (s)" -> {
-                int val = plugin.getConfigManager().getPowerUpsMinSeconds();
-                if (event.isLeftClick()) val += 5;
-                if (event.isRightClick()) val -= 5;
-                val = Math.max(1, Math.min(600, val));
-                plugin.getConfigManager().setPowerUpsMinSeconds(val);
-                changed = true;
-            }
-            case "§e§lMax Duration (s)" -> {
-                int val = plugin.getConfigManager().getPowerUpsMaxSeconds();
-                if (event.isLeftClick()) val += 5;
-                if (event.isRightClick()) val -= 5;
-                val = Math.max(1, Math.min(1800, val));
-                plugin.getConfigManager().setPowerUpsMaxSeconds(val);
-                changed = true;
-            }
-            case "§e§lMin Level" -> {
-                int val = plugin.getConfigManager().getPowerUpsMinLevel();
-                if (event.isLeftClick()) val += 1;
-                if (event.isRightClick()) val -= 1;
-                val = Math.max(1, Math.min(5, val));
-                plugin.getConfigManager().setPowerUpsMinLevel(val);
-                changed = true;
-            }
-            case "§e§lMax Level" -> {
-                int val = plugin.getConfigManager().getPowerUpsMaxLevel();
-                if (event.isLeftClick()) val += 1;
-                if (event.isRightClick()) val -= 1;
-                val = Math.max(1, Math.min(5, val));
-                plugin.getConfigManager().setPowerUpsMaxLevel(val);
-                changed = true;
-            }
+        switch (id) {
+            case "back_power_ups" -> guiManager.openPowerUpsMenu(player);
+            case "powerup_duration_min_seconds" -> adjustPowerUpDuration(player, event, true);
+            case "powerup_duration_max_seconds" -> adjustPowerUpDuration(player, event, false);
+            case "powerup_level_min" -> adjustPowerUpLevel(player, event, true);
+            case "powerup_level_max" -> adjustPowerUpLevel(player, event, false);
             default -> {}
-        }
-        if (isBackButton(clicked)) {
-            guiManager.openPowerUpsMenu(player);
-        } else if (changed) {
-            guiManager.openPowerUpDurationsMenu(player);
         }
     }
 
@@ -1195,26 +1161,35 @@ public class GuiListener implements Listener {
         Player player = (Player) event.getWhoClicked();
         ItemStack clicked = event.getCurrentItem();
         if (clicked == null || !clicked.hasItemMeta()) return;
-        String name = com.example.speedrunnerswap.utils.GuiCompat.getDisplayName(clicked.getItemMeta());
-        if (isBackButton(clicked)) {
+        String id = getButtonId(clicked);
+        if (id == null) return;
+
+        if ("back_settings".equals(id)) {
             guiManager.openSettingsMenu(player);
             return;
         }
-        try {
-            org.bukkit.Material mat = org.bukkit.Material.matchMaterial(name.replace("§e", "").trim());
-            if (mat != null) {
-                java.util.Set<org.bukkit.Material> set = plugin.getConfigManager().getDangerousBlocks();
-                if (set.contains(mat)) {
-                    // Remove and persist back to config list
-                    set.remove(mat);
-                    java.util.List<String> list = new java.util.ArrayList<>();
-                    for (org.bukkit.Material m : set) list.add(m.name());
-                    plugin.getConfig().set("safe_swap.dangerous_blocks", list);
-                    plugin.saveConfig();
-                }
-                guiManager.openDangerousBlocksMenu(player);
-            }
-        } catch (Exception ignored) {}
+
+        if ("dangerous_block_add".equals(id)) {
+            plugin.getChatInputHandler().expectConfigListAdd(player, "safe_swap.dangerous_blocks");
+            player.closeInventory();
+            player.sendMessage("§eEnter a block name to add to dangerous blocks (type 'cancel' to abort)");
+            return;
+        }
+
+        if (!id.startsWith("dangerous_block_remove:")) return;
+
+        String materialName = id.substring("dangerous_block_remove:".length());
+        org.bukkit.Material mat = org.bukkit.Material.matchMaterial(materialName);
+        if (mat == null) return;
+
+        java.util.Set<org.bukkit.Material> set = plugin.getConfigManager().getDangerousBlocks();
+        if (set.remove(mat)) {
+            java.util.List<String> list = new java.util.ArrayList<>();
+            for (org.bukkit.Material m : set) list.add(m.name());
+            plugin.getConfig().set("safe_swap.dangerous_blocks", list);
+            plugin.saveConfig();
+        }
+        guiManager.openDangerousBlocksMenu(player);
     }
 
     private void handleWorldBorderClick(InventoryClickEvent event) {
@@ -1222,57 +1197,54 @@ public class GuiListener implements Listener {
         ItemStack clicked = event.getCurrentItem();
         if (clicked == null || !clicked.hasItemMeta()) return;
 
-        String name = com.example.speedrunnerswap.utils.GuiCompat.getDisplayName(clicked.getItemMeta());
-        boolean changed = false;
+        String id = getButtonId(clicked);
+        if (id == null) return;
 
-        switch (name) {
-            case "§e§lToggle World Border" -> {
+        switch (id) {
+            case "world_border_toggle" -> {
                 boolean enabled = plugin.getConfig().getBoolean("world_border.enabled", true);
-                // Flip
                 plugin.getConfig().set("world_border.enabled", !enabled);
                 plugin.saveConfig();
-                // Hook start/stop
                 if (!enabled) {
                     plugin.getWorldBorderManager().startBorderShrinking();
                 } else {
                     plugin.getWorldBorderManager().stopBorderShrinking();
                 }
-                changed = true;
+                guiManager.openWorldBorderMenu(player);
             }
-            case "§a§lInitial Border Size" -> {
+            case "world_border_initial" -> {
                 int val = plugin.getConfig().getInt("world_border.initial_size", 2000);
                 if (event.isLeftClick()) val += event.isShiftClick() ? 500 : 100;
                 if (event.isRightClick()) val -= event.isShiftClick() ? 500 : 100;
                 val = Math.max(100, Math.min(29999984, val));
                 plugin.getConfig().set("world_border.initial_size", val);
                 plugin.saveConfig();
-                changed = true;
+                guiManager.openWorldBorderMenu(player);
             }
-            case "§c§lFinal Border Size" -> {
+            case "world_border_final" -> {
                 int val = plugin.getConfig().getInt("world_border.final_size", 100);
                 if (event.isLeftClick()) val += event.isShiftClick() ? 100 : 50;
                 if (event.isRightClick()) val -= event.isShiftClick() ? 100 : 50;
-                val = Math.max(50, Math.min(1000, val));
+                val = Math.max(50, Math.min(10000, val));
                 plugin.getConfig().set("world_border.final_size", val);
                 plugin.saveConfig();
-                changed = true;
+                guiManager.openWorldBorderMenu(player);
             }
-            case "§6§lShrink Duration" -> {
+            case "world_border_shrink" -> {
                 int val = plugin.getConfig().getInt("world_border.shrink_duration", 1800);
                 if (event.isLeftClick()) val += event.isShiftClick() ? 900 : 300;
                 if (event.isRightClick()) val -= event.isShiftClick() ? 900 : 300;
                 val = Math.max(300, Math.min(7200, val));
                 plugin.getConfig().set("world_border.shrink_duration", val);
                 plugin.saveConfig();
-                changed = true;
+                guiManager.openWorldBorderMenu(player);
             }
-            case "§e§lWarning Settings" -> {
+            case "world_border_warning" -> {
                 int dist = plugin.getConfig().getInt("world_border.warning_distance", 50);
                 int interval = plugin.getConfig().getInt("world_border.warning_interval", 300);
                 if (event.isLeftClick()) dist += event.isShiftClick() ? 50 : 10;
                 if (event.isRightClick()) dist -= event.isShiftClick() ? 50 : 10;
                 if (event.isShiftClick()) {
-                    // While shift-clicking, also tweak interval for convenience
                     if (event.isLeftClick()) interval += 30;
                     if (event.isRightClick()) interval -= 30;
                 }
@@ -1281,13 +1253,10 @@ public class GuiListener implements Listener {
                 plugin.getConfig().set("world_border.warning_distance", dist);
                 plugin.getConfig().set("world_border.warning_interval", interval);
                 plugin.saveConfig();
-                changed = true;
+                guiManager.openWorldBorderMenu(player);
             }
+            case "back_dream_menu" -> guiManager.openDreamMenu(player);
             default -> {}
-        }
-
-        if (changed) {
-            guiManager.openWorldBorderMenu(player);
         }
     }
 
@@ -1392,11 +1361,12 @@ public class GuiListener implements Listener {
                     plugin.saveConfig();
                 }
                 case "last_stand_duration" -> {
-                    int duration = plugin.getConfig().getInt("last_stand.duration", 30);
-                    if (event.isLeftClick()) duration += 5;
-                    if (event.isRightClick()) duration -= 5;
-                    duration = Math.max(5, Math.min(300, duration));
-                    plugin.getConfig().set("last_stand.duration", duration);
+                    int durationTicks = plugin.getConfigManager().getLastStandDuration();
+                    int delta = event.isShiftClick() ? 100 : 20; // 5s or 1s
+                    if (event.isLeftClick()) durationTicks += delta;
+                    if (event.isRightClick()) durationTicks -= delta;
+                    durationTicks = Math.max(20, Math.min(20 * 60 * 5, durationTicks));
+                    plugin.getConfig().set("last_stand.duration_ticks", durationTicks);
                     plugin.saveConfig();
                 }
                 case "last_stand_strength" -> {
@@ -1470,31 +1440,41 @@ public class GuiListener implements Listener {
             switch (id) {
                 case "back_settings" -> { guiManager.openSettingsMenu(player); return; }
                 case "toggle_compass" -> {
-                    boolean enabled = plugin.getConfig().getBoolean("compass.enabled", true);
-                    plugin.getConfig().set("compass.enabled", !enabled);
-                    plugin.saveConfig();
+                    boolean enabled = plugin.getConfig().getBoolean("tracker.enabled", true);
+                    plugin.getConfigManager().setTrackerEnabled(!enabled);
+                    if (!enabled) {
+                        plugin.getTrackerManager().startTracking();
+                        for (Player hunter : plugin.getGameManager().getHunters()) {
+                            if (hunter.isOnline()) plugin.getTrackerManager().giveTrackingCompass(hunter);
+                        }
+                    } else {
+                        plugin.getTrackerManager().stopTracking();
+                    }
                 }
                 case "compass_update" -> {
-                    int val = plugin.getConfig().getInt("compass.update_interval", 20);
+                    int val = plugin.getConfig().getInt("tracker.update_ticks", 20);
                     int delta = event.isShiftClick() ? 10 : 5;
                     if (event.isLeftClick()) val += delta;
                     if (event.isRightClick()) val -= delta;
                     val = Math.max(1, Math.min(200, val));
-                    plugin.getConfig().set("compass.update_interval", val);
+                    plugin.getConfig().set("tracker.update_ticks", val);
                     plugin.saveConfig();
+                    if (plugin.getConfig().getBoolean("tracker.enabled", true)) {
+                        plugin.getTrackerManager().startTracking();
+                    }
                 }
                 case "compass_range" -> {
-                    int val = plugin.getConfig().getInt("compass.tracking_range", 100);
+                    int val = plugin.getConfig().getInt("tracker.max_distance", 1000);
                     int delta = event.isShiftClick() ? 50 : 10;
                     if (event.isLeftClick()) val += delta;
                     if (event.isRightClick()) val -= delta;
                     val = Math.max(10, Math.min(100000, val));
-                    plugin.getConfig().set("compass.tracking_range", val);
+                    plugin.getConfig().set("tracker.max_distance", val);
                     plugin.saveConfig();
                 }
                 case "compass_distance" -> {
-                    boolean show = plugin.getConfig().getBoolean("compass.show_distance", true);
-                    plugin.getConfig().set("compass.show_distance", !show);
+                    boolean show = plugin.getConfig().getBoolean("tracker.show_distance", true);
+                    plugin.getConfig().set("tracker.show_distance", !show);
                     plugin.saveConfig();
                 }
                 default -> {}
@@ -2027,25 +2007,21 @@ public class GuiListener implements Listener {
         ItemStack clicked = event.getCurrentItem();
         if (clicked == null || !clicked.hasItemMeta()) return;
 
-        java.util.List<String> lore = com.example.speedrunnerswap.utils.GuiCompat.getLore(clicked.getItemMeta());
-        if (lore == null) return;
-        String effectId = null;
-        for (String text : lore) {
-            int idx = text.indexOf("Effect ID:");
-            if (idx >= 0) {
-                // format: "Effect ID: <ID>"
-                int split = text.indexOf(':');
-                if (split >= 0 && split + 1 < text.length()) {
-                    effectId = text.substring(split + 1).trim();
-                    // Strip legacy color/formatting codes to get the raw ID
-                    effectId = effectId.replaceAll("§[0-9A-FK-ORa-fk-or]", "");
-                }
-                break;
-            }
-        }
-        if (effectId == null || effectId.isEmpty()) return;
+        String buttonId = getButtonId(clicked);
+        if (buttonId == null) return;
 
-        boolean positive = title.contains("Positive Effects");
+        if ("back_power_ups".equals(buttonId)) {
+            guiManager.openPowerUpsMenu(player);
+            return;
+        }
+
+        if (!buttonId.startsWith("effect_toggle:")) return;
+
+        String[] parts = buttonId.split(":", 3);
+        if (parts.length < 3) return;
+        boolean positive = "good".equalsIgnoreCase(parts[1]);
+        String effectId = parts[2];
+
         java.util.List<String> list = new java.util.ArrayList<>(positive
             ? plugin.getConfig().getStringList("power_ups.good_effects")
             : plugin.getConfig().getStringList("power_ups.bad_effects"));
@@ -2055,8 +2031,27 @@ public class GuiListener implements Listener {
         else plugin.getConfig().set("power_ups.bad_effects", list);
         plugin.saveConfig();
 
-        // Refresh menu
         if (positive) guiManager.openPositiveEffectsMenu(player); else guiManager.openNegativeEffectsMenu(player);
+    }
+
+    private void adjustPowerUpDuration(Player player, InventoryClickEvent event, boolean min) {
+        int current = min ? plugin.getConfigManager().getPowerUpsMinSeconds() : plugin.getConfigManager().getPowerUpsMaxSeconds();
+        if (event.isLeftClick()) current += 5;
+        if (event.isRightClick()) current -= 5;
+        current = Math.max(1, Math.min(1800, current));
+        if (min) plugin.getConfigManager().setPowerUpsMinSeconds(current);
+        else plugin.getConfigManager().setPowerUpsMaxSeconds(current);
+        guiManager.openPowerUpDurationsMenu(player);
+    }
+
+    private void adjustPowerUpLevel(Player player, InventoryClickEvent event, boolean min) {
+        int current = min ? plugin.getConfigManager().getPowerUpsMinLevel() : plugin.getConfigManager().getPowerUpsMaxLevel();
+        if (event.isLeftClick()) current += 1;
+        if (event.isRightClick()) current -= 1;
+        current = Math.max(1, Math.min(5, current));
+        if (min) plugin.getConfigManager().setPowerUpsMinLevel(current);
+        else plugin.getConfigManager().setPowerUpsMaxLevel(current);
+        guiManager.openPowerUpDurationsMenu(player);
     }
     
     private void handleBroadcastSettingsClick(InventoryClickEvent event) {
