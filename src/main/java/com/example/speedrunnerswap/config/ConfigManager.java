@@ -356,12 +356,9 @@ public class ConfigManager {
         try {
             Player.class.getMethod("setRespawnLocation", org.bukkit.Location.class, boolean.class)
                     .invoke(player, location, true);
-            return;
-        } catch (Throwable ignored) {}
-
-        try {
-            player.setBedSpawnLocation(location, true);
-        } catch (Throwable ignored) {}
+        } catch (Throwable reflectiveFailure) {
+            plugin.getLogger().warning("Failed to set respawn location for " + player.getName() + ": " + reflectiveFailure.getMessage());
+        }
     }
 
 
