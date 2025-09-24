@@ -824,7 +824,7 @@ public class ConfigManager {
     
     // Apply default interval on mode switch
     public boolean getApplyDefaultOnModeSwitch() {
-        return config.getBoolean("swap.apply_default_on_mode_switch", true);
+        return config.getBoolean("swap.apply_default_on_mode_switch", false);
     }
     
     public void setApplyDefaultOnModeSwitch(boolean enabled) {
@@ -834,16 +834,20 @@ public class ConfigManager {
     
     // Per-mode default intervals
     public int getModeDefaultInterval(com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode mode) {
-        String key = (mode == com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode.SAPNAP)
-                ? "swap.default_intervals.sapnap"
-                : "swap.default_intervals.dream";
+        String key = switch (mode) {
+            case SAPNAP -> "swap.default_intervals.sapnap";
+            case TASK -> "swap.default_intervals.task";
+            default -> "swap.default_intervals.dream";
+        };
         return config.getInt(key, 60);
     }
     
     public void setModeDefaultInterval(com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode mode, int seconds) {
-        String key = (mode == com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode.SAPNAP)
-                ? "swap.default_intervals.sapnap"
-                : "swap.default_intervals.dream";
+        String key = switch (mode) {
+            case SAPNAP -> "swap.default_intervals.sapnap";
+            case TASK -> "swap.default_intervals.task";
+            default -> "swap.default_intervals.dream";
+        };
         seconds = Math.max(10, seconds);
         config.set(key, seconds);
         saveConfig();

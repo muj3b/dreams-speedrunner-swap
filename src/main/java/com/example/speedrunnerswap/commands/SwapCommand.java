@@ -11,6 +11,7 @@ import org.bukkit.entity.Player;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Locale;
 import java.util.logging.Level;
 import java.util.stream.Collectors;
 
@@ -131,66 +132,76 @@ public class SwapCommand implements CommandExecutor, TabCompleter {
         if (rest.length == 0) {
             sender.sendMessage("§eCurrent mode: §f" + plugin.getCurrentMode().name().toLowerCase());
             sender.sendMessage("§7Usage: /swap mode <dream|sapnap|task> [--force]");
-            sender.sendMessage("§7       /swap mode default <dream|sapnap|task>");
             return true;
         }
 
-        String mode = rest[0].toLowerCase();
+        boolean force = false;
+        String targetArg = null;
+        for (String token : rest) {
+            if ("--force".equalsIgnoreCase(token) || "-f".equalsIgnoreCase(token) || "force".equalsIgnoreCase(token)) {
+                force = true;
+            } else if (targetArg == null) {
+                targetArg = token;
+            }
+        }
+
+        if (targetArg == null) {
+            sender.sendMessage("§cSpecify a mode to switch to (dream, sapnap, task).");
+            return false;
+        }
+
+        String mode = targetArg.toLowerCase(Locale.ROOT);
 
         if ("default".equals(mode)) {
-            if (rest.length < 2) {
-                sender.sendMessage("§eDefault mode: §f" + plugin.getConfigManager().getDefaultMode().name().toLowerCase());
-                sender.sendMessage("§7Usage: /swap mode default <dream|sapnap>");
-                return true;
-            }
-            String val = rest[1].toLowerCase();
-            if (!val.equals("dream") && !val.equals("sapnap") && !val.equals("task")) {
-                sender.sendMessage("§cUnknown mode: " + val);
-                return false;
-            }
-            com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode m = switch (val) {
-                case "sapnap" -> com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode.SAPNAP;
-                case "task" -> com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode.TASK;
-                default -> com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode.DREAM;
-            };
-            plugin.getConfigManager().setDefaultMode(m);
-            sender.sendMessage("§aDefault mode set to §f" + val + "§a.");
+            sender.sendMessage("§eSetting a startup default is now handled in config.yml (game.default_mode).");
             return true;
         }
-        boolean force = rest.length > 1 && ("--force".equalsIgnoreCase(rest[1]) || "-f".equalsIgnoreCase(rest[1]) || "force".equalsIgnoreCase(rest[1]));
+
+        com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode target = switch (mode) {
+            case "dream", "hunters", "manhunt" -> com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode.DREAM;
+            case "sapnap", "control", "multi", "multirunner", "runners" -> com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode.SAPNAP;
+            case "task", "taskmaster", "task-manager", "taskmanager" -> com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode.TASK;
+            default -> null;
+        };
+
+        if (target == null) {
+            sender.sendMessage("§cUnknown mode: " + mode + ". Use dream|sapnap|task.");
+            return false;
+        }
+
         if (plugin.getGameManager().isGameRunning() && !force) {
             sender.sendMessage("§cStop the current game before switching modes. Add --force to end it and switch now.");
             return false;
         }
+
         if (force && plugin.getGameManager().isGameRunning()) {
             plugin.getGameManager().stopGame();
         }
-        switch (mode) {
-            case "dream":
-                plugin.setCurrentMode(com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode.DREAM);
-                sender.sendMessage("§aMode set to §fDream§a (runners + hunters)");
-                // Open main GUI if a player
-                if (sender instanceof Player p) plugin.getGuiManager().openMainMenu(p);
-                return true;
-            case "sapnap":
-            case "sapnaps":
-            case "runner":
-            case "runners":
-                plugin.setCurrentMode(com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode.SAPNAP);
-                sender.sendMessage("§aMode set to §fSapnap§a (runners only)");
-                if (sender instanceof Player p) {
-                    try { new com.example.speedrunnerswap.gui.ControlGui(plugin).openMainMenu(p); } catch (Throwable ignored) {}
+
+        plugin.setCurrentMode(target);
+
+        String confirmation = switch (target) {
+            case DREAM -> "§aMode set to §fDream§a (runners + hunters).";
+            case SAPNAP -> "§aMode set to §fSapnap§a (multi-runner control).";
+            case TASK -> "§aMode set to §6Task Master§a (secret objectives).";
+        };
+        sender.sendMessage(confirmation);
+
+        if (sender instanceof Player player) {
+            switch (target) {
+                case DREAM, TASK -> plugin.getGuiManager().openMainMenu(player);
+                case SAPNAP -> {
+                    try {
+                        new com.example.speedrunnerswap.gui.ControlGui(plugin).openMainMenu(player);
+                    } catch (Throwable t) {
+                        plugin.getLogger().warning("Sapnap GUI failed to open: " + t.getMessage());
+                        player.sendMessage("§cFailed to open Sapnap control menu. Check console.");
+                    }
                 }
-                return true;
-            case "task":
-                plugin.setCurrentMode(com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode.TASK);
-                sender.sendMessage("§aMode set to §6Task Manager§a (runners only, secret tasks)");
-                if (sender instanceof Player p) plugin.getGuiManager().openMainMenu(p);
-                return true;
-            default:
-                sender.sendMessage("§cUnknown mode: " + mode + ". Use dream|sapnap|task");
-                return false;
+            }
         }
+
+        return true;
     }
 
     private boolean handleCreator(CommandSender sender) {
@@ -528,9 +539,18 @@ public class SwapCommand implements CommandExecutor, TabCompleter {
             plugin.getGameManager().stopGame();
         }
 
-        plugin.getGameManager().setRunners(new ArrayList<>());
-        plugin.getGameManager().setHunters(new ArrayList<>());
+        java.util.LinkedHashSet<Player> affected = new java.util.LinkedHashSet<>();
+        affected.addAll(plugin.getGameManager().getRunners());
+        affected.addAll(plugin.getGameManager().getHunters());
+
+        plugin.getGameManager().clearAllTeams();
         sender.sendMessage("§aCleared all teams (runners and hunters).");
+
+        for (Player target : affected) {
+            if (target != null && target.isOnline() && target != sender) {
+                target.sendMessage("§eYour team assignment was cleared by §f" + sender.getName() + "§e.");
+            }
+        }
         return true;
     }
     
@@ -560,12 +580,18 @@ public class SwapCommand implements CommandExecutor, TabCompleter {
                     completions.add("confirm");
                 }
             } else if (args[0].equalsIgnoreCase("mode") && args.length == 2) {
-                for (String opt : new String[]{"dream", "sapnap", "default"}) {
+                for (String opt : new String[]{"dream", "sapnap", "task"}) {
                     if (opt.startsWith(args[1].toLowerCase())) completions.add(opt);
                 }
-            } else if (args[0].equalsIgnoreCase("mode") && args.length == 3 && "default".startsWith(args[1].toLowerCase())) {
-                for (String opt : new String[]{"dream", "sapnap"}) {
-                    if (opt.startsWith(args[2].toLowerCase())) completions.add(opt);
+                if ("--force".startsWith(args[1].toLowerCase())) {
+                    completions.add("--force");
+                }
+            } else if (args[0].equalsIgnoreCase("mode") && args.length >= 3) {
+                String current = args[args.length - 1].toLowerCase();
+                if ("--force".startsWith(current)) {
+                    completions.add("--force");
+                } else if ("-f".startsWith(current)) {
+                    completions.add("-f");
                 }
             } else if (args[0].equalsIgnoreCase("randomize") && args.length == 2) {
                 for (String opt : new String[]{"on","off"}) if (opt.startsWith(args[1].toLowerCase())) completions.add(opt);

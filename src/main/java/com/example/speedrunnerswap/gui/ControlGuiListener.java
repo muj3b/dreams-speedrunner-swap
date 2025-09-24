@@ -460,18 +460,6 @@ public class ControlGuiListener implements Listener {
             }
         }
 
-        // Apply default on mode switch toggle
-        if (type == Material.NOTE_BLOCK || type == Material.GRAY_DYE) {
-            String name = com.example.speedrunnerswap.utils.GuiCompat.getDisplayName(clicked.getItemMeta());
-            if (name != null && name.startsWith("Apply Mode Default on Switch:")) {
-                boolean current = plugin.getConfigManager().getApplyDefaultOnModeSwitch();
-                plugin.getConfigManager().setApplyDefaultOnModeSwitch(!current);
-                player.sendMessage("§eApply Default on Switch: " + (!current ? "§aYes" : "§cNo"));
-                new ControlGui(plugin).openMainMenu(player);
-                return;
-            }
-        }
-
         // Reset interval to mode default
         if (type == Material.ARROW) {
             String name = com.example.speedrunnerswap.utils.GuiCompat.getDisplayName(clicked.getItemMeta());

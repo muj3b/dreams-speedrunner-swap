@@ -15,7 +15,7 @@ swap:
   # Enable experimental intervals (<30s and >max) via GUI toggle
   beta_enabled: true
   # Apply per-mode default interval when switching modes (if game not running)
-  apply_default_on_mode_switch: true
+  apply_default_on_mode_switch: false
   # Min and max interval in seconds (only used if randomize is true)
   min_interval: 30
   max_interval: 90
@@ -23,6 +23,7 @@ swap:
   default_intervals:
     dream: 60
     sapnap: 60
+    task: 60
   # Jitter settings (only used if randomize is true)
   jitter:
     # Standard deviation in seconds
@@ -148,8 +149,8 @@ voice_chat:
 single_player_sleep:
   # If enabled, only the active runner can sleep to skip night
   # This helps when other players are caged or frozen and can't sleep
-  # Enabled by default for Sapnap mode, disabled by default for Dreams mode
-  enabled: false
+  # Enabled by default to prevent spectators from blocking night skip
+  enabled: true
 
 # Power-ups Configuration
 power_ups:

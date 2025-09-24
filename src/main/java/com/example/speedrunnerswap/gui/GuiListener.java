@@ -266,7 +266,7 @@ public class GuiListener implements Listener {
         if (earlyId != null) {
             switch (earlyId) {
                 case "back_mode" -> { guiManager.openModeSelector(player); return; }
-                case "statistics" -> { guiManager.openStatisticsMenu(player); return; }
+                case "statistics" -> { guiManager.openStatisticsMenu(player, GuiManager.StatsParent.MAIN); return; }
                 case "world_border" -> { guiManager.openWorldBorderMenu(player); return; }
                 case "power_ups" -> { guiManager.openPowerUpsMenu(player); return; }
                 case "team_selector" -> { guiManager.openTeamSelector(player); return; }
@@ -555,7 +555,7 @@ public class GuiListener implements Listener {
                 case "last_stand" -> guiManager.openLastStandMenu(player);
                 case "dream_tracking" -> guiManager.openCompassSettingsMenu(player);
                 case "sudden_death" -> guiManager.openSuddenDeathMenu(player);
-                case "statistics" -> guiManager.openStatisticsMenu(player);
+            case "statistics" -> guiManager.openStatisticsMenu(player, GuiManager.StatsParent.SETTINGS);
                 case "task_settings" -> guiManager.openTaskSettingsMenu(player);
                 case "custom_tasks_menu" -> guiManager.openCustomTasksMenu(player);
                 case "task_assignments" -> {
@@ -625,6 +625,7 @@ public class GuiListener implements Listener {
                     if (!beta) val = Math.min(maxAllowed, val);
                     plugin.getConfigManager().setSwapInterval(val);
                     if (plugin.getGameManager().isGameRunning()) plugin.getGameManager().refreshSwapSchedule();
+                    player.sendMessage("§eSwap interval: §f" + val + "s");
                     break;
                 }
                 case "interval_plus": {
@@ -637,6 +638,7 @@ public class GuiListener implements Listener {
                     if (!beta) val = Math.min(maxAllowed, val);
                     plugin.getConfigManager().setSwapInterval(val);
                     if (plugin.getGameManager().isGameRunning()) plugin.getGameManager().refreshSwapSchedule();
+                    player.sendMessage("§eSwap interval: §f" + val + "s");
                     break;
                 }
                 case "random_swaps":
@@ -644,7 +646,9 @@ public class GuiListener implements Listener {
                     break;
                 case "beta_intervals": {
                     boolean en = plugin.getConfigManager().isBetaIntervalEnabled();
-                    plugin.getConfigManager().setBetaIntervalEnabled(!en);
+                    boolean next = !en;
+                    plugin.getConfigManager().setBetaIntervalEnabled(next);
+                    player.sendMessage("§eExperimental intervals: " + (next ? "§aEnabled" : "§cDisabled"));
                     break;
                 }
                 case "random_range": {
@@ -660,6 +664,7 @@ public class GuiListener implements Listener {
                         plugin.getConfig().set("swap.max_interval", max);
                     }
                     plugin.saveConfig();
+                     player.sendMessage("§eRandom interval range: §f" + min + "s - " + max + "s");
                     break;
                 }
                 case "safe_swaps":
@@ -667,14 +672,18 @@ public class GuiListener implements Listener {
                     break;
                 case "pause_disconnect": {
                     boolean enabled = plugin.getConfigManager().isPauseOnDisconnect();
-                    plugin.getConfig().set("swap.pause_on_disconnect", !enabled);
+                    boolean next = !enabled;
+                    plugin.getConfig().set("swap.pause_on_disconnect", next);
                     plugin.saveConfig();
+                    player.sendMessage("§eAuto-pause on disconnect: " + (next ? "§aEnabled" : "§cDisabled"));
                     break;
                 }
                 case "hunter_swap": {
                     boolean enabled = plugin.getConfigManager().isHunterSwapEnabled();
-                    plugin.getConfig().set("swap.hunter_swap.enabled", !enabled);
+                    boolean next = !enabled;
+                    plugin.getConfig().set("swap.hunter_swap.enabled", next);
                     plugin.saveConfig();
+                    player.sendMessage("§eHunter swap mechanic: " + (next ? "§aEnabled" : "§cDisabled"));
                     break;
                 }
                 case "hunter_swap_interval": {
@@ -685,12 +694,15 @@ public class GuiListener implements Listener {
                     val = Math.max(30, Math.min(600, val));
                     plugin.getConfig().set("swap.hunter_swap.interval", val);
                     plugin.saveConfig();
+                    player.sendMessage("§eHunter swap interval: §f" + val + "s");
                     break;
                 }
                 case "hot_potato": {
                     boolean enabled = plugin.getConfigManager().isHotPotatoModeEnabled();
-                    plugin.getConfig().set("swap.hot_potato_mode.enabled", !enabled);
+                    boolean next = !enabled;
+                    plugin.getConfig().set("swap.hot_potato_mode.enabled", next);
                     plugin.saveConfig();
+                    player.sendMessage("§eHot potato swaps: " + (next ? "§aEnabled" : "§cDisabled"));
                     break;
                 }
                 case "single_sleep": {
@@ -701,11 +713,13 @@ public class GuiListener implements Listener {
                 }
                 case "freeze_toggle": {
                     boolean enabled = plugin.getConfigManager().isFreezeMechanicEnabled();
-                    plugin.getConfig().set("freeze_mechanic.enabled", !enabled);
+                    boolean next = !enabled;
+                    plugin.getConfig().set("freeze_mechanic.enabled", next);
                     plugin.saveConfig();
                     if (plugin.getGameManager().isGameRunning()) {
                         plugin.getGameManager().refreshFreezeMechanic();
                     }
+                    player.sendMessage("§eFreeze mechanic: " + (next ? "§aEnabled" : "§cDisabled"));
                     break;
                 }
                 case "freeze_mode": {
@@ -721,6 +735,7 @@ public class GuiListener implements Listener {
                     if (plugin.getGameManager().isGameRunning()) {
                         plugin.getGameManager().refreshFreezeMechanic();
                     }
+                    player.sendMessage("§eInactive runner state: §f" + next);
                     break;
                 }
                 case "freeze_duration": {
@@ -734,6 +749,7 @@ public class GuiListener implements Listener {
                     if (plugin.getGameManager().isGameRunning()) {
                         plugin.getGameManager().refreshFreezeMechanic();
                     }
+                    player.sendMessage("§eFreeze duration: §f" + (val / 20) + "s");
                     break;
                 }
                 case "freeze_check_interval": {
@@ -747,6 +763,7 @@ public class GuiListener implements Listener {
                     if (plugin.getGameManager().isGameRunning()) {
                         plugin.getGameManager().refreshFreezeMechanic();
                     }
+                    player.sendMessage("§eFreeze check interval: §f" + val + " ticks");
                     break;
                 }
                 case "freeze_max_distance": {
@@ -760,12 +777,14 @@ public class GuiListener implements Listener {
                     if (plugin.getGameManager().isGameRunning()) {
                         plugin.getGameManager().refreshFreezeMechanic();
                     }
+                    player.sendMessage("§eFreeze distance limit: §f" + val + " blocks");
                     break;
                 }
                 case "tracker_toggle": {
                     boolean enabled = plugin.getConfigManager().isTrackerEnabled();
-                    plugin.getConfigManager().setTrackerEnabled(!enabled);
-                    if (!enabled) {
+                    boolean next = !enabled;
+                    plugin.getConfigManager().setTrackerEnabled(next);
+                    if (next) {
                         plugin.getTrackerManager().startTracking();
                         for (org.bukkit.entity.Player hunter : plugin.getGameManager().getHunters()) {
                             if (hunter.isOnline()) plugin.getTrackerManager().giveTrackingCompass(hunter);
@@ -773,6 +792,7 @@ public class GuiListener implements Listener {
                     } else {
                         plugin.getTrackerManager().stopTracking();
                     }
+                    player.sendMessage("§eHunter tracking: " + (next ? "§aEnabled" : "§cDisabled"));
                     break;
                 }
                 case "force_swap":
@@ -921,20 +941,6 @@ public class GuiListener implements Listener {
                     plugin.getConfigManager().setBetaIntervalEnabled(!enabled);
                     break;
                 }
-                case "apply_mode_default_toggle": {
-                    boolean enabled = plugin.getConfigManager().getApplyDefaultOnModeSwitch();
-                    plugin.getConfigManager().setApplyDefaultOnModeSwitch(!enabled);
-                    break;
-                }
-                case "swap_interval_reset": {
-                    plugin.getConfigManager().applyModeDefaultInterval(plugin.getCurrentMode());
-                    break;
-                }
-                case "swap_interval_save_default": {
-                    int curr = plugin.getConfigManager().getSwapInterval();
-                    plugin.getConfigManager().setModeDefaultInterval(plugin.getCurrentMode(), curr);
-                    break;
-                }
                 // duplicate routing cases removed (handled in early routing or above)
             }
         } else {
@@ -1011,12 +1017,19 @@ public class GuiListener implements Listener {
 
     private void toggleRandomSwaps(Player player) {
         boolean current = plugin.getConfigManager().isSwapRandomized();
-        plugin.getConfigManager().setSwapRandomized(!current);
+        boolean next = !current;
+        plugin.getConfigManager().setSwapRandomized(next);
+        player.sendMessage("§eRandomized swaps: " + (next ? "§aEnabled" : "§cDisabled"));
+        if (plugin.getGameManager().isGameRunning()) {
+            plugin.getGameManager().refreshSwapSchedule();
+        }
     }
 
     private void toggleSafeSwaps(Player player) {
         boolean current = plugin.getConfigManager().isSafeSwapEnabled();
-        plugin.getConfigManager().setSafeSwapEnabled(!current);
+        boolean next = !current;
+        plugin.getConfigManager().setSafeSwapEnabled(next);
+        player.sendMessage("§eSafe swap checks: " + (next ? "§aEnabled" : "§cDisabled"));
     }
 
     // Other menu handlers
@@ -1025,27 +1038,35 @@ public class GuiListener implements Listener {
         ItemStack clicked = event.getCurrentItem();
         if (clicked == null || !clicked.hasItemMeta()) return;
 
-        // Handle clear teams button by ID
         String id = getButtonId(clicked);
         if ("clear_teams".equals(id)) {
-            plugin.getGameManager().setRunners(new java.util.ArrayList<>());
-            plugin.getGameManager().setHunters(new java.util.ArrayList<>());
-            player.sendMessage("§aCleared all teams.");
-            guiManager.openTeamSelector(player);
+            java.util.LinkedHashSet<Player> affected = new java.util.LinkedHashSet<>();
+            affected.addAll(plugin.getGameManager().getRunners());
+            affected.addAll(plugin.getGameManager().getHunters());
+
+            plugin.getGameManager().clearAllTeams();
+            player.sendMessage("§aCleared all team assignments.");
+
+            for (Player p : affected) {
+                if (p != null && p.isOnline() && !p.equals(player)) {
+                    p.sendMessage("§eYour team assignment was cleared by §f" + player.getName() + "§e.");
+                }
+            }
+
+            guiManager.updateTeamSelectors();
+            guiManager.updateMainMenus();
             return;
         }
 
         String name = com.example.speedrunnerswap.utils.GuiCompat.getDisplayName(clicked.getItemMeta());
-
-        // Select assignment team - check mode restrictions
         com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode currentMode = plugin.getCurrentMode();
+
         if (name != null) {
             if (name.contains("§b§lRunners")) {
                 guiManager.setPlayerTeam(player, com.example.speedrunnerswap.models.Team.RUNNER);
                 return;
             }
             if (name.contains("§c§lHunters")) {
-                // Only allow hunter selection in Dream mode
                 if (currentMode != com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode.TASK) {
                     guiManager.setPlayerTeam(player, com.example.speedrunnerswap.models.Team.HUNTER);
                 } else {
@@ -1055,12 +1076,11 @@ public class GuiListener implements Listener {
             }
         }
 
-        // Assign a player by clicking their head, using current selected team
         if (clicked.getType() == Material.PLAYER_HEAD && clicked.getItemMeta() != null) {
             String targetName = com.example.speedrunnerswap.utils.GuiCompat.getDisplayName(clicked.getItemMeta());
-            // Strip all color codes and formatting without deprecated ChatColor API
             try { targetName = com.example.speedrunnerswap.utils.TextUtil.stripColors(targetName); } catch (Throwable ignored) {}
             if (targetName != null) targetName = targetName.trim();
+
             Player target = Bukkit.getPlayerExact(targetName);
             if (target == null) {
                 player.sendMessage("§cPlayer not found or offline: " + targetName);
@@ -1068,36 +1088,50 @@ public class GuiListener implements Listener {
             }
 
             com.example.speedrunnerswap.models.Team selected = guiManager.getSelectedTeam(player);
-            if (selected == com.example.speedrunnerswap.models.Team.NONE) {
-                // In Task mode, default to RUNNER for convenience
+            if (event.isShiftClick()) {
+                selected = com.example.speedrunnerswap.models.Team.NONE;
+            } else if (selected == com.example.speedrunnerswap.models.Team.NONE) {
                 if (currentMode == com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode.TASK) {
-                    try { plugin.getGameManager().getPlayerState(player).setSelectedTeam(com.example.speedrunnerswap.models.Team.RUNNER); } catch (Throwable ignored) {}
+                    guiManager.setPlayerTeam(player, com.example.speedrunnerswap.models.Team.RUNNER);
                     selected = com.example.speedrunnerswap.models.Team.RUNNER;
                 } else {
-                    player.sendMessage("§eSelect a team (Runners/Hunters) first.");
+                    player.sendMessage("§eSelect a team (Runners/Hunters) first or shift-click to remove.");
                     return;
                 }
             }
 
-            // Build updated team lists
-            java.util.List<Player> newRunners = new java.util.ArrayList<>(plugin.getGameManager().getRunners());
-            java.util.List<Player> newHunters = new java.util.ArrayList<>(plugin.getGameManager().getHunters());
-            newRunners.remove(target);
-            newHunters.remove(target);
-            if (selected == com.example.speedrunnerswap.models.Team.RUNNER) {
-                newRunners.add(target);
-            } else if (selected == com.example.speedrunnerswap.models.Team.HUNTER) {
-                newHunters.add(target);
+            boolean changed = plugin.getGameManager().assignPlayerToTeam(target, selected);
+            if (!changed) {
+                player.sendMessage("§eNo change for §f" + target.getName() + "§e.");
+                return;
             }
 
-            // Apply to runtime and config
-            plugin.getGameManager().setRunners(newRunners);
-            plugin.getGameManager().setHunters(newHunters);
+            com.example.speedrunnerswap.models.Team finalTeam;
+            if (plugin.getGameManager().isRunner(target)) {
+                finalTeam = com.example.speedrunnerswap.models.Team.RUNNER;
+            } else if (plugin.getGameManager().isHunter(target)) {
+                finalTeam = com.example.speedrunnerswap.models.Team.HUNTER;
+            } else {
+                finalTeam = com.example.speedrunnerswap.models.Team.NONE;
+            }
 
-            // Refresh GUI to reflect changes
-            guiManager.openTeamSelector(player);
+            String targetDisplay = "§f" + target.getName();
+            if (finalTeam == com.example.speedrunnerswap.models.Team.NONE) {
+                player.sendMessage("§eRemoved " + targetDisplay + " §efrom all teams.");
+                if (!target.equals(player)) {
+                    target.sendMessage("§eYou were removed from all teams by §f" + player.getName() + "§e.");
+                }
+            } else {
+                String teamLabel = finalTeam == com.example.speedrunnerswap.models.Team.RUNNER ? "§bRunners" : "§cHunters";
+                player.sendMessage("§aAdded " + targetDisplay + " §ato " + teamLabel + "§a.");
+                if (!target.equals(player)) {
+                    target.sendMessage("§eYou were assigned to " + teamLabel + " §eby §f" + player.getName() + "§e.");
+                }
+            }
+
+            guiManager.updateTeamSelectors();
+            guiManager.updateMainMenus();
         }
-
     }
 
     private void handlePowerUpsMenuClick(InventoryClickEvent event) {
@@ -1111,7 +1145,9 @@ public class GuiListener implements Listener {
         switch (buttonId) {
             case "toggle_powerups" -> {
                 boolean current = plugin.getConfigManager().isPowerUpsEnabled();
-                plugin.getConfigManager().setPowerUpsEnabled(!current);
+                boolean next = !current;
+                plugin.getConfigManager().setPowerUpsEnabled(next);
+                player.sendMessage("§ePower-ups: " + (next ? "§aEnabled" : "§cDisabled"));
                 guiManager.openPowerUpsMenu(player);
             }
             case "open_effects_good" -> guiManager.openPositiveEffectsMenu(player);
@@ -1298,41 +1334,58 @@ public class GuiListener implements Listener {
             switch (id) {
                 case "toggle_bounty" -> {
                     boolean enabled = plugin.getConfig().getBoolean("bounty.enabled", false);
-                    plugin.getConfig().set("bounty.enabled", !enabled);
+                    boolean next = !enabled;
+                    plugin.getConfig().set("bounty.enabled", next);
                     plugin.saveConfig();
+                    if (!next) {
+                        plugin.getBountyManager().clearBounty();
+                    }
+                    player.sendMessage("§eBounty system: " + (next ? "§aEnabled" : "§cDisabled"));
                 }
                 case "bounty_base" -> {
                     int val = plugin.getConfig().getInt("bounty.base_amount", 10);
                     int delta = event.isShiftClick() ? 10 : 5;
-                    if (event.isLeftClick()) val += delta; if (event.isRightClick()) val -= delta;
+                    if (event.isLeftClick()) val += delta;
+                    if (event.isRightClick()) val -= delta;
                     val = Math.max(0, Math.min(10000, val));
                     plugin.getConfig().set("bounty.base_amount", val);
                     plugin.saveConfig();
+                    player.sendMessage("§eBounty base amount: §f" + val);
                 }
                 case "bounty_multiplier" -> {
                     int val = plugin.getConfig().getInt("bounty.kill_multiplier", 2);
                     int delta = event.isShiftClick() ? 2 : 1;
-                    if (event.isLeftClick()) val += delta; if (event.isRightClick()) val -= delta;
+                    if (event.isLeftClick()) val += delta;
+                    if (event.isRightClick()) val -= delta;
                     val = Math.max(1, Math.min(10, val));
                     plugin.getConfig().set("bounty.kill_multiplier", val);
                     plugin.saveConfig();
+                    player.sendMessage("§eBounty kill multiplier: §f" + val + "x");
                 }
                 case "bounty_max" -> {
                     int val = plugin.getConfig().getInt("bounty.max_amount", 100);
                     int delta = event.isShiftClick() ? 20 : 10;
-                    if (event.isLeftClick()) val += delta; if (event.isRightClick()) val -= delta;
+                    if (event.isLeftClick()) val += delta;
+                    if (event.isRightClick()) val -= delta;
                     val = Math.max(1, Math.min(100000, val));
                     plugin.getConfig().set("bounty.max_amount", val);
                     plugin.saveConfig();
+                    player.sendMessage("§eBounty max amount: §f" + val);
                 }
                 default -> {}
             }
             guiManager.openBountyMenu(player);
             return;
         }
-        // Fallback handling based on display name if IDs are missing
-        if (name != null && name.startsWith("§e§lAssign New Bounty")) { plugin.getBountyManager().assignNewBounty(); guiManager.openBountyMenu(player); }
-        else if (name != null && name.startsWith("§c§lClear Bounty")) { plugin.getBountyManager().clearBounty(); guiManager.openBountyMenu(player); }
+        if (name != null && name.startsWith("§e§lAssign New Bounty")) {
+            plugin.getBountyManager().assignNewBounty();
+            player.sendMessage("§eAssigned a new bounty target.");
+            guiManager.openBountyMenu(player);
+        } else if (name != null && name.startsWith("§c§lClear Bounty")) {
+            plugin.getBountyManager().clearBounty();
+            player.sendMessage("§eCleared the current bounty target.");
+            guiManager.openBountyMenu(player);
+        }
     }
 
     private void handleLastStandClick(InventoryClickEvent event) {
@@ -1345,8 +1398,10 @@ public class GuiListener implements Listener {
             switch (buttonId) {
                 case "toggle_last_stand" -> {
                     boolean enabled = plugin.getConfigManager().isLastStandEnabled();
-                    plugin.getConfig().set("last_stand.enabled", !enabled);
+                    boolean next = !enabled;
+                    plugin.getConfig().set("last_stand.enabled", next);
                     plugin.saveConfig();
+                    player.sendMessage("§eLast Stand: " + (next ? "§aEnabled" : "§cDisabled"));
                 }
                 case "last_stand_threshold" -> {
                     int threshold = plugin.getConfig().getInt("last_stand.health_threshold", 4);
@@ -1355,6 +1410,7 @@ public class GuiListener implements Listener {
                     threshold = Math.max(1, Math.min(20, threshold));
                     plugin.getConfig().set("last_stand.health_threshold", threshold);
                     plugin.saveConfig();
+                    player.sendMessage("§eLast Stand health threshold: §f" + threshold + " ❤");
                 }
                 case "last_stand_duration" -> {
                     int durationTicks = plugin.getConfigManager().getLastStandDuration();
@@ -1364,6 +1420,7 @@ public class GuiListener implements Listener {
                     durationTicks = Math.max(20, Math.min(20 * 60 * 5, durationTicks));
                     plugin.getConfig().set("last_stand.duration_ticks", durationTicks);
                     plugin.saveConfig();
+                    player.sendMessage("§eLast Stand duration: §f" + (durationTicks / 20) + "s");
                 }
                 case "last_stand_strength" -> {
                     int amp = plugin.getConfigManager().getLastStandStrengthAmplifier();
@@ -1372,6 +1429,7 @@ public class GuiListener implements Listener {
                     amp = Math.max(0, Math.min(5, amp));
                     plugin.getConfig().set("last_stand.strength_amplifier", amp);
                     plugin.saveConfig();
+                    player.sendMessage("§eLast Stand strength level: §f" + (amp + 1));
                 }
                 case "last_stand_speed" -> {
                     int amp = plugin.getConfigManager().getLastStandSpeedAmplifier();
@@ -1380,6 +1438,7 @@ public class GuiListener implements Listener {
                     amp = Math.max(0, Math.min(5, amp));
                     plugin.getConfig().set("last_stand.speed_amplifier", amp);
                     plugin.saveConfig();
+                    player.sendMessage("§eLast Stand speed level: §f" + (amp + 1));
                 }
             }
             guiManager.openLastStandMenu(player);
@@ -1531,8 +1590,14 @@ public class GuiListener implements Listener {
             switch (buttonId) {
                 case "toggle_sudden_death" -> {
                     boolean enabled = plugin.getConfig().getBoolean("sudden_death.enabled", false);
-                    plugin.getConfig().set("sudden_death.enabled", !enabled);
+                    boolean next = !enabled;
+                    plugin.getConfig().set("sudden_death.enabled", next);
                     plugin.saveConfig();
+                    if (!next) {
+                        plugin.getSuddenDeathManager().cancelSchedule();
+                        plugin.getSuddenDeathManager().deactivate();
+                    }
+                    player.sendMessage("§eSudden Death: " + (next ? "§aEnabled" : "§cDisabled"));
                 }
                 case "sudden_death_time" -> {
                     int time = plugin.getConfig().getInt("sudden_death.trigger_time", 1800);
@@ -1542,16 +1607,21 @@ public class GuiListener implements Listener {
                     time = Math.max(300, Math.min(21600, time)); // 5 min to 6 hours
                     plugin.getConfig().set("sudden_death.trigger_time", time);
                     plugin.saveConfig();
+                    player.sendMessage("§eSudden Death trigger: §f" + (time / 60) + " minutes");
                 }
                 case "sudden_death_no_regen" -> {
                     boolean noRegen = plugin.getConfig().getBoolean("sudden_death.no_regen", true);
-                    plugin.getConfig().set("sudden_death.no_regen", !noRegen);
+                    boolean next = !noRegen;
+                    plugin.getConfig().set("sudden_death.no_regen", next);
                     plugin.saveConfig();
+                    player.sendMessage("§eDisable natural regen during Sudden Death: " + (next ? "§aYes" : "§cNo"));
                 }
                 case "sudden_death_one_hit" -> {
                     boolean oneHit = plugin.getConfig().getBoolean("sudden_death.one_hit_kill", false);
-                    plugin.getConfig().set("sudden_death.one_hit_kill", !oneHit);
+                    boolean next = !oneHit;
+                    plugin.getConfig().set("sudden_death.one_hit_kill", next);
                     plugin.saveConfig();
+                    player.sendMessage("§eOne-hit kills during Sudden Death: " + (next ? "§aEnabled" : "§cDisabled"));
                 }
                 case "activate_sudden_death_now" -> {
                     plugin.getSuddenDeathManager().activateSuddenDeath();
@@ -1574,15 +1644,29 @@ public class GuiListener implements Listener {
         String name = com.example.speedrunnerswap.utils.GuiCompat.getDisplayName(clicked.getItemMeta());
         switch (name) {
             case "§4§lSudden Death: §aActive" -> {
-                // Toggle off
                 plugin.getSuddenDeathManager().deactivate();
+                plugin.getSuddenDeathManager().cancelSchedule();
+                plugin.getConfig().set("sudden_death.enabled", false);
+                plugin.saveConfig();
+                player.sendMessage("§eSudden Death: §cDisabled");
             }
             case "§4§lSudden Death: §cInactive" -> {
-                // No immediate action; user can Schedule or Activate explicitly
+                plugin.getConfig().set("sudden_death.enabled", true);
+                plugin.saveConfig();
+                player.sendMessage("§eSudden Death: §aEnabled");
             }
-            case "§e§lCancel Scheduled Sudden Death" -> plugin.getSuddenDeathManager().cancelSchedule();
-            case "§e§lSchedule Sudden Death" -> plugin.getSuddenDeathManager().scheduleSuddenDeath();
-            case "§c§lActivate Now" -> plugin.getSuddenDeathManager().activateSuddenDeath();
+            case "§e§lCancel Scheduled Sudden Death" -> {
+                plugin.getSuddenDeathManager().cancelSchedule();
+                player.sendMessage("§eCancelled scheduled Sudden Death.");
+            }
+            case "§e§lSchedule Sudden Death" -> {
+                plugin.getSuddenDeathManager().scheduleSuddenDeath();
+                player.sendMessage("§eSudden Death scheduled.");
+            }
+            case "§c§lActivate Now" -> {
+                plugin.getSuddenDeathManager().activateSuddenDeath();
+                player.sendMessage("§4Sudden Death activated!");
+            }
             case "§6§lActivation Delay (minutes)" -> {
                 long seconds = plugin.getConfig().getLong("sudden_death.activation_delay", 1200);
                 long delta = 5 * 60L;
@@ -1593,6 +1677,7 @@ public class GuiListener implements Listener {
                 seconds = Math.max(min, Math.min(max, seconds));
                 plugin.getConfig().set("sudden_death.activation_delay", seconds);
                 plugin.saveConfig();
+                player.sendMessage("§eSudden Death activation delay: §f" + (seconds / 60) + " minutes");
             }
             default -> {}
         }
@@ -1663,6 +1748,7 @@ public class GuiListener implements Listener {
             if (taskMode != null) {
                 taskMode.reloadTasks();
             }
+            player.sendMessage("§eInclude built-in tasks: " + (!current ? "§aYes" : "§cNo"));
             guiManager.openCustomTasksMenu(player);
         } else if (name.equals("§a§lAdd New Task")) {
             guiManager.promptTaskInput(player, "id");
@@ -1882,23 +1968,31 @@ public class GuiListener implements Listener {
             case "§7§lBack" -> guiManager.openTaskManagerMenu(player);
             case "§e§lPause On Disconnect: §aEnabled", "§e§lPause On Disconnect: §cDisabled" -> {
                 boolean cur = plugin.getConfig().getBoolean("task_manager.pause_on_disconnect", true);
-                plugin.getConfig().set("task_manager.pause_on_disconnect", !cur);
+                boolean next = !cur;
+                plugin.getConfig().set("task_manager.pause_on_disconnect", next);
                 plugin.saveConfig();
+                player.sendMessage("§ePause Task Master when runner disconnects: " + (next ? "§aYes" : "§cNo"));
             }
             case "§e§lRemove On Timeout: §aYes", "§e§lRemove On Timeout: §cNo" -> {
                 boolean cur = plugin.getConfig().getBoolean("task_manager.remove_on_timeout", true);
-                plugin.getConfig().set("task_manager.remove_on_timeout", !cur);
+                boolean next = !cur;
+                plugin.getConfig().set("task_manager.remove_on_timeout", next);
                 plugin.saveConfig();
+                player.sendMessage("§eRemove inactive players on timeout: " + (next ? "§aYes" : "§cNo"));
             }
             case "§e§lAllow Late Joiners: §aYes", "§e§lAllow Late Joiners: §cNo" -> {
                 boolean cur = plugin.getConfig().getBoolean("task_manager.allow_late_joiners", false);
-                plugin.getConfig().set("task_manager.allow_late_joiners", !cur);
+                boolean next = !cur;
+                plugin.getConfig().set("task_manager.allow_late_joiners", next);
                 plugin.saveConfig();
+                player.sendMessage("§eAllow Task Master late joiners: " + (next ? "§aYes" : "§cNo"));
             }
             case "§e§lEnd When One Left: §aYes", "§e§lEnd When One Left: §cNo" -> {
                 boolean cur = plugin.getConfig().getBoolean("task_manager.end_when_one_left", false);
-                plugin.getConfig().set("task_manager.end_when_one_left", !cur);
+                boolean next = !cur;
+                plugin.getConfig().set("task_manager.end_when_one_left", next);
                 plugin.saveConfig();
+                player.sendMessage("§eEnd round when one runner remains: " + (next ? "§aYes" : "§cNo"));
             }
             case "§6§lRejoin Grace (s)" -> {
                 int val = plugin.getConfig().getInt("task_manager.rejoin_grace_seconds", 180);
@@ -1908,6 +2002,7 @@ public class GuiListener implements Listener {
                 val = Math.max(10, Math.min(3600, val));
                 plugin.getConfig().set("task_manager.rejoin_grace_seconds", val);
                 plugin.saveConfig();
+                player.sendMessage("§eTask Master rejoin grace: §f" + val + "s");
             }
             case "§6§lReload Tasks" -> {
                 var tmm = plugin.getTaskManagerMode();
@@ -1930,8 +2025,9 @@ public class GuiListener implements Listener {
                 case "back_settings" -> { guiManager.openDreamMenu(player); return; }
                 case "dream_tracker_toggle" -> {
                     boolean enabled = plugin.getConfigManager().isTrackerEnabled();
-                    plugin.getConfigManager().setTrackerEnabled(!enabled);
-                    if (!enabled) {
+                    boolean next = !enabled;
+                    plugin.getConfigManager().setTrackerEnabled(next);
+                    if (next) {
                         plugin.getTrackerManager().startTracking();
                         for (org.bukkit.entity.Player hunter : plugin.getGameManager().getHunters()) {
                             if (hunter.isOnline()) plugin.getTrackerManager().giveTrackingCompass(hunter);
@@ -1939,10 +2035,12 @@ public class GuiListener implements Listener {
                     } else {
                         plugin.getTrackerManager().stopTracking();
                     }
+                    player.sendMessage("§eHunter tracking: " + (next ? "§aEnabled" : "§cDisabled"));
                 }
                 case "dream_single_sleep_toggle" -> {
                     boolean enabled = plugin.getConfigManager().isSinglePlayerSleepEnabled();
                     plugin.getConfigManager().setSinglePlayerSleepEnabled(!enabled);
+                    player.sendMessage("§eSingle Player Sleep: " + (!enabled ? "§aEnabled" : "§cDisabled"));
                 }
                 default -> {}
             }
@@ -1956,11 +2054,22 @@ public class GuiListener implements Listener {
             case "§7§lBack" -> guiManager.openDreamMenu(player);
             case "§e§lTracker: §aEnabled", "§e§lTracker: §cDisabled" -> {
                 boolean en = plugin.getConfigManager().isTrackerEnabled();
-                plugin.getConfigManager().setTrackerEnabled(!en);
+                boolean next = !en;
+                plugin.getConfigManager().setTrackerEnabled(next);
+                if (next) {
+                    plugin.getTrackerManager().startTracking();
+                    for (org.bukkit.entity.Player hunter : plugin.getGameManager().getHunters()) {
+                        if (hunter.isOnline()) plugin.getTrackerManager().giveTrackingCompass(hunter);
+                    }
+                } else {
+                    plugin.getTrackerManager().stopTracking();
+                }
+                player.sendMessage("§eHunter tracking: " + (next ? "§aEnabled" : "§cDisabled"));
             }
             case "§e§lSingle Player Sleep: §aEnabled", "§e§lSingle Player Sleep: §cDisabled" -> {
                 boolean en = plugin.getConfigManager().isSinglePlayerSleepEnabled();
                 plugin.getConfigManager().setSinglePlayerSleepEnabled(!en);
+                player.sendMessage("§eSingle Player Sleep: " + (!en ? "§aEnabled" : "§cDisabled"));
             }
             default -> {}
         }
@@ -1973,16 +2082,31 @@ public class GuiListener implements Listener {
         if (clicked == null || !clicked.hasItemMeta()) return;
         String id = getButtonId(clicked);
         if (id != null) {
+            if ("stats_back_main".equals(id)) {
+                guiManager.openMainMenu(player);
+                return;
+            }
             switch (id) {
                 case "toggle_stats" -> {
                     boolean statsEnabled = plugin.getConfig().getBoolean("stats.enabled", true);
-                    plugin.getConfig().set("stats.enabled", !statsEnabled);
+                    boolean next = !statsEnabled;
+                    plugin.getConfig().set("stats.enabled", next);
                     plugin.saveConfig();
+                    player.sendMessage("§eStatistics tracking: " + (next ? "§aEnabled" : "§cDisabled"));
+                    if (plugin.getGameManager().isGameRunning()) {
+                        if (next) {
+                            plugin.getStatsManager().startTracking();
+                        } else {
+                            plugin.getStatsManager().stopTracking();
+                        }
+                    }
                 }
                 case "toggle_distance_tracking" -> {
                     boolean distanceTracking = plugin.getConfig().getBoolean("stats.distance_tracking", true);
-                    plugin.getConfig().set("stats.distance_tracking", !distanceTracking);
+                    boolean next = !distanceTracking;
+                    plugin.getConfig().set("stats.distance_tracking", next);
                     plugin.saveConfig();
+                    player.sendMessage("§eDistance tracking: " + (next ? "§aEnabled" : "§cDisabled"));
                 }
                 case "stats_update_rate" -> {
                     int ticks = plugin.getConfig().getInt("stats.distance_update_ticks", 20);
@@ -1991,11 +2115,25 @@ public class GuiListener implements Listener {
                     ticks = Math.max(1, Math.min(200, ticks));
                     plugin.getConfig().set("stats.distance_update_ticks", ticks);
                     plugin.saveConfig();
+                    player.sendMessage("§eDistance update interval: §f" + ticks + " ticks");
                 }
                 default -> {}
             }
-            guiManager.openStatisticsMenu(player);
+            guiManager.openStatisticsMenu(player, guiManager.getStatsMenuParent(player));
         }
+    }
+
+    private String formatPotionName(String effectId) {
+        if (effectId == null || effectId.isEmpty()) return "";
+        String[] parts = effectId.toLowerCase(java.util.Locale.ROOT).split("_");
+        StringBuilder builder = new StringBuilder();
+        for (String part : parts) {
+            if (part.isEmpty()) continue;
+            builder.append(Character.toUpperCase(part.charAt(0)));
+            if (part.length() > 1) builder.append(part.substring(1));
+            builder.append(' ');
+        }
+        return builder.toString().trim();
     }
 
     private void handleEffectsMenuClick(InventoryClickEvent event, String title) {
@@ -2022,10 +2160,15 @@ public class GuiListener implements Listener {
             ? plugin.getConfig().getStringList("power_ups.good_effects")
             : plugin.getConfig().getStringList("power_ups.bad_effects"));
 
-        if (list.contains(effectId)) list.remove(effectId); else list.add(effectId);
+        boolean wasEnabled = list.contains(effectId);
+        if (wasEnabled) list.remove(effectId); else list.add(effectId);
         if (positive) plugin.getConfig().set("power_ups.good_effects", list);
         else plugin.getConfig().set("power_ups.bad_effects", list);
         plugin.saveConfig();
+
+        String effectName = formatPotionName(effectId);
+        if (effectName.isEmpty()) effectName = effectId;
+        player.sendMessage("§e" + effectName + " §7effect: " + (!wasEnabled ? "§aEnabled" : "§cDisabled"));
 
         if (positive) guiManager.openPositiveEffectsMenu(player); else guiManager.openNegativeEffectsMenu(player);
     }
@@ -2037,6 +2180,7 @@ public class GuiListener implements Listener {
         current = Math.max(1, Math.min(1800, current));
         if (min) plugin.getConfigManager().setPowerUpsMinSeconds(current);
         else plugin.getConfigManager().setPowerUpsMaxSeconds(current);
+        player.sendMessage("§e" + (min ? "Minimum" : "Maximum") + " power-up duration: §f" + current + "s");
         guiManager.openPowerUpDurationsMenu(player);
     }
 
@@ -2047,6 +2191,7 @@ public class GuiListener implements Listener {
         current = Math.max(1, Math.min(5, current));
         if (min) plugin.getConfigManager().setPowerUpsMinLevel(current);
         else plugin.getConfigManager().setPowerUpsMaxLevel(current);
+        player.sendMessage("§e" + (min ? "Minimum" : "Maximum") + " power-up level: §f" + current);
         guiManager.openPowerUpDurationsMenu(player);
     }
     

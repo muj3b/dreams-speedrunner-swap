@@ -1198,28 +1198,89 @@ public class GameManager {
 
     /** Replace runners list and update config team names */
     public void setRunners(java.util.List<Player> players) {
+        java.util.LinkedHashSet<Player> unique = new java.util.LinkedHashSet<>(players);
         java.util.List<String> names = new java.util.ArrayList<>();
-        for (Player p : players) names.add(p.getName());
-        // Clear and set in config atomically
+        for (Player p : unique) names.add(p.getName());
         plugin.getConfigManager().setRunnerNames(names);
-        // Also ensure no overlap: remove these names from hunters in config
+
         java.util.List<String> currentHunters = plugin.getConfigManager().getHunterNames();
         currentHunters.removeAll(names);
         plugin.getConfigManager().setHunterNames(currentHunters);
-        // Update runtime list
-        this.runners = new java.util.ArrayList<>(players);
+
+        this.runners = new java.util.ArrayList<>(unique);
+        refreshTeamSelections();
     }
 
     /** Replace hunters list and update config team names */
     public void setHunters(java.util.List<Player> players) {
+        java.util.LinkedHashSet<Player> unique = new java.util.LinkedHashSet<>(players);
         java.util.List<String> names = new java.util.ArrayList<>();
-        for (Player p : players) names.add(p.getName());
+        for (Player p : unique) names.add(p.getName());
         plugin.getConfigManager().setHunterNames(names);
-        // Ensure no overlap: remove from runners
+
         java.util.List<String> currentRunners = plugin.getConfigManager().getRunnerNames();
         currentRunners.removeAll(names);
         plugin.getConfigManager().setRunnerNames(currentRunners);
-        this.hunters = new java.util.ArrayList<>(players);
+
+        this.hunters = new java.util.ArrayList<>(unique);
+        refreshTeamSelections();
+    }
+
+    /** Clear all team assignments */
+    public void clearAllTeams() {
+        this.runners = new java.util.ArrayList<>();
+        this.hunters = new java.util.ArrayList<>();
+        plugin.getConfigManager().setRunnerNames(java.util.Collections.emptyList());
+        plugin.getConfigManager().setHunterNames(java.util.Collections.emptyList());
+        refreshTeamSelections();
+    }
+
+    /** Assign a single player to the requested team (removing them from the other). */
+    public boolean assignPlayerToTeam(Player target, Team team) {
+        if (target == null) return false;
+
+        java.util.List<Player> newRunners = new java.util.ArrayList<>(runners);
+        java.util.List<Player> newHunters = new java.util.ArrayList<>(hunters);
+        boolean changed = false;
+
+        if (newRunners.remove(target)) changed = true;
+        if (newHunters.remove(target)) changed = true;
+
+        if (team == Team.RUNNER) {
+            if (!newRunners.contains(target)) {
+                newRunners.add(target);
+                changed = true;
+            }
+        } else if (team == Team.HUNTER) {
+            if (!newHunters.contains(target)) {
+                newHunters.add(target);
+                changed = true;
+            }
+        }
+
+        if (!changed) {
+            return false;
+        }
+
+        setRunners(newRunners);
+        setHunters(newHunters);
+        return true;
+    }
+
+    private void refreshTeamSelections() {
+        for (Player online : Bukkit.getOnlinePlayers()) {
+            try {
+                PlayerState state = getPlayerState(online);
+                if (state == null) continue;
+                if (runners.contains(online)) {
+                    state.setSelectedTeam(Team.RUNNER);
+                } else if (hunters.contains(online)) {
+                    state.setSelectedTeam(Team.HUNTER);
+                } else {
+                    state.setSelectedTeam(Team.NONE);
+                }
+            } catch (Throwable ignored) {}
+        }
     }
 
     private void updateTitles() {

@@ -30,6 +30,7 @@ public class GuiManager {
     // Always schedule inventory opens to the next tick to avoid re-entrancy issues
     // Track pending opens to prevent race conditions
     private final java.util.Set<java.util.UUID> pendingOpens = java.util.Collections.synchronizedSet(new java.util.HashSet<>());
+    private final java.util.Map<java.util.UUID, StatsParent> statsMenuParent = new java.util.concurrent.ConcurrentHashMap<>();
     
     public void openInventorySoon(org.bukkit.entity.Player player, org.bukkit.inventory.Inventory inv) {
         if (player == null || inv == null) return;
@@ -1033,6 +1034,8 @@ public class GuiManager {
                 lore.add("§7Select a team above first");
                 lore.add("§7then click to assign");
             }
+
+            lore.add("§7Shift-click to remove from teams");
             
             // Add online status
             lore.add("");
@@ -1118,15 +1121,19 @@ public class GuiManager {
         inventory.setItem(19, createGuiButton(
                 safeSwap ? Material.SLIME_BLOCK : Material.MAGMA_BLOCK,
                 "§e§lSafe Swaps: " + (safeSwap ? "§aON" : "§cOFF"),
-                List.of("§7Prevent dangerous spawn locations",
-                        "§7Radius: §e" + plugin.getConfigManager().getSafeSwapHorizontalRadius() + " blocks"),
+                List.of(
+                        "§7Scan surroundings before swapping",
+                        "§7Avoids lava, fire, cacti, etc.",
+                        "§7Radius: §e" + plugin.getConfigManager().getSafeSwapHorizontalRadius() + " blocks",
+                        "§8Edit hazardous blocks via Dangerous Blocks"),
                 "safe_swaps"));
 
         // Grace Period
         int graceTicks = plugin.getConfigManager().getGracePeriodTicks();
         inventory.setItem(20, createGuiButton(Material.SHIELD, "§6§lGrace Period",
-                List.of("§7Current: §e" + (graceTicks / 20.0) + "s",
-                        "§7Protection after swaps",
+                List.of(
+                        "§7Invulnerability after each swap",
+                        "§7Current duration: §e" + (graceTicks / 20.0) + "s",
                         "§7Left/Right: ±0.5s, Shift: ±2s"),
                 "grace_period"));
 
@@ -1135,7 +1142,9 @@ public class GuiManager {
         inventory.setItem(21, createGuiButton(
                 pauseDisconnect ? Material.REDSTONE_TORCH : Material.LEVER,
                 "§e§lPause on Disconnect: " + (pauseDisconnect ? "§aON" : "§cOFF"),
-                List.of("§7Auto-pause if active runner leaves"),
+                List.of(
+                        "§7Stops the timer if the active runner quits",
+                        "§7Prevents the queue from progressing without them"),
                 "pause_disconnect"));
 
         // Inactive Runner State
@@ -1147,8 +1156,13 @@ public class GuiManager {
             default -> Material.POTION;
         };
         inventory.setItem(22, createGuiButton(freezeIcon, "§6§lInactive State: §a" + freezeMode,
-                List.of("§7How inactive runners are handled",
-                        "§7Click to cycle through options"),
+                List.of(
+                        "§7Choose how queued players are managed:",
+                        "§bEFFECTS §7– Freeze in place with slowness.",
+                        "§bSPECTATOR §7– Switch to spectator mode.",
+                        "§bLIMBO §7– Teleport to configured limbo spawn.",
+                        "§bCAGE §7– Trap inside obsidian cage.",
+                        "§7Click to cycle through options."),
                 "freeze_mode"));
 
         // === TIMER VISIBILITY SECTION (Row 3) ===
@@ -1209,8 +1223,10 @@ public class GuiManager {
         inventory.setItem(46, createGuiButton(
                 singleSleep ? Material.WHITE_BED : Material.RED_BED,
                 "§e§lSingle Player Sleep: " + (singleSleep ? "§aON" : "§cOFF"),
-                List.of("§7Only active runner can skip night",
-                        "§7Recommended for cage/spectator modes"),
+                List.of(
+                        "§7Active runner can skip the night solo",
+                        "§7Prevents spectators from blocking sleep",
+                        "§7Recommended when using cages or spectator mode"),
                 "single_sleep"));
 
         // Voice Chat Integration
@@ -1802,7 +1818,19 @@ public class GuiManager {
     
     // Helper methods for team management
     public void setPlayerTeam(Player player, Team team) {
-        plugin.getGameManager().getPlayerState(player).setSelectedTeam(team);
+        try {
+            var state = plugin.getGameManager().getPlayerState(player);
+            if (state != null) {
+                state.setSelectedTeam(team);
+            }
+        } catch (Throwable ignored) {}
+
+        String label = switch (team) {
+            case RUNNER -> "§bRunners";
+            case HUNTER -> "§cHunters";
+            case NONE -> "§7No team";
+        };
+        player.sendMessage("§eTeam selector focus: " + label + "§e.");
         updateTeamSelectors();
     }
     
@@ -1843,15 +1871,27 @@ public class GuiManager {
     }
     
     // Statistics Menu
+    public enum StatsParent {
+        MAIN,
+        SETTINGS
+    }
+
     public void openStatisticsMenu(Player player) {
+        openStatisticsMenu(player, StatsParent.SETTINGS);
+    }
+
+    public void openStatisticsMenu(Player player, StatsParent parent) {
         Inventory inventory = com.example.speedrunnerswap.utils.GuiCompat.createInventory(null, 54, "§b§lStatistics & Tracking");
+        statsMenuParent.put(player.getUniqueId(), parent);
         ItemStack filler = createItem(Material.BLACK_STAINED_GLASS_PANE, " ");
         fillBorder(inventory, filler);
         addGameControlsHeader(inventory);
         
         // Back button
+        String backId = parent == StatsParent.MAIN ? "stats_back_main" : "back_settings";
+        String backLore = parent == StatsParent.MAIN ? "§7Return to main menu" : "§7Return to Settings";
         inventory.setItem(0, createGuiButton(Material.ARROW, "§7§lBack", 
-            List.of("§7Return to Settings"), "back_settings"));
+            List.of(backLore), backId));
         
         // Statistics toggles
         boolean statsEnabled = plugin.getConfig().getBoolean("stats.enabled", true);
@@ -1878,6 +1918,10 @@ public class GuiManager {
         inventory.setItem(15, updateRate);
         
         openInventorySoon(player, inventory);
+    }
+
+    public StatsParent getStatsMenuParent(Player player) {
+        return statsMenuParent.getOrDefault(player.getUniqueId(), StatsParent.SETTINGS);
     }
     
     // Kits Menu

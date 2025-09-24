@@ -152,11 +152,6 @@ public class ControlGui {
         boolean singlePlayerSleep = plugin.getConfigManager().isSinglePlayerSleepEnabled();
         inv.setItem(30, named(singlePlayerSleep ? Material.WHITE_BED : Material.RED_BED, (singlePlayerSleep ? "§a" : "§c") + "§lSingle Sleep: " + (singlePlayerSleep ? "ON" : "OFF"), List.of("§7Only active runner can sleep")));
 
-        boolean applyDefault = plugin.getConfigManager().getApplyDefaultOnModeSwitch();
-        inv.setItem(31, named(applyDefault ? Material.NOTE_BLOCK : Material.GRAY_DYE, "Apply Mode Default on Switch: " + (applyDefault ? "Yes" : "No"), List.of("§7Apply mode default interval on switch")));
-
-        inv.setItem(32, named(Material.WRITABLE_BOOK, "Save as Mode Default", List.of("§7Set current interval as default")));
-
         // Row 5: Utilities
         inv.setItem(34, button(Material.SPYGLASS, "statistics", "§9§lStatistics", List.of("§7View session stats")));
 
