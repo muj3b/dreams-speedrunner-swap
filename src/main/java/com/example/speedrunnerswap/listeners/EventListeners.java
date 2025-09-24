@@ -250,12 +250,20 @@ public class EventListeners implements Listener {
     public void onPlayerRespawn(PlayerRespawnEvent event) {
         Player player = event.getPlayer();
 
+        if (plugin.getConfigManager().isForceGlobalSpawn() && plugin.getGameManager().isRunner(player)) {
+            org.bukkit.Location spawn = plugin.getConfigManager().getSpawnLocation();
+            if (spawn != null && spawn.getWorld() != null) {
+                event.setRespawnLocation(spawn);
+                plugin.getConfigManager().applyRespawnLocation(player, spawn);
+            }
+        }
+
         if (plugin.getGameManager().isGameRunning() &&
             plugin.getGameManager().isHunter(player)) {
             plugin.getTrackerManager().giveTrackingCompass(player);
         }
     }
-    
+
     @EventHandler
     public void onPlayerQuit(PlayerQuitEvent event) {
         Player player = event.getPlayer();
@@ -460,16 +468,19 @@ public class EventListeners implements Listener {
                 event.setCancelled(true);
                 return;
             }
-            
+
             // If we reach here, it's the active runner entering bed - schedule night skip check
             if (plugin.getGameManager().isRunner(player) && player.equals(plugin.getGameManager().getActiveRunner())) {
                 plugin.getServer().getScheduler().runTaskLater(plugin, () -> {
+                    if (plugin.getConfigManager().isForceGlobalSpawn() && plugin.getGameManager().isRunner(player)) {
+                        org.bukkit.Location spawn = plugin.getConfigManager().getSpawnLocation();
+                        plugin.getConfigManager().applyRespawnLocation(player, spawn);
+                    }
                     if (player.isOnline() && player.isSleeping()) {
                         org.bukkit.World world = player.getWorld();
                         if (world.getTime() > 12000 && world.getTime() < 24000) {
                             world.setTime(0); // Set to day
                             world.setStorm(false);
-                            world.setThundering(false);
                             // Notify players
                             for (Player p : plugin.getServer().getOnlinePlayers()) {
                                 p.sendMessage("§eThe night has been skipped by the active runner!");

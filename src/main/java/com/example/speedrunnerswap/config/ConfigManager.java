@@ -329,7 +329,7 @@ public class ConfigManager {
     }
 
 
-    public void setGlobalSpawn(org.bukkit.Location location, boolean propagate) {
+    public void setGlobalSpawn(org.bukkit.Location location, boolean propagateRunners) {
         if (location == null || location.getWorld() == null) {
             return;
         }
@@ -339,12 +339,18 @@ public class ConfigManager {
         config.set("spawn.z", location.getZ());
         plugin.saveConfig();
 
-        if (!propagate) {
+        if (!propagateRunners) {
+            return;
+        }
+
+        if (plugin.getGameManager() == null) {
             return;
         }
 
         for (Player online : plugin.getServer().getOnlinePlayers()) {
-            applyRespawnLocation(online, location);
+            if (plugin.getGameManager().isRunner(online)) {
+                applyRespawnLocation(online, location);
+            }
         }
     }
 
