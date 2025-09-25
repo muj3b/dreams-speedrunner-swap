@@ -339,6 +339,10 @@ public class ConfigManager {
         config.set("spawn.z", location.getZ());
         plugin.saveConfig();
 
+        if (plugin.getGameManager() != null) {
+            plugin.getGameManager().setSharedRunnerSpawn(location);
+        }
+
         if (!propagateRunners) {
             return;
         }

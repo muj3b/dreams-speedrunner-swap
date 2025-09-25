@@ -198,10 +198,18 @@ public class ChatInputHandler implements Listener {
                         player.sendMessage("§cUnknown block '" + msg + "'. Addition cancelled.");
                         return;
                     }
+                    java.util.Set<org.bukkit.Material> cache = plugin.getConfigManager().getDangerousBlocks();
+                    if (!cache.add(material)) {
+                        player.sendMessage("§e" + material.name() + " §cis already in the blacklist.");
+                        plugin.getGuiManager().openDangerousBlocksMenu(player);
+                        return;
+                    }
                     value = material.name();
                 }
                 java.util.List<String> list = plugin.getConfig().getStringList(state.configPath);
-                list.add(value);
+                if (!list.contains(value)) {
+                    list.add(value);
+                }
                 plugin.getConfig().set(state.configPath, list);
                 plugin.saveConfig();
                 player.sendMessage("§aAppended to §e" + state.configPath + "§a.");

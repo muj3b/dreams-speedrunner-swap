@@ -319,7 +319,7 @@ public final class GuiManager implements Listener {
         statusLore.add("§7Mode: §f" + mode.name());
         statusLore.add("§7Running: " + (running ? "§aYes" : "§cNo"));
         statusLore.add("§7Paused: " + (paused ? "§eYes" : "§cNo"));
-        statusLore.add("§7Speed Owners: §b" + gm.getRunners().size());
+        statusLore.add("§7Speedrunners: §b" + gm.getRunners().size());
         if (mode == SpeedrunnerSwap.SwapMode.DREAM) {
             statusLore.add("§7Hunters: §c" + gm.getHunters().size());
         } else {
@@ -531,7 +531,7 @@ public final class GuiManager implements Listener {
         instructionLore.add("§72. Click player head to assign");
         instructionLore.add("§73. Shift-click to remove");
         if (plugin.getCurrentMode() != SpeedrunnerSwap.SwapMode.DREAM) {
-            instructionLore.add("§cThis mode uses speed owners only.");
+            instructionLore.add("§cThis mode uses speedrunners only.");
             instructionLore.add("§7Assigning hunters is disabled.");
         }
         items.add(simpleItem(4, () -> icon(Material.BOOK, "§e§lInstructions", instructionLore)));
@@ -585,7 +585,7 @@ public final class GuiManager implements Listener {
                 case HUNTER -> "§cHunter";
                 case NONE -> "§7Unassigned";
             });
-            lore.add("§7Focus: " + (currentFocus == Team.RUNNER ? "§bSpeed Owners" : "§cHunters"));
+            lore.add("§7Focus: " + (currentFocus == Team.RUNNER ? "§bSpeedrunners" : "§cHunters"));
             lore.add("§7Click to assign, shift-click to clear");
             GuiCompat.setLore(meta, lore);
             head.setItemMeta(meta);
@@ -609,7 +609,7 @@ public final class GuiManager implements Listener {
                     Msg.send(ctxClick.player(), "§eRemoved §f" + online.getName() + "§e from teams.");
                     if (online != ctxClick.player()) Msg.send(online, "§eYou were removed from all teams by §f" + ctxClick.player().getName());
                 } else {
-                    String label = targetTeam == Team.RUNNER ? "§bSpeed Owners" : "§cHunters";
+                    String label = targetTeam == Team.RUNNER ? "§bSpeedrunners" : "§cHunters";
                     Msg.send(ctxClick.player(), "§aAdded §f" + online.getName() + "§a to " + label + "§a.");
                     if (online != ctxClick.player()) Msg.send(online, "§eYou were assigned to " + label + " §eby §f" + ctxClick.player().getName());
                 }

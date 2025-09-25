@@ -48,6 +48,8 @@ public class GameManager {
     private final java.util.Set<java.util.UUID> cagedPlayers = new java.util.HashSet<>();
     private final java.util.Map<java.util.UUID, Integer> portalSwapRetries = new java.util.HashMap<>();
     private boolean swapInProgress = false;
+    private Location sharedRunnerSpawn;
+    private boolean spawnSyncInFlight;
 
     private static final EnumSet<InventoryType> RETURN_CONTAINERS = EnumSet.of(
             InventoryType.CRAFTING,
@@ -62,6 +64,10 @@ public class GameManager {
             InventoryType.MERCHANT,
             InventoryType.BEACON
     );
+
+    private static final long TASK_INTRO_DELAY_TICKS = 8L * 20L;
+    private static final int RESPAWN_SEARCH_RADIUS = 6;
+    private static final int RESPAWN_VERTICAL_RANGE = 8;
     
     public GameManager(SpeedrunnerSwap plugin) {
         this.plugin = plugin;
@@ -88,17 +94,17 @@ public class GameManager {
             String failureMessage = switch (mode) {
                 case DREAM -> hasRunner
                         ? "§cGame cannot start: Assign at least one hunter for Dream mode."
-                        : "§cGame cannot start: Assign at least one speed owner.";
+                        : "§cGame cannot start: Assign at least one speedrunner.";
                 case SAPNAP -> hasRunner
                         ? (hasHunter
-                            ? "§cGame cannot start: Sapnap mode does not allow hunters. Clear them and keep only speed owners."
-                            : "§cGame cannot start: Assign at least one speed owner.")
-                        : "§cGame cannot start: Assign at least one speed owner.";
+                            ? "§cGame cannot start: Sapnap mode does not allow hunters. Clear them and keep only speedrunners."
+                            : "§cGame cannot start: Assign at least one speedrunner.")
+                        : "§cGame cannot start: Assign at least one speedrunner.";
                 case TASK -> hasRunner
                         ? (hasHunter
-                            ? "§cGame cannot start: Task Master mode uses only speed owners. Remove any hunters before starting."
-                            : "§cGame cannot start: Assign at least one speed owner.")
-                        : "§cGame cannot start: Assign at least one speed owner.";
+                            ? "§cGame cannot start: Task Master mode uses only speedrunners. Remove any hunters before starting."
+                            : "§cGame cannot start: Assign at least one speedrunner.")
+                        : "§cGame cannot start: Assign at least one speedrunner.";
             };
 
             Msg.broadcast(failureMessage);
@@ -117,7 +123,7 @@ public class GameManager {
                 if (count > 0) {
                     String title = switch (countdownMode) {
                         case DREAM -> "§b§lDream Swap starting in " + count;
-                        case SAPNAP -> "§d§lSapnap speed owner swap in " + count;
+                        case SAPNAP -> "§d§lSapnap speedrunner swap in " + count;
                         case TASK -> "§6§lTaskmaster starting in " + count;
                     };
                     String subtitle = "§7Made by muj3b";
@@ -152,25 +158,32 @@ public class GameManager {
                     }
                 }
                 
-                applyInactiveEffects();
                 scheduleNextSwap();
                 if (plugin.getCurrentMode() == com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode.DREAM) {
                     scheduleNextHunterSwap();
                 }
-                startActionBarUpdates();
 
-                // If Task Manager mode, assign tasks and announce to each runner
+                Runnable postStart = () -> {
+                    if (!gameRunning) return;
+                    applyInactiveEffects();
+                    startActionBarUpdates();
+                    startTitleUpdates();
+                    startCageEnforcement();
+                    if (plugin.getConfigManager().isFreezeMechanicEnabled()) {
+                        startFreezeChecking();
+                    }
+                };
+
                 if (plugin.getCurrentMode() == com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode.TASK) {
                     try { plugin.getTaskManagerMode().assignAndAnnounceTasks(runners); } catch (Throwable t) {
                         plugin.getLogger().warning("Task assignment failed: " + t.getMessage());
                     }
-                }
-                startTitleUpdates();
-                startCageEnforcement();
-                if (plugin.getCurrentMode() == com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode.TASK) {
                     startRunnerTimeoutWatcher();
+                    Bukkit.getScheduler().runTaskLater(plugin, postStart, TASK_INTRO_DELAY_TICKS);
+                } else {
+                    postStart.run();
                 }
-                
+
                 if (plugin.getCurrentMode() != com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode.SAPNAP && plugin.getConfigManager().isTrackerEnabled()) {
                     plugin.getTrackerManager().startTracking();
                     for (Player hunter : hunters) {
@@ -184,14 +197,10 @@ public class GameManager {
                 if (plugin.getConfig().getBoolean("stats.enabled", true)) {
                     plugin.getStatsManager().startTracking();
                 }
-
-                if (plugin.getConfigManager().isFreezeMechanicEnabled()) {
-                    startFreezeChecking();
-                }
             }
         }
     }.runTaskTimer(plugin, 0L, 20L);
-    
+
     return true;
 }    public void endGame(Team winner) {
         if (!gameRunning) {
@@ -883,6 +892,45 @@ public class GameManager {
         return position;
     }
     
+    private Location prepareSafeSpawn(Location base, World fallbackWorld) {
+        if (base == null) {
+            return null;
+        }
+        World world = base.getWorld() != null ? base.getWorld() : fallbackWorld;
+        if (world == null) {
+            return null;
+        }
+
+        Location centered = base.clone();
+        centered.setWorld(world);
+        centered.setX(centered.getBlockX() + 0.5);
+        centered.setZ(centered.getBlockZ() + 0.5);
+
+        Location safe = SafeLocationFinder.findSafeLocation(
+                centered,
+                Math.max(RESPAWN_SEARCH_RADIUS, plugin.getConfigManager().getSafeSwapHorizontalRadius()),
+                Math.max(RESPAWN_VERTICAL_RANGE, plugin.getConfigManager().getSafeSwapVerticalDistance()),
+                plugin.getConfigManager().getDangerousBlocks());
+        if (safe != null) {
+            safe.setX(safe.getBlockX() + 0.5);
+            safe.setZ(safe.getBlockZ() + 0.5);
+            ensureChunkLoaded(safe);
+            return safe;
+        }
+        ensureChunkLoaded(centered);
+        return centered;
+    }
+
+    private void ensureChunkLoaded(Location location) {
+        if (location == null || location.getWorld() == null) {
+            return;
+        }
+        try {
+            location.getWorld().getChunkAt(location);
+        } catch (Throwable ignored) {
+        }
+    }
+
     /**
      * Update hostile mob targeting when players swap
      * This ensures mobs that were targeting the previous runner now target the new runner
@@ -1462,6 +1510,81 @@ public class GameManager {
 
         this.runners = new java.util.ArrayList<>(unique);
         refreshTeamSelections();
+    }
+
+    public void setSharedRunnerSpawn(Location location) {
+        if (location == null || location.getWorld() == null) {
+            this.sharedRunnerSpawn = null;
+            return;
+        }
+        Location prepared = prepareSafeSpawn(location, location.getWorld());
+        if (prepared == null) {
+            prepared = location.clone();
+        }
+        ensureChunkLoaded(prepared);
+        this.sharedRunnerSpawn = prepared;
+        for (Player runner : runners) {
+            if (runner != null && runner.isOnline()) {
+                syncRunnerRespawn(runner, prepared);
+            }
+        }
+    }
+
+    public Location getSharedRunnerSpawn() {
+        return sharedRunnerSpawn == null ? null : sharedRunnerSpawn.clone();
+    }
+
+    public boolean isSpawnSyncInFlight() {
+        return spawnSyncInFlight;
+    }
+
+    public Location resolveRunnerRespawn(Player player) {
+        if (player == null) {
+            return null;
+        }
+        Location candidate = prepareSafeSpawn(sharedRunnerSpawn, null);
+        if (candidate != null) {
+            return candidate;
+        }
+
+        if (plugin.getConfigManager().isForceGlobalSpawn()) {
+            Location configured = plugin.getConfigManager().getSpawnLocation();
+            if (configured != null && configured.getWorld() != null) {
+                World playerWorld = player.getWorld();
+                if (playerWorld == null || configured.getWorld().equals(playerWorld)) {
+                    Location safeConfigured = prepareSafeSpawn(configured, playerWorld);
+                    if (safeConfigured != null) {
+                        return safeConfigured;
+                    }
+                }
+            }
+        }
+
+        Location worldSpawn = player.getWorld() != null ? player.getWorld().getSpawnLocation() : null;
+        Location safeWorldSpawn = prepareSafeSpawn(worldSpawn, player.getWorld());
+        if (safeWorldSpawn != null) {
+            return safeWorldSpawn;
+        }
+
+        return worldSpawn;
+    }
+
+    public void syncRunnerRespawn(Player player, Location target) {
+        if (player == null || target == null) {
+            return;
+        }
+        boolean previous = spawnSyncInFlight;
+        spawnSyncInFlight = true;
+        try {
+            try {
+                player.setRespawnLocation(target, true);
+            } catch (Throwable ignored) {
+                // Fallback handled below
+            }
+            plugin.getConfigManager().applyRespawnLocation(player, target);
+        } finally {
+            spawnSyncInFlight = previous;
+        }
     }
 
     /** Replace hunters list and update config team names */

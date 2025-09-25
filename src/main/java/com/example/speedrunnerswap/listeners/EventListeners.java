@@ -13,6 +13,7 @@ import org.bukkit.event.inventory.InventoryAction;
 import org.bukkit.event.player.*;
 import org.bukkit.event.player.PlayerChangedWorldEvent;
 import org.bukkit.event.player.PlayerPortalEvent;
+import org.bukkit.event.player.PlayerRespawnEvent;
 import org.bukkit.event.entity.PlayerDeathEvent;
 import org.bukkit.event.entity.EntityDamageEvent;
 import org.bukkit.event.entity.EntityDamageByEntityEvent;
@@ -261,16 +262,14 @@ public class EventListeners implements Listener {
     public void onPlayerRespawn(PlayerRespawnEvent event) {
         Player player = event.getPlayer();
 
-        if (plugin.getConfigManager().isForceGlobalSpawn() && plugin.getGameManager().isRunner(player)) {
-            org.bukkit.Location spawn = plugin.getConfigManager().getSpawnLocation();
-            if (spawn != null && spawn.getWorld() != null) {
-                event.setRespawnLocation(spawn);
-                plugin.getConfigManager().applyRespawnLocation(player, spawn);
+        if (plugin.getGameManager().isRunner(player)) {
+            org.bukkit.Location target = plugin.getGameManager().resolveRunnerRespawn(player);
+            if (target != null) {
+                event.setRespawnLocation(target);
+                plugin.getGameManager().syncRunnerRespawn(player, target);
             }
-        }
-
-        if (plugin.getGameManager().isGameRunning() &&
-            plugin.getGameManager().isHunter(player)) {
+        } else if (plugin.getGameManager().isGameRunning() &&
+                plugin.getGameManager().isHunter(player)) {
             plugin.getTrackerManager().giveTrackingCompass(player);
         }
     }
@@ -280,6 +279,38 @@ public class EventListeners implements Listener {
         Player player = event.getPlayer();
         plugin.getGameManager().handlePlayerQuit(player);
         plugin.getGameManager().updateTeams();
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR)
+    public void onPlayerSpawnChange(PlayerRespawnEvent event) {
+        if (!event.isBedSpawn() && !event.isAnchorSpawn()) {
+            return;
+        }
+        if (plugin.getGameManager().isSpawnSyncInFlight()) {
+            return;
+        }
+        Player player = event.getPlayer();
+        if (player == null || !plugin.getGameManager().isRunner(player)) {
+            return;
+        }
+        org.bukkit.Location spawn = null;
+        try {
+            java.lang.reflect.Method locator = player.getClass().getMethod("getRespawnLocation");
+            Object result = locator.invoke(player);
+            if (result instanceof org.bukkit.Location loc) {
+                spawn = loc;
+            }
+        } catch (NoSuchMethodException ignored) {
+            // Older API, fall back to event location
+        } catch (Throwable reflectiveFailure) {
+            plugin.getLogger().fine("Failed to read respawn location reflectively: " + reflectiveFailure.getMessage());
+        }
+        if (spawn == null) {
+            spawn = event.getRespawnLocation();
+        }
+        if (spawn != null && spawn.getWorld() != null) {
+            plugin.getGameManager().setSharedRunnerSpawn(spawn);
+        }
     }
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
