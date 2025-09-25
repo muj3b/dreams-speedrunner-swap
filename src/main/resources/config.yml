@@ -72,6 +72,14 @@ limbo:
   y: 200.0
   z: 0.5
 
+# Global spawn handling for post-game resets
+spawn:
+  force_global: true
+  world: "world"
+  x: 0.5
+  y: 64.0
+  z: 0.5
+
 # Movement and Interaction Control
 cancel:
   # Cancel movement for inactive runners
@@ -85,6 +93,9 @@ tracker:
   enabled: true
   # How often to update the compass (in ticks, 20 ticks = 1 second)
   update_ticks: 20
+  # Retry logic when runners are inside portals to avoid unsafe swaps
+  portal_retry_attempts: 5
+  portal_retry_delay_ticks: 20
   # Temporary compass jamming after swaps to give the new runner an escape window
   compass_jamming:
     enabled: false
@@ -138,6 +149,13 @@ ui:
     # How often to update titles for waiting runners (in ticks)
     title: 10
 
+# Cosmetic trail that follows the active runner
+particle_trail:
+  enabled: false
+  type: "DUST"
+  spawn_interval: 5
+  color: [255, 0, 0]
+
 # Simple Voice Chat Integration (if available)
 voice_chat:
   # Whether to integrate with Simple Voice Chat
@@ -183,6 +201,7 @@ kits:
 # Advanced Stats Configuration
 stats:
   enabled: true
+  distance_tracking: true
   # How often to update distance traveled (in ticks)
   distance_update_ticks: 20
   # Whether to display stats periodically during the game
@@ -229,11 +248,6 @@ sudden_death:
     # Maximum distance for random compass pointing when jammed
     max_jam_distance: 100
 
-# Donation / Support
-donation:
-  # URL used for the clickable donate message shown when the game ends
-  url: "https://donate.stripe.com/8x29AT0H58K03judnR0Ba01"
-
 # Task Manager Configuration
 task_manager:
   # Custom tasks that players can add to the task pool
@@ -256,6 +270,7 @@ task_manager:
   remove_on_timeout: true
   allow_late_joiners: false
   end_when_one_left: false
+  difficulty: MEDIUM
   # Runtime state (do not edit manually unless you know what you're doing)
   runtime:
     assignments: {}

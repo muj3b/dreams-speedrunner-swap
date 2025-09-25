@@ -17,8 +17,16 @@ public record TaskDefinition(
         this(id, description, type, Arrays.asList(params), TaskDifficulty.MEDIUM, List.of(), true);
     }
 
+    public TaskDefinition(String id, String description, TaskType type, TaskDifficulty difficulty, String... params) {
+        this(id, description, type, Arrays.asList(params), difficulty != null ? difficulty : TaskDifficulty.MEDIUM, List.of(), true);
+    }
+
     // Backward-compat: no params
     public TaskDefinition(String id, String description, TaskType type) {
         this(id, description, type, List.of(), TaskDifficulty.MEDIUM, List.of(), true);
+    }
+
+    public TaskDefinition(String id, String description, TaskType type, TaskDifficulty difficulty) {
+        this(id, description, type, List.of(), difficulty != null ? difficulty : TaskDifficulty.MEDIUM, List.of(), true);
     }
 }

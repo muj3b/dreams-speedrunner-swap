@@ -22,8 +22,9 @@ import com.example.speedrunnerswap.utils.BukkitCompat;
 import org.bukkit.plugin.java.JavaPlugin;
 
 public final class SpeedrunnerSwap extends JavaPlugin {
-    
+
     private static SpeedrunnerSwap instance;
+    public static final String DONATION_URL = "https://donate.stripe.com/8x29AT0H58K03judnR0Ba01";
     private ConfigManager configManager;
     private GameManager gameManager;
     private GuiManager guiManager;

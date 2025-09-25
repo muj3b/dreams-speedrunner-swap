@@ -288,6 +288,8 @@ public final class GuiManager implements Listener {
         builders.put(MenuKey.TASK_CUSTOM, this::buildTaskCustom);
         builders.put(MenuKey.TASK_POOL, this::buildTaskPool);
         builders.put(MenuKey.TASK_ASSIGNMENTS, this::buildTaskAssignments);
+        builders.put(MenuKey.TASK_RUNNERS, this::buildTaskRunners);
+        builders.put(MenuKey.TASK_ADVANCED, this::buildTaskAdvanced);
         builders.put(MenuKey.SETTINGS_VOICE_CHAT, this::buildVoiceChat);
         builders.put(MenuKey.SETTINGS_BROADCAST, this::buildBroadcast);
         builders.put(MenuKey.SETTINGS_UI, this::buildUiSettings);
@@ -437,6 +439,7 @@ public final class GuiManager implements Listener {
 
     private MenuItem modeItem(int slot, SpeedrunnerSwap.SwapMode mode, boolean direct, SpeedrunnerSwap.SwapMode current) {
         boolean selected = mode == current;
+        boolean isDefault = plugin.getConfigManager().getDefaultMode() == mode;
         Material mat = switch (mode) {
             case DREAM -> Material.DIAMOND_SWORD;
             case SAPNAP -> Material.DIAMOND_BOOTS;
@@ -459,14 +462,16 @@ public final class GuiManager implements Listener {
         }
         lore.add("");
         lore.add(selected ? "§aCurrently active" : "§eClick to switch");
+        lore.add(isDefault ? "§bServer default mode" : "§7Shift-click to save as default");
 
         return clickItem(slot, () -> {
-            ItemStack icon = icon(mat, (selected ? "§a§l" : "§e§l") + switch (mode) {
+            String prefix = selected ? "§a§l" : isDefault ? "§b§l" : "§e§l";
+            ItemStack icon = icon(mat, prefix + switch (mode) {
                 case DREAM -> "Dream";
                 case SAPNAP -> "Sapnap";
                 case TASK -> "Task Master";
             }, lore);
-            if (selected) {
+            if (selected || isDefault) {
                 ItemMeta meta = icon.getItemMeta();
                 meta.addEnchant(org.bukkit.enchantments.Enchantment.UNBREAKING, 1, true);
                 meta.addItemFlags(org.bukkit.inventory.ItemFlag.HIDE_ENCHANTS);
@@ -474,6 +479,12 @@ public final class GuiManager implements Listener {
             }
             return icon;
         }, ctx -> {
+            if (ctx.shift()) {
+                plugin.getConfigManager().setDefaultMode(mode);
+                Msg.send(ctx.player(), "§eStartup mode set to §f" + mode.name().toLowerCase(Locale.ROOT) + "§e.");
+                ctx.reopen();
+                return;
+            }
             if (selected) {
                 Msg.send(ctx.player(), "§eAlready using that mode.");
                 return;
@@ -934,6 +945,18 @@ public final class GuiManager implements Listener {
                 10, 50, 0, 5000,
                 "§7Maximum random offset"));
 
+        items.add(adjustItem(15, Material.OBSIDIAN, "§6§lPortal Retries",
+                () -> plugin.getConfig().getInt("tracker.portal_retry_attempts", 5),
+                value -> plugin.getConfig().set("tracker.portal_retry_attempts", Math.max(1, value)),
+                1, 2, 1, 10,
+                "§7Attempts before giving up in portals"));
+
+        items.add(adjustItem(16, Material.CLOCK, "§6§lPortal Retry Delay",
+                () -> (int) plugin.getConfig().getLong("tracker.portal_retry_delay_ticks", 20L),
+                value -> plugin.getConfig().set("tracker.portal_retry_delay_ticks", Math.max(1, value)),
+                5, 20, 1, 200,
+                "§7Ticks between portal retry checks"));
+
         items.add(clickItem(44, () -> icon(Material.BARRIER, "§7§lBack", Collections.emptyList()),
                 ctxClick -> open(ctxClick.player(), MenuKey.SETTINGS_HOME, null, false)));
 
@@ -1333,31 +1356,150 @@ public final class GuiManager implements Listener {
     }
 
     private MenuScreen buildTaskHome(MenuContext ctx) {
-        TaskManagerMode mode = plugin.getTaskManagerMode();
-        int assignments = mode != null ? mode.getAssignments().size() : 0;
+        GameManager gm = plugin.getGameManager();
+        TaskManagerMode taskMode = plugin.getTaskManagerMode();
+
         List<MenuItem> items = new ArrayList<>();
         items.add(backButton(0, "§7§lBack", MenuKey.MAIN, null, this::openMainMenu));
 
-        items.add(navigateItem(10, Material.WRITABLE_BOOK, "§6§lCompetition Rules", MenuKey.SETTINGS_TASK,
-                "§7Pause behaviour, grace timers"));
-        items.add(navigateItem(12, Material.EMERALD, "§a§lCustom Tasks", MenuKey.TASK_CUSTOM,
-                "§7Manage custom entries"));
-        items.add(clickItem(14, () -> icon(Material.FEATHER, "§b§lReroll Tasks", List.of("§7Assign new secret tasks")), ctxClick -> {
-            if (plugin.getGameManager().isGameRunning()) {
-                Msg.send(ctxClick.player(), "§cStop the game before rerolling tasks.");
+        boolean running = gm.isGameRunning();
+        boolean paused = gm.isGamePaused();
+        boolean ready = gm.canStartGame();
+        int runnerCount = gm.getRunners().size();
+        int onlineRunners = (int) gm.getRunners().stream().filter(Player::isOnline).count();
+
+        // Status tiles ------------------------------------------------
+        items.add(clickItem(10, () -> {
+            if (running) {
+                return icon(Material.BARRIER, "§c§lStop Competition",
+                        List.of("§7Running with §f" + onlineRunners + " §7online runners",
+                                "", "§eClick to end the Task Master round"));
+            }
+
+            List<String> lore = new ArrayList<>();
+            if (!ready) {
+                lore.add("§cNot enough players selected");
+                if (runnerCount == 0) {
+                    lore.add("§7Select at least one §brunner");
+                }
+            } else {
+                lore.add("§7Ready with §f" + runnerCount + " §7queued runners");
+            }
+            lore.add("");
+            lore.add(ready ? "§eClick to start" : "§cAssign runners to begin");
+            String label = ready ? "§a§lStart Competition" : "§4§lCannot Start";
+            Material mat = ready ? Material.LIME_CONCRETE : Material.RED_CONCRETE;
+            return icon(mat, label, lore);
+        }, ctxClick -> {
+            if (running) {
+                gm.stopGame();
+                Msg.send(ctxClick.player(), "§cTask Master round stopped.");
+                ctxClick.reopen();
                 return;
             }
-            if (mode != null) {
-                mode.assignAndAnnounceTasks(plugin.getGameManager().getRunners());
+            if (!ready) {
+                Msg.send(ctxClick.player(), "§cAssign at least one runner before starting.");
+                return;
+            }
+            if (gm.startGame()) {
+                Msg.send(ctxClick.player(), "§aTask Master competition started.");
+            } else {
+                Msg.send(ctxClick.player(), "§cUnable to start. Check team assignments.");
+            }
+            ctxClick.reopen();
+        }));
+
+        items.add(clickItem(12, () -> {
+            if (!running) {
+                return icon(Material.GRAY_CONCRETE, "§7§lPause Competition",
+                        List.of("§7The round is not currently running"));
+            }
+            if (paused) {
+                return icon(Material.LIME_DYE, "§a§lResume Competition",
+                        List.of("§7Resumes swaps and tracker updates"));
+            }
+            return icon(Material.CLOCK, "§e§lPause Competition",
+                    List.of("§7Freeze progress without ending", "§eClick to pause"));
+        }, ctxClick -> {
+            if (!running) {
+                Msg.send(ctxClick.player(), "§eStart the competition first.");
+                return;
+            }
+            if (paused) {
+                gm.resumeGame();
+                Msg.send(ctxClick.player(), "§aCompetition resumed.");
+            } else {
+                gm.pauseGame();
+                Msg.send(ctxClick.player(), "§eCompetition paused.");
+            }
+            ctxClick.reopen();
+        }));
+
+        items.add(clickItem(14, () -> {
+            boolean hasAssignments = taskMode != null && !taskMode.getAssignments().isEmpty();
+            List<String> lore = new ArrayList<>();
+            lore.add("§7Broadcast current secret tasks");
+            lore.add(hasAssignments ? "§aAssignments available" : "§cNo assignments yet");
+            lore.add("");
+            lore.add("§eClick to pulse competition updates");
+            return icon(Material.HEART_OF_THE_SEA, "§b§lPulse Competition", lore);
+        }, ctxClick -> {
+            if (taskMode == null || taskMode.getAssignments().isEmpty()) {
+                Msg.send(ctxClick.player(), "§cNo active assignments yet. Start the round first.");
+                return;
+            }
+            taskMode.broadcastAssignments();
+            Msg.send(ctxClick.player(), "§aBroadcasting current assignments to all players.");
+        }));
+
+        // Runner-only management --------------------------------------
+        items.add(navigateItem(19, Material.PLAYER_HEAD, "§b§lRunner Management", MenuKey.TASK_RUNNERS,
+                "§7Task competition uses runners only"));
+
+        // Task statistics tile ----------------------------------------
+        boolean statsEnabled = plugin.getConfig().getBoolean("stats.enabled", true);
+        boolean distanceEnabled = plugin.getConfig().getBoolean("stats.distance_tracking", true);
+        int distanceTicks = plugin.getConfig().getInt("stats.distance_update_ticks", 20);
+        List<String> statsLore = new ArrayList<>();
+        statsLore.add("§7Statistics: " + (statsEnabled ? "§aEnabled" : "§cDisabled"));
+        statsLore.add("§7Distance Tracking: " + (distanceEnabled ? "§aEnabled" : "§cDisabled"));
+        statsLore.add("§7Update Interval: §f" + distanceTicks + " ticks");
+        statsLore.add("");
+        statsLore.add("§eClick to open stats settings");
+        items.add(clickItem(21, () -> icon(Material.BOOK, "§e§lCompetition Stats", statsLore),
+                ctxClick -> open(ctxClick.player(), MenuKey.STATS_ROOT, null, false)));
+
+        // Shuffle tasks ------------------------------------------------
+        items.add(clickItem(23, () -> icon(Material.FEATHER, "§d§lShuffle Tasks",
+                List.of("§7Reassign secret tasks", "§7Use before the round begins")), ctxClick -> {
+            if (plugin.getGameManager().isGameRunning()) {
+                Msg.send(ctxClick.player(), "§cStop the game before shuffling tasks.");
+                return;
+            }
+            if (taskMode != null) {
+                taskMode.assignAndAnnounceTasks(plugin.getGameManager().getRunners());
                 Msg.send(ctxClick.player(), "§aTasks rerolled for current runners.");
             }
         }));
-        items.add(navigateItem(16, Material.PAPER, "§e§lCurrent Assignments", MenuKey.TASK_ASSIGNMENTS,
-                "§7Active runner tasks", assignments));
-        items.add(navigateItem(18, Material.BOOKSHELF, "§6§lTask Pool", MenuKey.TASK_POOL,
+
+        // Task settings & advanced ------------------------------------
+        items.add(navigateItem(25, Material.WRITABLE_BOOK, "§6§lTask Settings", MenuKey.SETTINGS_TASK,
+                "§7Pause rules, defaults, grace"));
+
+        items.add(navigateItem(28, Material.EMERALD, "§a§lCustom Tasks", MenuKey.TASK_CUSTOM,
+                "§7Create and edit entries"));
+
+        int assignments = taskMode != null ? taskMode.getAssignments().size() : 0;
+        items.add(navigateItem(30, Material.PAPER, "§e§lCurrent Assignments", MenuKey.TASK_ASSIGNMENTS,
+                "§7View who has each task", assignments));
+
+        items.add(navigateItem(32, Material.BOOKSHELF, "§6§lTask Pool", MenuKey.TASK_POOL,
                 "§7Enable/disable individual tasks", 0));
 
-        return new MenuScreen("§6§lTask Master", 36, items);
+        items.add(navigateItem(34, Material.COMPARATOR, "§b§lAdvanced Controls", MenuKey.TASK_ADVANCED,
+                "§7UI performance, timers, config browser"));
+
+        return new MenuScreen("§6§lTask Master", 45, items);
     }
 
     private MenuScreen buildTaskSettings(MenuContext ctx) {
@@ -1433,6 +1575,68 @@ public final class GuiManager implements Listener {
         return new MenuScreen("§6§lCustom Tasks", 54, items);
     }
 
+    private MenuScreen buildTaskRunners(MenuContext ctx) {
+        GameManager gm = plugin.getGameManager();
+        List<MenuItem> items = new ArrayList<>();
+        items.add(backButton(0, "§7§lBack", MenuKey.TASK_HOME, null, this::openTaskManagerMenu));
+
+        items.add(simpleItem(2, () -> icon(Material.BOOK, "§6§lTask Competition",
+                List.of("§7Runners only. Hunters are unused", "§7Shift-click to remove players"))));
+
+        items.add(clickItem(6, () -> icon(Material.BARRIER, "§c§lClear Runners",
+                List.of("§7Remove all runner assignments")), ctxClick -> {
+            Set<Player> affected = new HashSet<>(gm.getRunners());
+            for (Player player : affected) {
+                gm.assignPlayerToTeam(player, Team.NONE);
+                if (player != ctxClick.player()) {
+                    Msg.send(player, "§eYou were removed from runners by §f" + ctxClick.player().getName());
+                }
+            }
+            Msg.send(ctxClick.player(), "§cCleared all runners.");
+            ctxClick.reopen();
+        }));
+
+        int slot = 9;
+        for (Player online : Bukkit.getOnlinePlayers()) {
+            if (slot >= 54) break;
+            boolean isRunner = gm.isRunner(online);
+            ItemStack head = new ItemStack(Material.PLAYER_HEAD);
+            SkullMeta meta = (SkullMeta) head.getItemMeta();
+            meta.setOwningPlayer(online);
+            GuiCompat.setDisplayName(meta, (isRunner ? "§b" : "§7") + online.getName());
+            GuiCompat.setLore(meta, List.of(
+                    isRunner ? "§aCurrently a runner" : "§7Not assigned",
+                    "§7Click: assign as runner",
+                    "§7Shift-click: clear"));
+            head.setItemMeta(meta);
+
+            items.add(clickItem(slot, () -> head, ctxClick -> {
+                boolean remove = ctxClick.shift();
+                Team target = remove ? Team.NONE : Team.RUNNER;
+                boolean changed = gm.assignPlayerToTeam(online, target);
+                if (!changed) {
+                    Msg.send(ctxClick.player(), "§eNo change for §f" + online.getName());
+                } else if (remove) {
+                    Msg.send(ctxClick.player(), "§eRemoved §f" + online.getName() + " §efrom runners.");
+                    if (online != ctxClick.player()) {
+                        Msg.send(online, "§eYou were removed from runners by §f" + ctxClick.player().getName());
+                    }
+                } else {
+                    Msg.send(ctxClick.player(), "§aAdded §f" + online.getName() + " §ato runners.");
+                    if (online != ctxClick.player()) {
+                        Msg.send(online, "§eYou were assigned as a runner by §f" + ctxClick.player().getName());
+                    }
+                }
+                ctxClick.reopen();
+            }));
+
+            slot++;
+            if ((slot + 1) % 9 == 0) slot += 2;
+        }
+
+        return new MenuScreen("§b§lRunner Management", 54, items);
+    }
+
     private MenuScreen buildTaskPool(MenuContext ctx) {
         List<MenuItem> items = new ArrayList<>();
         items.add(backButton(0, "§7§lBack", MenuKey.TASK_HOME, null, this::openTaskManagerMenu));
@@ -1444,7 +1648,7 @@ public final class GuiManager implements Listener {
             return new MenuScreen("§6§lTask Pool", 54, items);
         }
 
-        TaskDefinition[] defs = mode.getAllDefinitions().values().toArray(TaskDefinition[]::new);
+        TaskDefinition[] defs = mode.getAllDefinitions().values().toArray(new TaskDefinition[0]);
         java.util.Arrays.sort(defs, java.util.Comparator.comparing(TaskDefinition::id, String.CASE_INSENSITIVE_ORDER));
 
         int perPage = 36;
@@ -1521,6 +1725,39 @@ public final class GuiManager implements Listener {
                         "§7Tasks total: §f" + defs.length))));
 
         return new MenuScreen("§6§lTask Pool", 54, items);
+    }
+
+    private MenuScreen buildTaskAdvanced(MenuContext ctx) {
+        List<MenuItem> items = new ArrayList<>();
+        items.add(backButton(0, "§7§lBack", MenuKey.TASK_HOME, null, this::openTaskManagerMenu));
+
+        items.add(simpleItem(2, () -> icon(Material.PAINTING, "§7Performance Tips",
+                List.of("§7Lower update rates → quicker UI refresh", "§7Use these tools to fine tune"))));
+
+        items.add(navigateItem(10, Material.COMPARATOR, "§b§lUI Performance", MenuKey.SETTINGS_UI,
+                "§7Action bar, title & trail colours"));
+        items.add(navigateItem(12, Material.CLOCK, "§6§lSwap Timing", MenuKey.SETTINGS_SWAP,
+                "§7Intervals, jitter, grace period"));
+        items.add(navigateItem(14, Material.BOOK, "§e§lStats Advanced", MenuKey.STATS_ADVANCED,
+                "§7Distance tracking cadence"));
+        items.add(navigateItem(16, Material.BELL, "§6§lBroadcast Controls", MenuKey.SETTINGS_BROADCAST,
+                "§7Toggle announcements"));
+
+        items.add(navigateItem(21, Material.NOTE_BLOCK, "§d§lVoice Chat", MenuKey.SETTINGS_VOICE_CHAT,
+                "§7Simple Voice Chat integration"));
+        items.add(navigateItem(23, Material.CHEST, "§a§lKit Manager", MenuKey.KIT_MANAGER,
+                "§7Quick kit testing"));
+        items.add(navigateItem(25, Material.ENCHANTED_BOOK, "§6§lTask Settings", MenuKey.SETTINGS_TASK,
+                "§7Pause on disconnect, defaults"));
+
+        items.add(clickItem(31, () -> icon(Material.PAPER, "§e§lConfig Browser",
+                List.of("§7Type a config path in chat", "§7Format: path=value", "§7Example: swap.interval=75")), ctxClick -> {
+            ctxClick.player().closeInventory();
+            Msg.send(ctxClick.player(), "§eEnter a config path and value (path=value) or 'cancel'.");
+            plugin.getChatInputHandler().expectConfigString(ctxClick.player(), "__dynamic__");
+        }));
+
+        return new MenuScreen("§b§lAdvanced Controls", 45, items);
     }
 
     private MenuItem buildParticleTypeCycler(int slot) {
@@ -1813,6 +2050,8 @@ public final class GuiManager implements Listener {
         TASK_CUSTOM,
         TASK_POOL,
         TASK_ASSIGNMENTS,
+        TASK_RUNNERS,
+        TASK_ADVANCED,
         STATS_ROOT,
         STATS_ADVANCED,
         SETTINGS_VOICE_CHAT,

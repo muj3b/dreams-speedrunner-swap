@@ -196,15 +196,10 @@ public class SwapCommand implements CommandExecutor, TabCompleter {
 
     private boolean handleCreator(CommandSender sender) {
         // No special permission; anyone can view credits/support
-        final String donateUrl = plugin.getConfig().getString(
-                "donation.url",
-                "https://donate.stripe.com/8x29AT0H58K03judnR0Ba01"
-        );
-
         sender.sendMessage("§6§lSpeedrunner Swap");
         sender.sendMessage("§eCreated by §f m u j 3 b");
         sender.sendMessage("§d❤ Donate to support development");
-        sender.sendMessage("§b" + donateUrl);
+        sender.sendMessage("§b" + SpeedrunnerSwap.DONATION_URL);
         return true;
     }
 

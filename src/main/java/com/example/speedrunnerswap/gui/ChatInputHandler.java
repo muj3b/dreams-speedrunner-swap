@@ -1,6 +1,7 @@
 package com.example.speedrunnerswap.gui;
 
 import com.example.speedrunnerswap.SpeedrunnerSwap;
+import com.example.speedrunnerswap.task.TaskDifficulty;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
@@ -17,9 +18,10 @@ public class ChatInputHandler implements Listener {
     private final Map<UUID, InputState> activeInputs = new HashMap<>();
     
     private static class InputState {
-        enum Type { TASK_ID, TASK_DESCRIPTION, CONFIG_STRING, CONFIG_LIST_ADD }
+        enum Type { TASK_ID, TASK_DESCRIPTION, TASK_DIFFICULTY, CONFIG_STRING, CONFIG_LIST_ADD }
         final Type type;
         String taskId; // Store task ID when collecting description
+        String taskDescription;
         String configPath; // Path for config edits
         
         InputState(Type type) {
@@ -91,18 +93,98 @@ public class ChatInputHandler implements Listener {
         String msg = rawMessage == null ? "" : rawMessage.trim();
         switch (state.type) {
             case TASK_ID -> {
-                expectTaskDescription(player, msg);
-                player.sendMessage("§6Enter a §bdescription §6for task §e" + msg);
+                if ("cancel".equalsIgnoreCase(msg)) {
+                    player.sendMessage("§cTask creation cancelled.");
+                    return;
+                }
+                if (msg.isEmpty()) {
+                    player.sendMessage("§cTask ID cannot be empty. Try again.");
+                    expectTaskId(player);
+                    return;
+                }
+                String id = msg.trim().toLowerCase(java.util.Locale.ROOT).replaceAll("[^a-z0-9_]+", "_");
+                if (id.isBlank()) {
+                    player.sendMessage("§cTask ID must contain letters or numbers. Try again.");
+                    expectTaskId(player);
+                    return;
+                }
+                var mode = plugin.getTaskManagerMode();
+                if (mode != null && mode.isTask(id)) {
+                    player.sendMessage("§cA task with that ID already exists. Use a different ID.");
+                    expectTaskId(player);
+                    return;
+                }
+                expectTaskDescription(player, id);
+                player.sendMessage("§6Enter a §bdescription §6for task §e" + id + "§6. Type §cCancel §6to abort.");
             }
             case TASK_DESCRIPTION -> {
-                String id = state.taskId != null ? state.taskId.trim() : ("custom_" + System.currentTimeMillis());
-                java.util.List<String> list = plugin.getConfig().getStringList("task_manager.custom_tasks");
-                list.add(msg);
-                plugin.getConfig().set("task_manager.custom_tasks", list);
-                plugin.saveConfig();
-                player.sendMessage("§aAdded custom task §e" + id + "§a: §f" + msg);
+                if ("cancel".equalsIgnoreCase(msg)) {
+                    player.sendMessage("§cTask creation cancelled.");
+                    return;
+                }
+                String id = state.taskId != null && !state.taskId.isBlank()
+                        ? state.taskId.trim()
+                        : ("custom_" + System.currentTimeMillis());
+                if (msg.isEmpty()) {
+                    player.sendMessage("§cDescription cannot be empty. Please enter a description.");
+                    expectTaskDescription(player, id);
+                    return;
+                }
+                InputState next = new InputState(InputState.Type.TASK_DIFFICULTY);
+                next.taskId = id;
+                next.taskDescription = msg;
+                activeInputs.put(uuid, next);
+                player.sendMessage("§6Select a difficulty for §e" + id + "§6. Type §aEasy§6, §eMedium§6, or §cHard§6. Type §cCancel §6to abort.");
+            }
+            case TASK_DIFFICULTY -> {
+                if ("cancel".equalsIgnoreCase(msg)) {
+                    player.sendMessage("§cTask creation cancelled.");
+                    return;
+                }
+                TaskDifficulty difficulty;
+                try {
+                    difficulty = TaskDifficulty.valueOf(msg.toUpperCase(java.util.Locale.ROOT));
+                } catch (IllegalArgumentException ex) {
+                    player.sendMessage("§cInvalid difficulty. Please type Easy, Medium, or Hard.");
+                    InputState retry = new InputState(InputState.Type.TASK_DIFFICULTY);
+                    retry.taskId = state.taskId;
+                    retry.taskDescription = state.taskDescription;
+                    activeInputs.put(uuid, retry);
+                    return;
+                }
+                String id = state.taskId != null && !state.taskId.isBlank()
+                        ? state.taskId.trim()
+                        : ("custom_" + System.currentTimeMillis());
+                String description = state.taskDescription != null ? state.taskDescription : "";
+                var mode = plugin.getTaskManagerMode();
+                if (mode == null) {
+                    player.sendMessage("§cTask Manager is not initialised. Try again later.");
+                    return;
+                }
+                mode.addCustomTask(id, description, difficulty);
+                player.sendMessage("§aAdded custom task §e" + id + " §7(" + difficulty.name().toLowerCase(java.util.Locale.ROOT) + ")§a.");
+                plugin.getGuiManager().openTaskManagerMenu(player);
             }
             case CONFIG_STRING -> {
+                if ("__dynamic__".equals(state.configPath)) {
+                    if ("cancel".equalsIgnoreCase(msg)) {
+                        player.sendMessage("§cConfig edit cancelled.");
+                        return;
+                    }
+                    int idx = msg.indexOf('=');
+                    if (idx <= 0 || idx == msg.length() - 1) {
+                        player.sendMessage("§cUsage: path=value (example: swap.interval=75)");
+                        expectConfigString(player, "__dynamic__");
+                        return;
+                    }
+                    String rawPath = msg.substring(0, idx).trim();
+                    String rawValue = msg.substring(idx + 1).trim();
+                    Object parsed = parseValue(rawValue);
+                    plugin.getConfig().set(rawPath, parsed);
+                    plugin.saveConfig();
+                    player.sendMessage("§aUpdated §e" + rawPath + "§a to §f" + rawValue + "§a.");
+                    return;
+                }
                 plugin.getConfig().set(state.configPath, msg);
                 plugin.saveConfig();
                 player.sendMessage("§aUpdated §e" + state.configPath + "§a.");
@@ -128,6 +210,20 @@ public class ChatInputHandler implements Listener {
                 }
             }
         }
+    }
+
+    private Object parseValue(String value) {
+        if (value.equalsIgnoreCase("true") || value.equalsIgnoreCase("false")) {
+            return Boolean.parseBoolean(value);
+        }
+        try {
+            if (value.contains(".")) {
+                return Double.parseDouble(value);
+            }
+            return Integer.parseInt(value);
+        } catch (NumberFormatException ignored) {
+        }
+        return value;
     }
 
     /** Register Paper's AsyncChatEvent using reflection for cross-platform support. */

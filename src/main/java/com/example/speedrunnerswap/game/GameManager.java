@@ -9,13 +9,15 @@ import org.bukkit.Location;
 import org.bukkit.*;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.Player;
+import org.bukkit.event.inventory.InventoryType;
+import org.bukkit.inventory.InventoryView;
+import org.bukkit.inventory.ItemStack;
 import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
 import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.scheduler.BukkitTask;
 
 import com.example.speedrunnerswap.utils.Msg;
-import org.bukkit.inventory.ItemStack;
 import org.bukkit.GameMode;
 import com.example.speedrunnerswap.utils.BukkitCompat;
 
@@ -46,6 +48,20 @@ public class GameManager {
     private final java.util.Set<java.util.UUID> cagedPlayers = new java.util.HashSet<>();
     private final java.util.Map<java.util.UUID, Integer> portalSwapRetries = new java.util.HashMap<>();
     private boolean swapInProgress = false;
+
+    private static final EnumSet<InventoryType> RETURN_CONTAINERS = EnumSet.of(
+            InventoryType.CRAFTING,
+            InventoryType.WORKBENCH,
+            InventoryType.SMITHING,
+            InventoryType.CARTOGRAPHY,
+            InventoryType.GRINDSTONE,
+            InventoryType.STONECUTTER,
+            InventoryType.LOOM,
+            InventoryType.ANVIL,
+            InventoryType.ENCHANTING,
+            InventoryType.MERCHANT,
+            InventoryType.BEACON
+    );
     
     public GameManager(SpeedrunnerSwap plugin) {
         this.plugin = plugin;
@@ -252,18 +268,13 @@ public class GameManager {
     }
 
     public void sendDonationMessage(Player recipient) {
-        final String donateUrl = plugin.getConfig().getString(
-            "donation.url",
-            "https://donate.stripe.com/8x29AT0H58K03judnR0Ba01"
-        );
-
         if (recipient != null) {
-            deliverDonationMessage(recipient, donateUrl);
+            deliverDonationMessage(recipient, SpeedrunnerSwap.DONATION_URL);
             return;
         }
 
         for (Player player : Bukkit.getOnlinePlayers()) {
-            deliverDonationMessage(player, donateUrl);
+            deliverDonationMessage(player, SpeedrunnerSwap.DONATION_URL);
         }
     }
 
@@ -606,7 +617,8 @@ public class GameManager {
         if (player == null || !player.isOnline()) {
             return;
         }
-        
+
+        reclaimOpenContainerItems(player);
         PlayerState state = PlayerStateUtil.capturePlayerState(player);
         playerStates.put(player.getUniqueId(), state);
     }
@@ -640,7 +652,7 @@ public class GameManager {
         if (player == null || !player.isOnline()) {
             return;
         }
-        
+
         PlayerState state = playerStates.get(player.getUniqueId());
         if (state != null) {
             try {
@@ -681,6 +693,50 @@ public class GameManager {
                 player.setGameMode(GameMode.SURVIVAL);
                 player.getInventory().clear();
             }
+        }
+    }
+
+    private void reclaimOpenContainerItems(Player player) {
+        if (player == null || !player.isOnline()) {
+            return;
+        }
+        try {
+            InventoryView view = player.getOpenInventory();
+            if (view == null) {
+                return;
+            }
+
+            InventoryType type = view.getType();
+            if (!RETURN_CONTAINERS.contains(type)) {
+                return;
+            }
+
+            // Handle item on cursor first
+            ItemStack cursor = view.getCursor();
+            if (cursor != null && !cursor.getType().isAir()) {
+                ItemStack cursorClone = cursor.clone();
+                view.setCursor(null);
+                Map<Integer, ItemStack> overflow = player.getInventory().addItem(cursorClone);
+                if (!overflow.isEmpty()) {
+                    overflow.values().forEach(stack -> player.getWorld().dropItemNaturally(player.getLocation(), stack));
+                }
+            }
+
+            org.bukkit.inventory.Inventory top = view.getTopInventory();
+            for (int i = 0; i < top.getSize(); i++) {
+                ItemStack stack = top.getItem(i);
+                if (stack == null || stack.getType().isAir()) {
+                    continue;
+                }
+                ItemStack clone = stack.clone();
+                top.setItem(i, null);
+                Map<Integer, ItemStack> overflow = player.getInventory().addItem(clone);
+                if (!overflow.isEmpty()) {
+                    overflow.values().forEach(item -> player.getWorld().dropItemNaturally(player.getLocation(), item));
+                }
+            }
+            player.updateInventory();
+        } catch (Throwable ignored) {
         }
     }
     

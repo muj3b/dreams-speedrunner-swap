@@ -191,7 +191,7 @@ In Task Master mode, players take turns controlling a single character while rac
 | **➕ Custom Task Creator** | Add your own tasks via GUI or config file |
 | **🕵️ Secret Objectives** | Tasks hidden from other players to maintain mystery |
 | **📊 Task Balancing** | All tasks designed for similar completion times |
-| **💡 Optional Hints** | Configurable hint system after time delays |
+| **🎚 Difficulty Buckets** | Pick Easy, Medium, or Hard pools for assignments |
 | **🎭 Strategic Deception** | Hide your true objective while sabotaging others |
 | **🏆 Instant Victory** | First to complete their task wins immediately |
 
@@ -257,7 +257,7 @@ In Task Master mode, players take turns controlling a single character while rac
 | **1** | 📥 **Download** | Get `SpeedrunnerSwap-*.jar` from releases |
 | **2** | 📁 **Install** | Place in server's `plugins/` directory |
 | **3** | 🔄 **Restart** | Start server to generate configs |
-| **4** | ⚙️ **Configure** | Run `/swap gui` to select mode, teams, and settings |
+| **4** | ⚙️ **Configure** | Run `/swap gui` → Mode Selector (shift-click a mode to save it as the server default) |
 | **5** | 🎮 **Play!** | Use `/swap gui` to start! |
 
 </div>
@@ -282,7 +282,10 @@ In Task Master mode, players take turns controlling a single character while rac
 | `/swap complete [confirm]` | Shows your current secret task or, with `confirm`, manually completes it (and ends the game). |
 | `/swap creator` · `/swap help` | Plugin credits and in-game help. |
 
-All commands require the `speedrunnerswap.admin` permission (granted to server operators by default).
+Permissions:
+- `speedrunnerswap.command` lets trusted players open the GUI, start/stop rounds, and manage teams.
+- `speedrunnerswap.admin` is required for mode changes, interval/randomize tweaks, task management, reloads, and `/swap clearteams`.
+- `/swap complete` is available to runners who have been assigned a Task Master objective.
 
 ---
 
@@ -294,7 +297,7 @@ The plugin ships with a comprehensive `config.yml`, but every option can be adju
 |:--|:--|:--|
 | **⚙️ Swap & Timing** | `swap.*` | Interval, randomisation, experimental limits, jitter, grace period, hunter swap, hot potato, preserve runner progress. |
 | **🛡️ Safety & Freeze** | `safe_swap.*`, `freeze_mode`, `freeze_mechanic.*`, `cancel.*`, `single_player_sleep`, `spawn.*`, `limbo.*` | Safe-swap radii, freeze mechanics, spawn handling, limbo/spawn location setters. |
-| **🎯 Hunter Tools** | `tracker.*` | Compass enable/disable, update ticks, compass jamming duration & distance. |
+| **🎯 Hunter Tools** | `tracker.*` | Compass enable/disable, update ticks, portal retry attempts/delay, compass jamming duration & distance. |
 | **🧪 Power-ups** | `power_ups.*` | Toggle system, choose positive/negative effects, duration & level ranges. |
 | **🌍 World Border** | `world_border.*` | Enable shrink, starting/ending size, shrink duration, warning distance/interval. |
 | **🏹 Bounty System** | `bounty.*` | Master toggle, cooldown, glow length, reward durations, manual assign/clear. |

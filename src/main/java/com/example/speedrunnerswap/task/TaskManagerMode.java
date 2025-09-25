@@ -2,6 +2,7 @@ package com.example.speedrunnerswap.task;
 
 import com.example.speedrunnerswap.SpeedrunnerSwap;
 import com.example.speedrunnerswap.utils.BukkitCompat;
+import com.example.speedrunnerswap.utils.Msg;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 
@@ -22,6 +23,7 @@ public class TaskManagerMode {
 
     // Task registry: id -> definition
     private final Map<String, TaskDefinition> registry = new LinkedHashMap<>();
+    private final Set<String> customTaskIds = new HashSet<>();
     // Difficulty filter and progression gates
     private TaskDifficulty difficultyFilter = TaskDifficulty.MEDIUM;
     private boolean netherReached = false;
@@ -130,6 +132,22 @@ public class TaskManagerMode {
         return Collections.unmodifiableMap(assignments);
     }
 
+    /** Broadcast the current assignments to the whole server. */
+    public void broadcastAssignments() {
+        if (assignments.isEmpty()) {
+            return;
+        }
+        Msg.broadcast("§6§l[Task Master] Current Assignments");
+        for (var entry : assignments.entrySet()) {
+            UUID uuid = entry.getKey();
+            String taskId = entry.getValue();
+            TaskDefinition def = registry.get(taskId);
+            String name = Optional.ofNullable(Bukkit.getOfflinePlayer(uuid).getName()).orElse(uuid.toString().substring(0, 8));
+            String description = def != null ? def.description() : taskId;
+            Msg.broadcast("§e• §f" + name + " §7→ §b" + description);
+        }
+    }
+
     public void saveAssignmentsToConfig() {
         try {
             Map<String, Object> map = new LinkedHashMap<>();
@@ -177,6 +195,7 @@ public class TaskManagerMode {
     /** Load tasks from tasks.yml and built-in defaults */
     private void loadTasks() {
         registry.clear();
+        customTaskIds.clear();
         // First attempt to load from tasks.yml if available
         boolean loadedFromFile = loadFromTasksYml();
         // If none loaded, optionally include built-in defaults
@@ -198,16 +217,26 @@ public class TaskManagerMode {
     private void loadCustomTasks() {
         var customTasks = plugin.getConfig().getList("task_manager.custom_tasks");
         if (customTasks == null) return;
-        
+
         for (Object obj : customTasks) {
             if (obj instanceof Map) {
                 @SuppressWarnings("unchecked")
                 Map<String, Object> taskMap = (Map<String, Object>) obj;
                 String id = String.valueOf(taskMap.get("id"));
                 String description = String.valueOf(taskMap.get("description"));
-                
+                TaskDifficulty difficulty = TaskDifficulty.MEDIUM;
+                Object rawDiff = taskMap.get("difficulty");
+                if (rawDiff != null) {
+                    try {
+                        difficulty = TaskDifficulty.valueOf(String.valueOf(rawDiff).toUpperCase(Locale.ROOT));
+                    } catch (IllegalArgumentException ignored) {
+                        difficulty = TaskDifficulty.MEDIUM;
+                    }
+                }
+
                 if (id != null && !id.equals("null") && description != null && !description.equals("null")) {
-                    register(new TaskDefinition(id, description, TaskType.COMPLEX_TASK));
+                    register(new TaskDefinition(id, description, TaskType.COMPLEX_TASK, difficulty));
+                    customTaskIds.add(id);
                     plugin.getLogger().info("Loaded custom task: " + id);
                 }
             }
@@ -215,10 +244,17 @@ public class TaskManagerMode {
     }
     
     /** Add a custom task and save to config */
-    public void addCustomTask(String id, String description) {
+    public void addCustomTask(String id, String description, TaskDifficulty difficulty) {
+        if (id == null || id.isBlank()) {
+            id = "custom_" + System.currentTimeMillis();
+        }
+        if (description == null) description = "";
+        if (difficulty == null) difficulty = TaskDifficulty.MEDIUM;
+
         // Add to registry
-        register(new TaskDefinition(id, description, TaskType.COMPLEX_TASK));
-        
+        register(new TaskDefinition(id, description, TaskType.COMPLEX_TASK, difficulty));
+        customTaskIds.add(id);
+
         // Save to config
         List<?> rawList = plugin.getConfig().getList("task_manager.custom_tasks");
         List<Object> customTasks = new ArrayList<>();
@@ -227,10 +263,16 @@ public class TaskManagerMode {
         Map<String, Object> taskMap = new HashMap<>();
         taskMap.put("id", id);
         taskMap.put("description", description);
+        taskMap.put("difficulty", difficulty.name());
         customTasks.add(taskMap);
 
         plugin.getConfig().set("task_manager.custom_tasks", customTasks);
         plugin.saveConfig();
+    }
+
+    /** Backward compatibility overload */
+    public void addCustomTask(String id, String description) {
+        addCustomTask(id, description, TaskDifficulty.MEDIUM);
     }
     
     /** Remove a custom task and save to config */
@@ -257,6 +299,7 @@ public class TaskManagerMode {
         if (removed) {
             // Remove from registry
             registry.remove(id);
+            customTaskIds.remove(id);
             
             // Save config
             plugin.getConfig().set("task_manager.custom_tasks", customTasks);
@@ -271,21 +314,18 @@ public class TaskManagerMode {
     
     /** Get all custom task IDs */
     public List<String> getCustomTaskIds() {
-        List<String> customIds = new ArrayList<>();
-        var customTasks = plugin.getConfig().getList("task_manager.custom_tasks");
-        if (customTasks == null) return customIds;
-        
-        for (Object obj : customTasks) {
-            if (obj instanceof Map) {
-                @SuppressWarnings("unchecked")
-                Map<String, Object> taskMap = (Map<String, Object>) obj;
-                String id = String.valueOf(taskMap.get("id"));
-                if (id != null && !id.equals("null")) {
-                    customIds.add(id);
-                }
-            }
+        return new ArrayList<>(customTaskIds);
+    }
+
+    public Map<TaskDifficulty, Integer> getTaskCounts(boolean enabledOnly) {
+        EnumMap<TaskDifficulty, Integer> counts = new EnumMap<>(TaskDifficulty.class);
+        for (TaskDifficulty diff : TaskDifficulty.values()) counts.put(diff, 0);
+        for (TaskDefinition def : registry.values()) {
+            if (enabledOnly && !def.enabled()) continue;
+            TaskDifficulty diff = def.difficulty() != null ? def.difficulty() : TaskDifficulty.MEDIUM;
+            counts.put(diff, counts.get(diff) + 1);
         }
-        return customIds;
+        return counts;
     }
     
     /** Reload tasks from config */
