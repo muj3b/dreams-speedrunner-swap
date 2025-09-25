@@ -188,17 +188,7 @@ public class SwapCommand implements CommandExecutor, TabCompleter {
         sender.sendMessage(confirmation);
 
         if (sender instanceof Player player) {
-            switch (target) {
-                case DREAM, TASK -> plugin.getGuiManager().openMainMenu(player);
-                case SAPNAP -> {
-                    try {
-                        new com.example.speedrunnerswap.gui.ControlGui(plugin).openMainMenu(player);
-                    } catch (Throwable t) {
-                        plugin.getLogger().warning("Sapnap GUI failed to open: " + t.getMessage());
-                        player.sendMessage("§cFailed to open Sapnap control menu. Check console.");
-                    }
-                }
-            }
+            plugin.getGuiManager().openMainMenu(player);
         }
 
         return true;

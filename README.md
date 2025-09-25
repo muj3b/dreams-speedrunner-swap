@@ -240,11 +240,11 @@ In Task Master mode, players take turns controlling a single character while rac
 
 | Feature | Description |
 |:--|:--|
-| **🖥️ Full GUI Control** | Manage teams, settings, and custom tasks from intuitive interface |
+| **🖥️ Full GUI Control** | Manage teams, settings, task pools, spawn, and cosmetics without touching files |
 | **🔄 Customizable Swaps** | Set intervals, randomization, grace periods, and jitter |
 | **🛡️ Safe Swap System** | Prevents swapping into dangerous situations |
-| **🎤 Discord Support** | Auto-mute inactive players for clear communication |
-| **➕ Custom Content** | Add your own tasks and modify gameplay via GUI or config |
+| **🎤 Voice Chat Integration** | Auto-mute inactive players via Simple Voice Chat support |
+| **📚 Task Pool Manager** | Enable/disable every objective, adjust difficulty filters, and reload `tasks.yml` live |
 
 ---
 
@@ -257,7 +257,7 @@ In Task Master mode, players take turns controlling a single character while rac
 | **1** | 📥 **Download** | Get `SpeedrunnerSwap-*.jar` from releases |
 | **2** | 📁 **Install** | Place in server's `plugins/` directory |
 | **3** | 🔄 **Restart** | Start server to generate configs |
-| **4** | ⚙️ **Configure** | Choose mode in `config.yml` |
+| **4** | ⚙️ **Configure** | Run `/swap gui` to select mode, teams, and settings |
 | **5** | 🎮 **Play!** | Use `/swap gui` to start! |
 
 </div>
@@ -266,81 +266,68 @@ In Task Master mode, players take turns controlling a single character while rac
 
 ## 📝 Commands
 
-| Command | Description | Modes |
+| Command | Description |
+|:--|:--|
+| `/swap gui` | Opens the full management hub (mode selector, team setup, settings, task pool, stats, kits, etc.). |
+| `/swap start` · `/swap stop` · `/swap pause` · `/swap resume` · `/swap status` | Runtime controls for starting, stopping, pausing and inspecting the current match. |
+| `/swap mode <dream|sapnap|task>` | Switches the active gameplay mode. Automatically blocks switching mid-match unless `--force` is provided. |
+| `/swap setrunners <players…>` · `/swap sethunters <players…>` · `/swap clearteams` | Quick team assignment helpers (mirrors the GUI team selector). |
+| `/swap interval <seconds>` · `/swap randomize <on|off>` | Fast tweaks for the base swap interval and randomisation without opening the menu. |
+| `/swap tasks list` | Prints all registered Task Master objectives with their enabled state and difficulty. |
+| `/swap tasks enable|disable <id>` | Toggle individual tasks from chat (same functionality is available in the GUI Task Pool). |
+| `/swap tasks difficulty <easy|medium|hard>` | Chooses the Task Master difficulty filter. |
+| `/swap tasks reroll` | Assigns fresh secret tasks to the currently selected runners (only before the round starts). |
+| `/swap tasks endwhenoneleft <on|off|toggle>` | Controls the “end when one runner remains” rule. |
+| `/swap tasks reload` | Reloads `tasks.yml` without restarting the server. |
+| `/swap complete [confirm]` | Shows your current secret task or, with `confirm`, manually completes it (and ends the game). |
+| `/swap creator` · `/swap help` | Plugin credits and in-game help. |
+
+All commands require the `speedrunnerswap.admin` permission (granted to server operators by default).
+
+---
+
+## ⚙️ Configuration & GUI Coverage
+
+The plugin ships with a comprehensive `config.yml`, but every option can be adjusted from the in-game GUI. Here’s how the configuration maps to the menu structure:
+
+| GUI Section | Key Config Areas | Highlights |
 |:--|:--|:--|
-| `/swap gui` | Open management GUI (includes custom task creator) | All |
-| `/swap start` | Start the game | All |
-| `/swap stop` | End current game | All |
-| `/swap mode <mode>` | Switch game mode | All |
-| `/swap tasks add <task>` | Add custom task via command | Task Master |
-| `/swap tasks list` | View all available tasks | Task Master |
-| `/swap tasks reload` | Reload tasks from config | Task Master |
-| `/swap task <player>` | View player's secret task (admin) | Task Master |
+| **⚙️ Swap & Timing** | `swap.*` | Interval, randomisation, experimental limits, jitter, grace period, hunter swap, hot potato, preserve runner progress. |
+| **🛡️ Safety & Freeze** | `safe_swap.*`, `freeze_mode`, `freeze_mechanic.*`, `cancel.*`, `single_player_sleep`, `spawn.*`, `limbo.*` | Safe-swap radii, freeze mechanics, spawn handling, limbo/spawn location setters. |
+| **🎯 Hunter Tools** | `tracker.*` | Compass enable/disable, update ticks, compass jamming duration & distance. |
+| **🧪 Power-ups** | `power_ups.*` | Toggle system, choose positive/negative effects, duration & level ranges. |
+| **🌍 World Border** | `world_border.*` | Enable shrink, starting/ending size, shrink duration, warning distance/interval. |
+| **🏹 Bounty System** | `bounty.*` | Master toggle, cooldown, glow length, reward durations, manual assign/clear. |
+| **🛡 Last Stand & Sudden Death** | `last_stand.*`, `sudden_death.*` | Configure runner clutch buffs and sudden-death arena, timers, and effects. |
+| **📊 Statistics & UI** | `stats.*`, `ui.update_ticks.*`, `timer_visibility.*` | Enable tracking, broadcast cadence, timer visibility, action bar/title update rates. |
+| **✨ Particle Trail** | `particle_trail.*` | Toggle runner particle trail, tick interval, particle id, and RGB colour (new GUI controls). |
+| **🎙 Voice Chat** | `voice_chat.*` | Simple Voice Chat integration toggles. |
+| **🎒 Kits** | `kits.*` & `kits.yml` | Enable runner/hunter kits and quick testing buttons. |
+| **🎯 Task Master** | `task_manager.*` | Pause behaviour, reconnection grace, max duration, include defaults, difficulty filter, per-task enable/disable, custom task creator, task pool management, assignments viewer. |
 
-**Permission:** `speedrunnerswap.admin` (default: op)
-
----
-
-## ⚙️ Configuration
-
-```yaml
-# Active mode: "HUNTERS", "CONTROL", or "TASKMASTER"
-game_mode: "TASKMASTER"
-
-# Swap settings
-swap:
-  interval_seconds: 60
-  randomize: false
-  grace_period_ticks: 60
-
-# Task Master settings (BETA)
-taskmaster:
-  hints_enabled: true
-  hint_delay_minutes: 10
-  hide_inventories: true
-  
-  # Add custom tasks here or via GUI
-  custom_tasks:
-    - "Build a house with exactly 100 blocks"
-    - "Die while holding a cake"
-    # Add as many as you want!
-  
-  # Task categories to include
-  enabled_categories:
-    - "special_tasks"
-    - "underground_tasks"
-    - "combat_tasks"
-    - "nether_tasks"
-    - "building_tasks"
-    - "farming_tasks"
-    - "transport_tasks"
-    - "collection_tasks"
-    - "trading_tasks"
-    - "unique_tasks"
-    - "custom_tasks"  # Your custom tasks
-```
+> 📝 **Tip:** Use `/swap gui` (or the `/swap` hotkey in the tab completions) to reach any of these menus instantly—every slider, toggle, and button writes back to `config.yml` (or `tasks.yml` / `kits.yml`) for persistence.
 
 ---
 
-## 🎨 Creating Custom Tasks
+## 🎨 Creating & Managing Custom Tasks
 
-### Via GUI (Easiest)
-1. Open `/swap gui`
-2. Navigate to Task Master settings
-3. Click "Custom Tasks"
-4. Add your own challenges!
+### GUI Workflow
+1. Open `/swap gui` → **Task Master**.
+2. **Custom Tasks** lets you add new objectives (ID + description) and remove existing ones.
+3. **Task Pool** provides page-based toggles to enable/disable any built-in or custom task, adjust the difficulty filter, and reload `tasks.yml` live.
 
-### Via Config
-Add tasks directly to `custom_tasks:` in config.yml
+### Command Workflow
+- `/swap tasks list` – review all definitions.
+- `/swap tasks enable|disable <id>` – quick toggles from console or chat.
+- `/swap tasks difficulty <easy|medium|hard>` – change the pool filter.
+- `/swap tasks reroll` – reassign secret tasks prior to a round.
+- `/swap tasks reload` – re-read `tasks.yml` after editing.
 
-### Via Command
-Use `/swap tasks add <your task description>`
-
-**Task Design Tips:**
-- Make tasks that take 10-30 minutes to complete
-- Include specific requirements (exact numbers, specific items)
-- Create tasks that can be sabotaged by others
-- Design objectives that require strategy and planning
+### Design Tips
+- Aim for goals that take 10–30 minutes so races stay competitive.
+- Use exact numbers (e.g. *collect 32 ender pearls*) to avoid ambiguity.
+- Mix tasks that encourage sabotage with those that reward cooperation.
+- Keep descriptions concise—the GUI shows the entire text to players.
 
 ---
 

@@ -17,7 +17,7 @@ public class ChatInputHandler implements Listener {
     private final Map<UUID, InputState> activeInputs = new HashMap<>();
     
     private static class InputState {
-        enum Type { TASK_ID, TASK_DESCRIPTION, DONATION_URL, CONFIG_STRING, CONFIG_LIST_ADD }
+        enum Type { TASK_ID, TASK_DESCRIPTION, CONFIG_STRING, CONFIG_LIST_ADD }
         final Type type;
         String taskId; // Store task ID when collecting description
         String configPath; // Path for config edits
@@ -46,10 +46,6 @@ public class ChatInputHandler implements Listener {
     public void expectTaskDescription(Player player) {
         // For when we already have the task ID stored
         activeInputs.put(player.getUniqueId(), new InputState(InputState.Type.TASK_DESCRIPTION));
-    }
-    
-    public void expectDonationUrl(Player player) {
-        activeInputs.put(player.getUniqueId(), new InputState(InputState.Type.DONATION_URL));
     }
     
     public void expectConfigString(Player player, String path) {
@@ -105,11 +101,6 @@ public class ChatInputHandler implements Listener {
                 plugin.getConfig().set("task_manager.custom_tasks", list);
                 plugin.saveConfig();
                 player.sendMessage("§aAdded custom task §e" + id + "§a: §f" + msg);
-            }
-            case DONATION_URL -> {
-                plugin.getConfig().set("donation.url", msg);
-                plugin.saveConfig();
-                player.sendMessage("§aUpdated donation URL.");
             }
             case CONFIG_STRING -> {
                 plugin.getConfig().set(state.configPath, msg);

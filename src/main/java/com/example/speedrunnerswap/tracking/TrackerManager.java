@@ -21,6 +21,8 @@ public class TrackerManager {
     private final java.util.Map<java.util.UUID, Integer> compassSlotCache = new java.util.HashMap<>();
     // Track hunters we've already notified about End portal hint this game
     private final java.util.Set<java.util.UUID> endHintNotifiedOnce = new java.util.HashSet<>();
+    private volatile org.bukkit.Location lastRunnerOverworldLocation;
+    private volatile org.bukkit.Location lastRunnerEndPortalLocation;
     
     public TrackerManager(SpeedrunnerSwap plugin) {
         this.plugin = plugin;
@@ -39,19 +41,32 @@ public class TrackerManager {
      * Start tracking the active runner
      */
     public void startTracking() {
+        if (!plugin.getConfigManager().isTrackerEnabled()) {
+            stopTracking();
+            return;
+        }
         synchronized (taskLock) {
             if (trackerTask != null) {
                 trackerTask.cancel();
             }
-            
+
             // Respect configured update rate with a sane minimum
             int updateTicks = Math.max(10, plugin.getConfigManager().getTrackerUpdateTicks());
-            
+
             trackerTask = Bukkit.getScheduler().runTaskTimer(plugin, () -> {
+                if (!plugin.getConfigManager().isTrackerEnabled()) {
+                    stopTracking();
+                    return;
+                }
+                if (!hasOnlineHunters()) {
+                    stopTracking();
+                    return;
+                }
                 Player activeRunner = plugin.getGameManager().getActiveRunner();
                 if (activeRunner == null || !activeRunner.isOnline() || !plugin.getGameManager().isGameRunning()) {
                     return;
                 }
+                cacheRunnerPositions(activeRunner);
 
                 // Update compass for all hunters regardless of dimension
                 for (Player hunter : plugin.getGameManager().getHunters()) {
@@ -61,11 +76,11 @@ public class TrackerManager {
                 }
             }, 0L, updateTicks);
         }
+    }
 
     // Particle trails have been removed intentionally. Hunters receive only the tracking compass.
     // If a future toggle is desired, reintroduce scheduled particleTask logic here guarded by config.
-    }
-    
+
     /**
      * Stop tracking
      */
@@ -88,7 +103,7 @@ public class TrackerManager {
         }
         
         // Avoid duplicates
-        if (!hunter.getInventory().contains(Material.COMPASS)) {
+        if (!hasCompass(hunter)) {
             ItemStack compass = new ItemStack(Material.COMPASS);
             hunter.getInventory().addItem(compass);
             // Reset cache so we find it quickly next time
@@ -132,15 +147,23 @@ public class TrackerManager {
             org.bukkit.World.Environment re = rw.getEnvironment();
             org.bukkit.Location rloc = activeRunner.getLocation();
 
-            if (he == org.bukkit.World.Environment.NETHER && re == org.bukkit.World.Environment.NORMAL) {
-                target = new org.bukkit.Location(hw, rloc.getX() / 8.0, rloc.getY(), rloc.getZ() / 8.0);
-            } else if (he == org.bukkit.World.Environment.NORMAL && re == org.bukkit.World.Environment.NETHER) {
-                target = new org.bukkit.Location(hw, rloc.getX() * 8.0, rloc.getY(), rloc.getZ() * 8.0);
-            } else if (re == org.bukkit.World.Environment.THE_END) {
-                if (endHintNotifiedOnce.add(hunter.getUniqueId())) {
-                    hunter.sendMessage("§eTracker: Runner is in §5The End§e. Compass shows a fallback until you enter The End.");
+            if (re == org.bukkit.World.Environment.THE_END) {
+                if (lastRunnerEndPortalLocation != null && lastRunnerEndPortalLocation.getWorld() != null) {
+                    target = lastRunnerEndPortalLocation.clone();
+                } else {
+                    if (endHintNotifiedOnce.add(hunter.getUniqueId())) {
+                        hunter.sendMessage("§eTracker: Runner is in §5The End§e. Fallback compass target set to spawn.");
+                    }
+                    target = hw.getSpawnLocation();
                 }
-                target = hw.getSpawnLocation();
+            } else if (he == org.bukkit.World.Environment.NORMAL && re == org.bukkit.World.Environment.NETHER) {
+                if (lastRunnerOverworldLocation != null && lastRunnerOverworldLocation.getWorld() != null) {
+                    target = lastRunnerOverworldLocation.clone();
+                } else {
+                    target = hw.getSpawnLocation();
+                }
+            } else if (he == org.bukkit.World.Environment.NETHER && re == org.bukkit.World.Environment.NORMAL) {
+                target = new org.bukkit.Location(hw, rloc.getX() / 8.0, rloc.getY(), rloc.getZ() / 8.0);
             } else {
                 target = hw.getSpawnLocation();
             }
@@ -169,6 +192,10 @@ public class TrackerManager {
     public void updateAllHunterCompasses() {
         Player activeRunner = plugin.getGameManager().getActiveRunner();
         if (activeRunner != null && activeRunner.isOnline()) {
+            if (!hasOnlineHunters()) {
+                stopTracking();
+                return;
+            }
             for (Player hunter : plugin.getGameManager().getHunters()) {
                 if (hunter.isOnline()) {
                     updateHunterCompass(hunter, activeRunner);
@@ -177,10 +204,57 @@ public class TrackerManager {
         }
     }
 
+    private void cacheRunnerPositions(Player runner) {
+        if (runner == null) return;
+        org.bukkit.Location loc = runner.getLocation();
+        if (loc == null || loc.getWorld() == null) return;
+        org.bukkit.World.Environment env = loc.getWorld().getEnvironment();
+        if (env == org.bukkit.World.Environment.NORMAL) {
+            lastRunnerOverworldLocation = loc.clone();
+        }
+    }
+
+    public void setLastRunnerOverworldLocation(org.bukkit.Location location) {
+        if (location == null || location.getWorld() == null) return;
+        if (location.getWorld().getEnvironment() != org.bukkit.World.Environment.NORMAL) return;
+        lastRunnerOverworldLocation = location.clone();
+    }
+
+    public void setLastRunnerEndPortalLocation(org.bukkit.Location location) {
+        if (location == null || location.getWorld() == null) return;
+        lastRunnerEndPortalLocation = location.clone();
+        endHintNotifiedOnce.clear();
+    }
+
     public void jamCompasses(long durationTicks) {
         isJammed = true;
         Bukkit.getScheduler().runTaskLater(plugin, () -> {
             isJammed = false;
         }, durationTicks);
+    }
+
+    private boolean hasCompass(Player player) {
+        if (player == null) return false;
+        var inv = player.getInventory();
+        if (inv.contains(Material.COMPASS, 1)) return true;
+        if (inv.getItemInOffHand() != null && inv.getItemInOffHand().getType() == Material.COMPASS) return true;
+        for (ItemStack stack : inv.getContents()) {
+            if (stack != null && stack.getType() == Material.COMPASS) return true;
+        }
+        for (ItemStack stack : player.getEnderChest().getContents()) {
+            if (stack != null && stack.getType() == Material.COMPASS) return true;
+        }
+        return false;
+    }
+
+    private boolean hasOnlineHunters() {
+        java.util.List<Player> hunters = plugin.getGameManager().getHunters();
+        if (hunters == null || hunters.isEmpty()) return false;
+        for (Player hunter : hunters) {
+            if (hunter != null && hunter.isOnline()) {
+                return true;
+            }
+        }
+        return false;
     }
 }

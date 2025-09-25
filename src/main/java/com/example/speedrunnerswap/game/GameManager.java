@@ -44,6 +44,8 @@ public class GameManager {
     private final java.util.Map<org.bukkit.World, java.util.List<org.bukkit.block.BlockState>> sharedCageBlocks = new java.util.HashMap<>();
     private final java.util.Map<org.bukkit.World, org.bukkit.Location> sharedCageCenters = new java.util.HashMap<>();
     private final java.util.Set<java.util.UUID> cagedPlayers = new java.util.HashSet<>();
+    private final java.util.Map<java.util.UUID, Integer> portalSwapRetries = new java.util.HashMap<>();
+    private boolean swapInProgress = false;
     
     public GameManager(SpeedrunnerSwap plugin) {
         this.plugin = plugin;
@@ -63,14 +65,33 @@ public class GameManager {
         }
         
         if (!canStartGame()) {
-            if (plugin.getCurrentMode() == com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode.SAPNAP) {
-                Msg.broadcast("§cGame cannot start: No online players available.");
-            } else {
-                Msg.broadcast("§cGame cannot start: At least one runner and one hunter are required.");
-            }
+            SpeedrunnerSwap.SwapMode mode = plugin.getCurrentMode();
+            boolean hasRunner = !runners.isEmpty();
+            boolean hasHunter = !hunters.isEmpty();
+
+            String failureMessage = switch (mode) {
+                case DREAM -> hasRunner
+                        ? "§cGame cannot start: Assign at least one hunter for Dream mode."
+                        : "§cGame cannot start: Assign at least one speed owner.";
+                case SAPNAP -> hasRunner
+                        ? (hasHunter
+                            ? "§cGame cannot start: Sapnap mode does not allow hunters. Clear them and keep only speed owners."
+                            : "§cGame cannot start: Assign at least one speed owner.")
+                        : "§cGame cannot start: Assign at least one speed owner.";
+                case TASK -> hasRunner
+                        ? (hasHunter
+                            ? "§cGame cannot start: Task Master mode uses only speed owners. Remove any hunters before starting."
+                            : "§cGame cannot start: Assign at least one speed owner.")
+                        : "§cGame cannot start: Assign at least one speed owner.";
+            };
+
+            Msg.broadcast(failureMessage);
             return false;
         }
         
+        // Capture mode for countdown presentation
+        final SpeedrunnerSwap.SwapMode countdownMode = plugin.getCurrentMode();
+
         // Countdown
         new BukkitRunnable() {
             int count = 3;
@@ -78,17 +99,33 @@ public class GameManager {
             @Override
             public void run() {
                 if (count > 0) {
+                    String title = switch (countdownMode) {
+                        case DREAM -> "§b§lDream Swap starting in " + count;
+                        case SAPNAP -> "§d§lSapnap speed owner swap in " + count;
+                        case TASK -> "§6§lTaskmaster starting in " + count;
+                    };
+                    String subtitle = "§7Made by muj3b";
                     for (Player player : Bukkit.getOnlinePlayers()) {
-                        BukkitCompat.showTitle(player, "§a§lStarting in " + count, "§7Made by muj3b", 10, 70, 10);
+                        BukkitCompat.showTitle(player, title, subtitle, 10, 70, 10);
                     }
                     count--;
                 } else {
+                    String goTitle = switch (countdownMode) {
+                        case DREAM -> "§b§lDream Swap GO!";
+                        case SAPNAP -> "§d§lSapnap swap GO!";
+                        case TASK -> "§6§lTaskmaster GO!";
+                    };
+                    for (Player player : Bukkit.getOnlinePlayers()) {
+                        BukkitCompat.showTitle(player, goTitle, "§7Made by muj3b", 10, 60, 10);
+                    }
                     this.cancel();
                     gameRunning = true;
                     gamePaused = false;
                     activeRunnerIndex = 0;
                     activeRunner = runners.get(activeRunnerIndex);
                     saveAllPlayerStates();
+                    portalSwapRetries.clear();
+                    swapInProgress = false;
                 
                 if (plugin.getConfigManager().isKitsEnabled()) {
                     for (Player player : runners) {
@@ -176,6 +213,8 @@ public class GameManager {
         if (cageTask != null) { cageTask.cancel(); cageTask = null; }
         if (runnerTimeoutTask != null) { runnerTimeoutTask.cancel(); runnerTimeoutTask = null; }
         plugin.getTrackerManager().stopTracking();
+        portalSwapRetries.clear();
+        swapInProgress = false;
         try { plugin.getStatsManager().stopTracking(); } catch (Exception ignored) {}
 
         new BukkitRunnable() {
@@ -212,20 +251,34 @@ public class GameManager {
         }.runTaskLater(plugin, 200L);
     }
 
-    private void broadcastDonationMessage() {
+    public void sendDonationMessage(Player recipient) {
         final String donateUrl = plugin.getConfig().getString(
             "donation.url",
             "https://donate.stripe.com/8x29AT0H58K03judnR0Ba01"
         );
 
-        for (Player player : Bukkit.getOnlinePlayers()) {
-            player.sendMessage("");
-            player.sendMessage("§6§l=== Support the Creator ===");
-            player.sendMessage("§eEnjoyed the game? Help keep updates coming!");
-            player.sendMessage("§d❤ Donate to support development");
-            player.sendMessage("§b" + donateUrl);
-            player.sendMessage("");
+        if (recipient != null) {
+            deliverDonationMessage(recipient, donateUrl);
+            return;
         }
+
+        for (Player player : Bukkit.getOnlinePlayers()) {
+            deliverDonationMessage(player, donateUrl);
+        }
+    }
+
+    private void deliverDonationMessage(Player player, String donateUrl) {
+        if (player == null) return;
+        player.sendMessage("");
+        player.sendMessage("§6§l=== Support the Creator ===");
+        player.sendMessage("§eEnjoyed the game? Help keep updates coming!");
+        player.sendMessage("§d❤ Donate to support development");
+        player.sendMessage("§b" + donateUrl);
+        player.sendMessage("");
+    }
+
+    private void broadcastDonationMessage() {
+        sendDonationMessage(null);
     }
     /** Stop the game without declaring a winner */
     public void stopGame() {
@@ -319,12 +372,23 @@ public class GameManager {
             return false;
         }
         loadTeams();
-        if (!runners.isEmpty()) {
-            if (plugin.getCurrentMode() == com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode.SAPNAP ||
-                plugin.getCurrentMode() == com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode.TASK) return true;
-            return !hunters.isEmpty();
+        SpeedrunnerSwap.SwapMode mode = plugin.getCurrentMode();
+        boolean hasRunner = !runners.isEmpty();
+        boolean hasHunter = !hunters.isEmpty();
+
+        if (!hasRunner) {
+            return false;
         }
-        return false;
+
+        if (huntersRequired(mode)) {
+            return hasHunter;
+        }
+
+        if (!huntersAllowed(mode) && hasHunter) {
+            return false;
+        }
+
+        return true;
     }
 
     /**
@@ -351,7 +415,8 @@ public class GameManager {
 
         // If a team becomes empty due to disconnects, pause instead of ending the game.
         // In runner-only mode, ignore hunters list being empty.
-        boolean teamEmpty = runners.isEmpty() || (plugin.getCurrentMode() != com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode.SAPNAP && hunters.isEmpty());
+        boolean huntersRequired = huntersRequired(plugin.getCurrentMode());
+        boolean teamEmpty = runners.isEmpty() || (huntersRequired && hunters.isEmpty());
         if (gameRunning && teamEmpty) {
             if (plugin.getConfigManager().isPauseOnDisconnect()) {
                 pauseGame();
@@ -406,6 +471,8 @@ public class GameManager {
         }
         
         savePlayerState(player);
+        portalSwapRetries.remove(player.getUniqueId());
+        ensureRunnerQueueCoherence();
     }
 
     /** Handle player rejoin */
@@ -447,6 +514,11 @@ public class GameManager {
                     resumeGame();
                 }
             }
+        }
+        portalSwapRetries.remove(player.getUniqueId());
+        ensureRunnerQueueCoherence();
+        if (plugin.getConfigManager().isTrackerEnabled()) {
+            plugin.getTrackerManager().startTracking();
         }
     }
 
@@ -792,8 +864,9 @@ public class GameManager {
     }
     
     private void applyInactiveEffects() {
+        ensureRunnerQueueCoherence();
         String freezeMode = plugin.getConfigManager().getFreezeMode();
-        
+
         for (Player runner : runners) {
             if (runner.equals(activeRunner)) {
                 // Remove player from shared cage set
@@ -936,6 +1009,15 @@ public class GameManager {
             return;
         }
 
+        if (activeRunner != null && deferSwapForPortal(activeRunner)) {
+            return;
+        }
+
+        if (swapInProgress) {
+            return;
+        }
+        swapInProgress = true;
+
         // Save dragon health before swap
         plugin.getDragonManager().onSwapStart();
 
@@ -961,6 +1043,8 @@ public class GameManager {
         boolean sameRunner = previousRunner != null && previousRunner.equals(nextRunner);
 
         activeRunner = nextRunner;
+        portalSwapRetries.remove(nextRunner.getUniqueId());
+        ensureRunnerQueueCoherence();
 
         // Grace period for the new active runner
         int gracePeriodTicks = plugin.getConfigManager().getGracePeriodTicks();
@@ -1014,6 +1098,7 @@ public class GameManager {
         }
 
         applyInactiveEffects();
+        refreshActiveTrackerTargets();
         scheduleNextSwap();
 
         // Restore dragon health after swap
@@ -1034,6 +1119,109 @@ public class GameManager {
                 plugin.getTrackerManager().jamCompasses(duration);
             }
         }
+        swapInProgress = false;
+    }
+
+    private void refreshActiveTrackerTargets() {
+        if (!plugin.getConfigManager().isTrackerEnabled()) {
+            return;
+        }
+        Player current = activeRunner;
+        if (current == null || !current.isOnline()) {
+            return;
+        }
+        try {
+            plugin.getTrackerManager().updateAllHunterCompasses();
+            org.bukkit.Location loc = current.getLocation();
+            if (loc != null && loc.getWorld() != null && loc.getWorld().getEnvironment() == org.bukkit.World.Environment.NORMAL) {
+                plugin.getTrackerManager().setLastRunnerOverworldLocation(loc);
+            }
+        } catch (Throwable t) {
+            plugin.getLogger().warning("Failed to refresh tracker targets: " + t.getMessage());
+        }
+    }
+
+    private boolean deferSwapForPortal(Player runner) {
+        if (runner == null || !runner.isOnline()) {
+            return false;
+        }
+        if (runner.getGameMode() == GameMode.SPECTATOR) {
+            portalSwapRetries.remove(runner.getUniqueId());
+            return false;
+        }
+
+        org.bukkit.Location loc = runner.getLocation();
+        if (loc == null) {
+            return false;
+        }
+        org.bukkit.Material type = loc.getBlock().getType();
+        boolean inPortal = type == org.bukkit.Material.NETHER_PORTAL || type == org.bukkit.Material.END_PORTAL || type == org.bukkit.Material.END_GATEWAY;
+        if (!inPortal) {
+            portalSwapRetries.remove(runner.getUniqueId());
+            return false;
+        }
+
+        int attempts = portalSwapRetries.getOrDefault(runner.getUniqueId(), 0);
+        int maxAttempts = plugin.getConfig().getInt("tracker.portal_retry_attempts", 5);
+        if (attempts >= maxAttempts) {
+            portalSwapRetries.remove(runner.getUniqueId());
+            return false;
+        }
+
+        portalSwapRetries.put(runner.getUniqueId(), attempts + 1);
+        long delay = plugin.getConfig().getLong("tracker.portal_retry_delay_ticks", 20L);
+        long normalizedDelay = Math.max(5L, delay);
+        if (plugin.getConfigManager().isBroadcastGameEvents()) {
+            Msg.broadcast("§e[SpeedrunnerSwap] Swap deferred: runner is mid-portal. Retrying in " + (normalizedDelay / 20.0) + "s (attempt " + (attempts + 1) + "/" + maxAttempts + ").");
+        } else {
+            plugin.getLogger().info("Deferred runner swap while player is in portal. Retry " + (attempts + 1) + "/" + maxAttempts + " in " + normalizedDelay + " ticks.");
+        }
+        Bukkit.getScheduler().runTaskLater(plugin, this::performSwap, normalizedDelay);
+        return true;
+    }
+
+    private void ensureRunnerQueueCoherence() {
+        List<Player> cleaned = new ArrayList<>();
+        java.util.Set<java.util.UUID> seen = new java.util.HashSet<>();
+
+        for (Player candidate : runners) {
+            if (candidate == null || !candidate.isOnline()) {
+                continue;
+            }
+            if (seen.add(candidate.getUniqueId())) {
+                cleaned.add(candidate);
+            }
+        }
+
+        runners = cleaned;
+
+        if (runners.isEmpty()) {
+            activeRunner = null;
+            activeRunnerIndex = 0;
+            return;
+        }
+
+        if (activeRunner != null && activeRunner.isOnline()) {
+            int idx = runners.indexOf(activeRunner);
+            if (idx >= 0) {
+                activeRunnerIndex = idx;
+            } else {
+                runners.add(0, activeRunner);
+                activeRunnerIndex = 0;
+                seen.add(activeRunner.getUniqueId());
+            }
+        } else {
+            activeRunner = runners.get(0);
+            activeRunnerIndex = 0;
+            seen.add(activeRunner.getUniqueId());
+        }
+
+        java.util.Set<java.util.UUID> allowed = new java.util.HashSet<>(seen);
+        if (activeRunner != null) {
+            allowed.add(activeRunner.getUniqueId());
+        }
+        portalSwapRetries.keySet().retainAll(allowed);
+        swapInProgress = false;
     }
 
     /** Trigger an immediate runner swap (admin action) */
@@ -1252,6 +1440,9 @@ public class GameManager {
                 changed = true;
             }
         } else if (team == Team.HUNTER) {
+            if (!huntersAllowed(plugin.getCurrentMode())) {
+                return false;
+            }
             if (!newHunters.contains(target)) {
                 newHunters.add(target);
                 changed = true;
@@ -1265,6 +1456,14 @@ public class GameManager {
         setRunners(newRunners);
         setHunters(newHunters);
         return true;
+    }
+
+    private boolean huntersAllowed(SpeedrunnerSwap.SwapMode mode) {
+        return mode == SpeedrunnerSwap.SwapMode.DREAM;
+    }
+
+    private boolean huntersRequired(SpeedrunnerSwap.SwapMode mode) {
+        return mode == SpeedrunnerSwap.SwapMode.DREAM;
     }
 
     private void refreshTeamSelections() {

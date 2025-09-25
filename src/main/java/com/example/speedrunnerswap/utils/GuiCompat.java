@@ -15,8 +15,15 @@ import java.util.List;
 public final class GuiCompat {
     private GuiCompat() {}
 
+    private static final InventoryHolder DEFAULT_HOLDER = new InventoryHolder() {
+        @Override
+        public Inventory getInventory() {
+            return null;
+        }
+    };
+
     public static Inventory createInventory(InventoryHolder holder, int size, String title) {
-        InventoryHolder effective = (holder != null) ? holder : new com.example.speedrunnerswap.gui.PluginGuiHolder();
+        InventoryHolder effective = (holder != null) ? holder : DEFAULT_HOLDER;
         try {
             return Bukkit.createInventory(effective, size, Component.text(title));
         } catch (Throwable t) {
@@ -27,7 +34,7 @@ public final class GuiCompat {
 
     @SuppressWarnings("deprecation")
     private static Inventory createInventoryLegacy(InventoryHolder holder, int size, String title) {
-        InventoryHolder effective = (holder != null) ? holder : new com.example.speedrunnerswap.gui.PluginGuiHolder();
+        InventoryHolder effective = (holder != null) ? holder : DEFAULT_HOLDER;
         return Bukkit.createInventory(effective, size, title);
     }
 

@@ -1,2303 +1,1880 @@
 package com.example.speedrunnerswap.gui;
 
 import com.example.speedrunnerswap.SpeedrunnerSwap;
+import com.example.speedrunnerswap.config.ConfigManager;
+import com.example.speedrunnerswap.game.GameManager;
+import com.example.speedrunnerswap.models.Team;
+import com.example.speedrunnerswap.task.TaskDefinition;
+import com.example.speedrunnerswap.task.TaskManagerMode;
+import com.example.speedrunnerswap.task.TaskDifficulty;
+import com.example.speedrunnerswap.utils.GuiCompat;
+import com.example.speedrunnerswap.utils.Msg;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
+import org.bukkit.NamespacedKey;
 import org.bukkit.entity.Player;
+import org.bukkit.event.EventHandler;
+import org.bukkit.event.Listener;
+import org.bukkit.event.inventory.ClickType;
+import org.bukkit.event.inventory.InventoryClickEvent;
+import org.bukkit.event.inventory.InventoryCloseEvent;
+import org.bukkit.event.inventory.InventoryDragEvent;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.inventory.meta.SkullMeta;
-import com.example.speedrunnerswap.models.Team;
-import java.util.logging.Level;
-import org.bukkit.enchantments.Enchantment;
+import org.bukkit.persistence.PersistentDataContainer;
+import org.bukkit.persistence.PersistentDataType;
+import org.bukkit.potion.PotionEffectType;
 
+import java.util.ArrayDeque;
 import java.util.ArrayList;
-import java.util.Comparator;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.Deque;
+import java.util.EnumMap;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.Set;
+import java.util.UUID;
+import java.util.function.BooleanSupplier;
+import java.util.function.Consumer;
+import java.util.function.Function;
+import java.util.function.IntSupplier;
+import java.util.function.Supplier;
 
-public class GuiManager {
-    
+/**
+ * Rebuilt GUI system that exposes the entire plugin configuration and runtime controls.
+ * Every screen is described using Menu definitions to keep navigation predictable.
+ */
+public final class GuiManager implements Listener {
+
+    private static final ItemStack FILLER_PRIMARY;
+    private static final ItemStack FILLER_ACCENT;
+    private static final ItemStack FILLER_BORDER;
+    private static final NamespacedKey BUTTON_KEY;
+    private static final List<String> PARTICLE_TYPES = List.of("DUST", "END_ROD", "FLAME", "CRIT", "HEART", "CLOUD", "SMOKE");
+
+    static {
+        FILLER_PRIMARY = pane(Material.LIGHT_BLUE_STAINED_GLASS_PANE);
+        FILLER_ACCENT = pane(Material.WHITE_STAINED_GLASS_PANE);
+        FILLER_BORDER = pane(Material.BLUE_STAINED_GLASS_PANE);
+        BUTTON_KEY = new NamespacedKey(SpeedrunnerSwap.getInstance(), "menu_button");
+    }
+
+    private static ItemStack pane(Material material) {
+        ItemStack pane = new ItemStack(material);
+        ItemMeta meta = pane.getItemMeta();
+        GuiCompat.setDisplayName(meta, " ");
+        meta.addItemFlags(org.bukkit.inventory.ItemFlag.values());
+        pane.setItemMeta(meta);
+        return pane;
+    }
+
     private final SpeedrunnerSwap plugin;
-    private final String BACK_BUTTON_TITLE = "§c§lBack to Main Menu";
-    private enum EffectCategory { GOOD, BAD }
-    
+    private final Map<MenuKey, MenuBuilder> builders = new EnumMap<>(MenuKey.class);
+    private final Map<UUID, MenuSession> sessions = new HashMap<>();
+    private final Map<UUID, Deque<MenuRequest>> history = new HashMap<>();
+    private final Map<UUID, Team> teamFocus = new HashMap<>();
+    private final Map<UUID, StatsParent> statsParents = new HashMap<>();
+
     public GuiManager(SpeedrunnerSwap plugin) {
         this.plugin = plugin;
+        registerBuilders();
     }
 
-    // Always schedule inventory opens to the next tick to avoid re-entrancy issues
-    // Track pending opens to prevent race conditions
-    private final java.util.Set<java.util.UUID> pendingOpens = java.util.Collections.synchronizedSet(new java.util.HashSet<>());
-    private final java.util.Map<java.util.UUID, StatsParent> statsMenuParent = new java.util.concurrent.ConcurrentHashMap<>();
-    
-    public void openInventorySoon(org.bukkit.entity.Player player, org.bukkit.inventory.Inventory inv) {
-        if (player == null || inv == null) return;
-        
-        // Prevent overlapping opens for the same player
-        java.util.UUID uuid = player.getUniqueId();
-        if (pendingOpens.contains(uuid)) {
-            // Requeue shortly so rapid Back -> Next clicks are not dropped
-            plugin.getServer().getScheduler().runTaskLater(plugin, () -> openInventorySoon(player, inv), 2L);
-            return;
-        }
-        
-        pendingOpens.add(uuid);
-        plugin.getServer().getScheduler().runTask(plugin, () -> {
-            try {
-                if (player.isOnline()) {
-                    // Give a 1-tick delay to ensure previous inventory is fully closed
-                    plugin.getServer().getScheduler().runTaskLater(plugin, () -> {
-                        if (player.isOnline()) {
-                            player.openInventory(inv);
-                        }
-                        pendingOpens.remove(uuid);
-                    }, 1L);
-                } else {
-                    pendingOpens.remove(uuid);
-                }
-            } catch (Exception e) {
-                pendingOpens.remove(uuid);
-                plugin.getLogger().warning("Failed to open inventory for " + player.getName() + ": " + e.getMessage());
-            }
-        });
-    }
-
-    // New direct gamemode selector - opens each gamemode's actual main menu
-    public void openDirectGamemodeSelector(Player player) {
-        int rows = 3;
-        org.bukkit.inventory.Inventory inv = com.example.speedrunnerswap.utils.GuiCompat.createInventory(null, rows * 9, "§6§lSpeedrunner Swap - Choose Gamemode");
-
-        ItemStack filler = createItem(Material.BLACK_STAINED_GLASS_PANE, " ");
-        fillBorder(inv, filler);
-        String currentMode = plugin.getCurrentMode().name();
-
-        // Dream's Speedrunners vs Hunters mode - opens Dream's main menu directly
-        java.util.List<String> dreamLore = new java.util.ArrayList<>();
-        dreamLore.add("§e§lSpeedrunners §7+ §c§lHunters");
-        dreamLore.add("§7Classic manhunt with tracking & PvP");
-        dreamLore.add("");
-        dreamLore.add("§b• §7Hunters track runners with compasses");
-        dreamLore.add("§b• §7Power-ups, world border, bounties");
-        dreamLore.add("§b• §7Team vs team competition");
-        dreamLore.add("");
-        dreamLore.add("§a§lClick to open Dream menu directly!");
-        if (currentMode.equals("DREAM")) {
-            dreamLore.add("§e● Currently Selected Mode");
-        }
-        ItemStack dream = createGuiButton(Material.DIAMOND_SWORD, "§a§lDream: Speedrunners vs Hunters", dreamLore, "direct_dream_menu");
-        if (currentMode.equals("DREAM")) dream = createGlowingItem(dream);
-        inv.setItem(11, dream);
-
-        // Sapnap's Multi-Runner Cooperation mode - opens Sapnap's main menu directly
-        java.util.List<String> sapLore = new java.util.ArrayList<>();
-        sapLore.add("§b§lMulti-Runner Cooperation");
-        sapLore.add("§7Pure teamwork - no hunters!");
-        sapLore.add("");
-        sapLore.add("§b• §7Share one character between runners");
-        sapLore.add("§b• §7Cooperative dragon defeat");
-        sapLore.add("§b• §7Queue-based rotation system");
-        sapLore.add("");
-        sapLore.add("§a§lClick to open Sapnap menu directly!");
-        if (currentMode.equals("SAPNAP")) {
-            sapLore.add("§e● Currently Selected Mode");
-        }
-        ItemStack sapnap = createGuiButton(Material.DIAMOND_BOOTS, "§b§lSapnap: Multi-Runner Swap", sapLore, "direct_sapnap_menu");
-        if (currentMode.equals("SAPNAP")) sapnap = createGlowingItem(sapnap);
-        inv.setItem(13, sapnap);
-
-        // Task Manager mode with secret tasks - opens Task Manager's main menu directly
-        java.util.List<String> taskLore = new java.util.ArrayList<>();
-        taskLore.add("§d§lSecret Task Competition");
-        taskLore.add("§7Each runner gets hidden objectives");
-        taskLore.add("");
-        taskLore.add("§b• §7Individual secret tasks");
-        taskLore.add("§b• §7First to complete wins");
-        taskLore.add("§b• §7Customizable task pool");
-        taskLore.add("");
-        taskLore.add("§a§lClick to open Task Manager menu directly!");
-        if (currentMode.equals("TASK")) {
-            taskLore.add("§e● Currently Selected Mode");
-        }
-        ItemStack taskMode = createGuiButton(Material.TARGET, "§6§lTask Manager Swap", taskLore, "direct_task_menu");
-        if (currentMode.equals("TASK")) taskMode = createGlowingItem(taskMode);
-        inv.setItem(15, taskMode);
-
-        openInventorySoon(player, inv);
-    }
-
-    public void openResetConfirmMenu(Player player) {
-        org.bukkit.inventory.Inventory inv = com.example.speedrunnerswap.utils.GuiCompat.createInventory(null, 9, "§4§lConfirm Reset All Settings");
-        ItemStack filler = createItem(Material.BLACK_STAINED_GLASS_PANE, " ");
-        for (int i = 0; i < inv.getSize(); i++) inv.setItem(i, filler);
-
-        inv.setItem(0, createGuiButton(Material.ARROW, "§7§lBack", java.util.List.of("§7Return"), "reset_confirm_no"));
-        inv.setItem(3, createGuiButton(Material.EMERALD_BLOCK, "§a§lCancel", java.util.List.of("§7Do nothing"), "reset_confirm_no"));
-        inv.setItem(5, createGuiButton(Material.REDSTONE_BLOCK, "§c§lConfirm Reset", java.util.List.of("§7Restore defaults from jar", "§cThis cannot be undone!"), "reset_confirm_yes"));
-
-        openInventorySoon(player, inv);
-    }
-
-    // Keep the old mode selector for backward compatibility if needed
-    public void openModeSelector(Player player) {
-        int rows = 3;
-        org.bukkit.inventory.Inventory inv = com.example.speedrunnerswap.utils.GuiCompat.createInventory(null, rows * 9, "§6§lSpeedrunner Swap - Mode Selection");
-
-        ItemStack filler = createItem(Material.BLACK_STAINED_GLASS_PANE, " ");
-        fillBorder(inv, filler);
-
-        boolean gameRunning = plugin.getGameManager().isGameRunning();
-        String currentMode = plugin.getCurrentMode().name();
-
-        // Dream's Speedrunners vs Hunters mode
-        java.util.List<String> dreamLore = new java.util.ArrayList<>();
-        dreamLore.add("§e§lSpeedrunners §7+ §c§lHunters");
-        dreamLore.add("§7Classic manhunt with tracking & PvP");
-        dreamLore.add("");
-        dreamLore.add("§b• §7Hunters track runners with compasses");
-        dreamLore.add("§b• §7Power-ups, world border, bounties");
-        dreamLore.add("§b• §7Team vs team competition");
-        if (currentMode.equals("DREAM")) {
-            dreamLore.add("");
-            dreamLore.add(gameRunning ? "§a▶ Currently Active" : "§e● Currently Selected");
-        }
-        ItemStack dream = createGuiButton(Material.DIAMOND_SWORD, "§a§lDream: Speedrunners vs Hunters", dreamLore, "mode_dream");
-        if (currentMode.equals("DREAM")) dream = createGlowingItem(dream);
-        inv.setItem(11, dream);
-
-        // Sapnap's Multi-Runner Cooperation mode  
-        java.util.List<String> sapLore = new java.util.ArrayList<>();
-        sapLore.add("§b§lMulti-Runner Cooperation");
-        sapLore.add("§7Pure teamwork - no hunters!");
-        sapLore.add("");
-        sapLore.add("§b• §7Share one character between runners");
-        sapLore.add("§b• §7Cooperative dragon defeat");
-        sapLore.add("§b• §7Queue-based rotation system");
-        if (currentMode.equals("SAPNAP")) {
-            sapLore.add("");
-            sapLore.add(gameRunning ? "§a▶ Currently Active" : "§e● Currently Selected");
-        }
-        ItemStack sapnap = createGuiButton(Material.DIAMOND_BOOTS, "§b§lSapnap: Multi-Runner Swap", sapLore, "mode_sapnap");
-        if (currentMode.equals("SAPNAP")) sapnap = createGlowingItem(sapnap);
-        inv.setItem(13, sapnap);
-
-        // Task Manager mode with secret tasks
-        java.util.List<String> taskLore = new java.util.ArrayList<>();
-        taskLore.add("§d§lSecret Task Competition");
-        taskLore.add("§7Each runner gets hidden objectives");
-        taskLore.add("");
-        taskLore.add("§b• §7Individual secret tasks");
-        taskLore.add("§b• §7First to complete wins");
-        taskLore.add("§b• §7Customizable task pool");
-        if (currentMode.equals("TASK")) {
-            taskLore.add("");
-            taskLore.add(gameRunning ? "§a▶ Currently Active" : "§e● Currently Selected");
-        }
-        ItemStack taskMode = createGuiButton(Material.TARGET, "§6§lTask Manager Swap", taskLore, "mode_task");
-        if (currentMode.equals("TASK")) taskMode = createGlowingItem(taskMode);
-        inv.setItem(15, taskMode);
-
-        // Force-stop for admins when game is running
-        if (gameRunning && player.hasPermission("speedrunnerswap.admin")) {
-            List<String> forceLore = java.util.List.of("§cStop current game and switch modes", "§7Admin-only quick mode switching");
-            inv.setItem(22, createGuiButton(Material.BARRIER, "§c§lForce Stop & Switch", forceLore, "admin_force_stop"));
-        } else if (gameRunning) {
-            List<String> infoLore = java.util.List.of("§7A game is currently running", "§7Stop it before switching modes");
-            inv.setItem(22, createItem(Material.PAPER, "§e§lGame In Progress", infoLore));
-        }
-
-        openInventorySoon(player, inv);
-    }
-
-    public void openForceConfirm(Player player, com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode target) {
-        String name = target == com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode.SAPNAP ? "Sapnap" : "Dream";
-        org.bukkit.inventory.Inventory inv = com.example.speedrunnerswap.utils.GuiCompat.createInventory(null, 9, "§4§lConfirm Mode Switch");
-        ItemStack filler = createItem(Material.BLACK_STAINED_GLASS_PANE, " ");
-        for (int i = 0; i < inv.getSize(); i++) inv.setItem(i, filler);
-
-        // Back
-        inv.setItem(0, createGuiButton(Material.ARROW, "§7§lBack", java.util.List.of("§7Return"), "back_mode"));
-        // Confirm / Cancel
-        String id = (target == com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode.SAPNAP) ? "force_yes_sapnap" : "force_yes_dream";
-        ItemStack yes = createGuiButton(Material.REDSTONE_BLOCK, "§c§lConfirm", java.util.List.of("§7End current game", "§7Switch to §f" + name), id);
-        ItemStack no = createGuiButton(Material.EMERALD_BLOCK, "§a§lCancel", java.util.List.of("§7Do nothing"), "force_no");
-        inv.setItem(3, no);
-        inv.setItem(5, yes);
-        openInventorySoon(player, inv);
-    }
-
-    public String formatTime(int seconds) {
-        int minutes = seconds / 60;
-        int hours = minutes / 60;
-        minutes %= 60;
-        seconds %= 60;
-
-        if (hours > 0) {
-            return String.format("%dh %dm %ds", hours, minutes, seconds);
-        } else if (minutes > 0) {
-            return String.format("%dm %ds", minutes, seconds);
-        } else {
-            return String.format("%ds", seconds);
-        }
-    }
-    
-    // Dangerous Blocks editor
-    public void openDangerousBlocksMenu(Player player) {
-        Inventory inv = com.example.speedrunnerswap.utils.GuiCompat.createInventory(null, 54, "§6§lDangerous Blocks");
-        ItemStack filler = createItem(Material.BLACK_STAINED_GLASS_PANE, " ");
-        fillBorder(inv, filler);
-        inv.setItem(0, createGuiButton(Material.ARROW, "§7§lBack", List.of("§7Return to Settings"), "back_settings"));
-        java.util.List<org.bukkit.Material> materials = new java.util.ArrayList<>(plugin.getConfigManager().getDangerousBlocks());
-        materials.sort(Comparator.comparing(Enum::name));
-        int slot = 10;
-        for (org.bukkit.Material mat : materials) {
-            if (slot >= 44) break;
-            ItemStack it = createGuiButton(mat, "§e" + mat.name(),
-                    List.of("§7Click to remove from list"),
-                    "dangerous_block_remove:" + mat.name());
-            inv.setItem(slot++, it);
-        }
-        inv.setItem(49, createGuiButton(Material.PAPER, "§7Currently Tracked",
-                List.of("§7These blocks are avoided during safe swaps"), "noop"));
-        inv.setItem(51, createGuiButton(Material.LAVA_BUCKET, "§eSuggested", List.of("§7Consider adding other hazards"), "noop"));
-        inv.setItem(52, createGuiButton(Material.EMERALD, "§a§lAdd Block", List.of("§7Click to add via chat"), "dangerous_block_add"));
-        inv.setItem(53, createGuiButton(Material.BARRIER, BACK_BUTTON_TITLE, List.of("§7Return to Dream menu"), "back_dream_menu"));
-        openInventorySoon(player, inv);
-    }
-    
-    public void openPositiveEffectsMenu(Player player) {
-        Inventory inventory = com.example.speedrunnerswap.utils.GuiCompat.createInventory(null, 36, "§a§lPositive Effects");
-
-        ItemStack filler = createItem(Material.BLACK_STAINED_GLASS_PANE, " ");
-        fillBorder(inventory, filler);
-
-        inventory.setItem(0, createGuiButton(Material.ARROW, "§7§lBack", List.of("§7Return to Power-ups"), "back_power_ups"));
-
-        ItemStack[] effectItems = new ItemStack[] {
-            createEffectItem(Material.POTION, "Speed", "SPEED", EffectCategory.GOOD),
-            createEffectItem(Material.POTION, "Jump Boost", "JUMP", EffectCategory.GOOD),
-            createEffectItem(Material.POTION, "Strength", "INCREASE_DAMAGE", EffectCategory.GOOD),
-            createEffectItem(Material.POTION, "Regeneration", "REGENERATION", EffectCategory.GOOD),
-            createEffectItem(Material.POTION, "Resistance", "DAMAGE_RESISTANCE", EffectCategory.GOOD),
-            createEffectItem(Material.POTION, "Fire Resistance", "FIRE_RESISTANCE", EffectCategory.GOOD),
-            createEffectItem(Material.POTION, "Water Breathing", "WATER_BREATHING", EffectCategory.GOOD),
-            createEffectItem(Material.POTION, "Night Vision", "NIGHT_VISION", EffectCategory.GOOD)
-        };
-
-        for (int i = 0; i < effectItems.length; i++) {
-            inventory.setItem(10 + i, effectItems[i]);
-        }
-
-        inventory.setItem(35, createGuiButton(Material.BARRIER, BACK_BUTTON_TITLE, List.of("§7Return to Dream menu"), "back_dream_menu"));
-
-        openInventorySoon(player, inventory);
-    }
-
-    public void openNegativeEffectsMenu(Player player) {
-        Inventory inventory = com.example.speedrunnerswap.utils.GuiCompat.createInventory(null, 36, "§c§lNegative Effects");
-
-        ItemStack filler = createItem(Material.BLACK_STAINED_GLASS_PANE, " ");
-        fillBorder(inventory, filler);
-
-        inventory.setItem(0, createGuiButton(Material.ARROW, "§7§lBack", List.of("§7Return to Power-ups"), "back_power_ups"));
-
-        ItemStack[] effectItems = new ItemStack[] {
-            createEffectItem(Material.POTION, "Slowness", "SLOW", EffectCategory.BAD),
-            createEffectItem(Material.POTION, "Weakness", "WEAKNESS", EffectCategory.BAD),
-            createEffectItem(Material.POTION, "Poison", "POISON", EffectCategory.BAD),
-            createEffectItem(Material.POTION, "Blindness", "BLINDNESS", EffectCategory.BAD),
-            createEffectItem(Material.POTION, "Hunger", "HUNGER", EffectCategory.BAD),
-            createEffectItem(Material.POTION, "Mining Fatigue", "SLOW_DIGGING", EffectCategory.BAD),
-            createEffectItem(Material.POTION, "Nausea", "CONFUSION", EffectCategory.BAD),
-            createEffectItem(Material.POTION, "Glowing", "GLOWING", EffectCategory.BAD)
-        };
-
-        for (int i = 0; i < effectItems.length; i++) {
-            inventory.setItem(10 + i, effectItems[i]);
-        }
-
-        inventory.setItem(35, createGuiButton(Material.BARRIER, BACK_BUTTON_TITLE, List.of("§7Return to Dream menu"), "back_dream_menu"));
-
-        openInventorySoon(player, inventory);
-    }
-
-    public ItemStack createEffectItem(Material material, String displayName, String effectId, EffectCategory category) {
-        List<String> lore = new ArrayList<>();
-        lore.add("§7Effect ID: §f" + effectId);
-        lore.add("§7Click to toggle this effect");
-        String path = category == EffectCategory.GOOD ? "power_ups.good_effects" : "power_ups.bad_effects";
-        List<String> enabled = plugin.getConfig().getStringList(path);
-        boolean isEnabled = enabled.contains(effectId);
-        lore.add(isEnabled ? "§aCurrently enabled" : "§cCurrently disabled");
-
-        String id = "effect_toggle:" + category.name().toLowerCase(Locale.ROOT) + ":" + effectId.toUpperCase(Locale.ROOT);
-        return createGuiButton(material, "§e§l" + displayName, lore, id);
-    }
-
-    public void openPowerUpsMenu(Player player) {
-        Inventory inventory = com.example.speedrunnerswap.utils.GuiCompat.createInventory(null, 36, "§e§lPower-ups Menu");
-        
-        // Border-only filler for cleaner look
-        ItemStack filler = createItem(Material.BLACK_STAINED_GLASS_PANE, " ");
-        fillBorder(inventory, filler);
-
-        // Toggle button
-        List<String> powerUpToggleLore = new ArrayList<>();
-        boolean powerUpsEnabled = plugin.getConfigManager().isPowerUpsEnabled();
-        powerUpToggleLore.add("§7Current status: " + (powerUpsEnabled ? "§aEnabled" : "§cDisabled"));
-        powerUpToggleLore.add("§7Click to toggle");
-        ItemStack toggleItem = createGuiButton(
-            powerUpsEnabled ? Material.LIME_DYE : Material.GRAY_DYE,
-            "§e§lToggle Power-ups",
-            powerUpToggleLore,
-            "toggle_powerups"
-        );
-        inventory.setItem(4, toggleItem);
-
-        // Positive effects section (detailed list)
-        List<String> positiveEffectsLore = new ArrayList<>();
-        positiveEffectsLore.add("§7Current effects:");
-        for (String effect : plugin.getConfig().getStringList("power_ups.good_effects")) {
-            positiveEffectsLore.add("§a• " + effect.toLowerCase());
-        }
-        positiveEffectsLore.add("");
-        positiveEffectsLore.add("§7Click to modify");
-        ItemStack goodEffectsItem = createGuiButton(Material.SPLASH_POTION, "§a§lPositive Effects", positiveEffectsLore, "open_effects_good");
-        inventory.setItem(11, goodEffectsItem);
-
-        // Negative effects section (detailed list)
-        List<String> negativeEffectsLore = new ArrayList<>();
-        negativeEffectsLore.add("§7Current effects:");
-        for (String effect : plugin.getConfig().getStringList("power_ups.bad_effects")) {
-            negativeEffectsLore.add("§c• " + effect.toLowerCase());
-        }
-        negativeEffectsLore.add("");
-        negativeEffectsLore.add("§7Click to modify");
-        ItemStack badEffectsItem = createGuiButton(Material.LINGERING_POTION, "§c§lNegative Effects", negativeEffectsLore, "open_effects_bad");
-        inventory.setItem(15, badEffectsItem);
-
-        // Duration settings
-        int minSec = plugin.getConfigManager().getPowerUpsMinSeconds();
-        int maxSec = plugin.getConfigManager().getPowerUpsMaxSeconds();
-        int minLvl = plugin.getConfigManager().getPowerUpsMinLevel();
-        int maxLvl = plugin.getConfigManager().getPowerUpsMaxLevel();
-        List<String> durationLore = new ArrayList<>();
-        durationLore.add("§7Duration: §e" + minSec + "-" + maxSec + "s");
-        durationLore.add("§7Level: §e" + minLvl + "-" + maxLvl);
-        durationLore.add("");
-        durationLore.add("§7Click to modify timings");
-        ItemStack durationItem = createGuiButton(Material.CLOCK, "§6§lEffect Durations", durationLore, "open_powerup_durations");
-        inventory.setItem(22, durationItem);
-
-        // Back button
-        inventory.setItem(31, createGuiButton(Material.BARRIER, BACK_BUTTON_TITLE, List.of("§7Return to Dream menu"), "back_dream_menu"));
-
-        openInventorySoon(player, inventory);
-    }
-
-    public void openPowerUpDurationsMenu(Player player) {
-        Inventory inv = com.example.speedrunnerswap.utils.GuiCompat.createInventory(null, 27, "§6§lPower-up Durations");
-        ItemStack filler = createItem(Material.GRAY_STAINED_GLASS_PANE, " ");
-        fillBorder(inv, filler);
-
-        ItemStack back = createGuiButton(Material.ARROW, "§7§lBack", List.of("§7Return to Power-ups"), "back_power_ups");
-        inv.setItem(0, back);
-
-        int minSec = plugin.getConfigManager().getPowerUpsMinSeconds();
-        int maxSec = plugin.getConfigManager().getPowerUpsMaxSeconds();
-        int minLvl = plugin.getConfigManager().getPowerUpsMinLevel();
-        int maxLvl = plugin.getConfigManager().getPowerUpsMaxLevel();
-
-        ItemStack minDur = createGuiButton(Material.CLOCK, "§e§lMin Duration (s)", List.of("§7Current: §f" + minSec, "§7Left/Right: ±5"), "powerup_duration_min_seconds");
-        ItemStack maxDur = createGuiButton(Material.CLOCK, "§e§lMax Duration (s)", List.of("§7Current: §f" + maxSec, "§7Left/Right: ±5"), "powerup_duration_max_seconds");
-        ItemStack minLvlItem = createGuiButton(Material.EXPERIENCE_BOTTLE, "§e§lMin Level", List.of("§7Current: §f" + minLvl, "§7Left/Right: ±1"), "powerup_level_min");
-        ItemStack maxLvlItem = createGuiButton(Material.EXPERIENCE_BOTTLE, "§e§lMax Level", List.of("§7Current: §f" + maxLvl, "§7Left/Right: ±1"), "powerup_level_max");
-
-        inv.setItem(10, minDur);
-        inv.setItem(12, maxDur);
-        inv.setItem(14, minLvlItem);
-        inv.setItem(16, maxLvlItem);
-
-        openInventorySoon(player, inv);
-    }
-
-    public void openWorldBorderMenu(Player player) {
-        Inventory inventory = com.example.speedrunnerswap.utils.GuiCompat.createInventory(null, 27, "§c§lWorld Border Settings");
-        
-        // Border-only filler for cleaner look
-        ItemStack filler = createItem(Material.BLACK_STAINED_GLASS_PANE, " ");
-        fillBorder(inventory, filler);
-
-        // Toggle button
-        boolean isEnabled = plugin.getConfig().getBoolean("world_border.enabled", true);
-        List<String> toggleLore = new ArrayList<>();
-        toggleLore.add("§7Current status: " + (isEnabled ? "§aEnabled" : "§cDisabled"));
-        toggleLore.add("§7Click to toggle");
-        ItemStack toggleItem = createGuiButton(
-            isEnabled ? Material.LIME_DYE : Material.GRAY_DYE,
-            "§e§lToggle World Border",
-            toggleLore,
-            "world_border_toggle"
-        );
-        inventory.setItem(4, toggleItem);
-
-        // Initial size setting
-        int initialSize = plugin.getConfig().getInt("world_border.initial_size", 2000);
-        List<String> initialSizeLore = new ArrayList<>();
-        initialSizeLore.add("§7Current size: §e" + initialSize + " blocks");
-        initialSizeLore.add("§7Left-click: §a+100 blocks");
-        initialSizeLore.add("§7Right-click: §c-100 blocks");
-        initialSizeLore.add("§7Shift + Left-click: §a+500 blocks");
-        initialSizeLore.add("§7Shift + Right-click: §c-500 blocks");
-        ItemStack initialSizeItem = createGuiButton(Material.GRASS_BLOCK, "§a§lInitial Border Size", initialSizeLore, "world_border_initial");
-        inventory.setItem(11, initialSizeItem);
-
-        // Final size setting
-        int finalSize = plugin.getConfig().getInt("world_border.final_size", 100);
-        List<String> finalSizeLore = new ArrayList<>();
-        finalSizeLore.add("§7Current size: §e" + finalSize + " blocks");
-        finalSizeLore.add("§7Left-click: §a+50 blocks");
-        finalSizeLore.add("§7Right-click: §c-50 blocks");
-        finalSizeLore.add("§7Shift + Left-click: §a+100 blocks");
-        finalSizeLore.add("§7Shift + Right-click: §c-100 blocks");
-        ItemStack finalSizeItem = createGuiButton(Material.BEDROCK, "§c§lFinal Border Size", finalSizeLore, "world_border_final");
-        inventory.setItem(13, finalSizeItem);
-
-        // Shrink duration setting
-        int shrinkDuration = plugin.getConfig().getInt("world_border.shrink_duration", 1800);
-        List<String> durationLore = new ArrayList<>();
-        durationLore.add("§7Current duration: §e" + formatTime(shrinkDuration));
-        durationLore.add("§7Left-click: §a+5 minutes");
-        durationLore.add("§7Right-click: §c-5 minutes");
-        durationLore.add("§7Shift + Left-click: §a+15 minutes");
-        durationLore.add("§7Shift + Right-click: §c-15 minutes");
-        ItemStack durationItem = createGuiButton(Material.CLOCK, "§6§lShrink Duration", durationLore, "world_border_shrink");
-        inventory.setItem(15, durationItem);
-
-        // Warning settings
-        int warningDistance = plugin.getConfig().getInt("world_border.warning_distance", 50);
-        int warningInterval = plugin.getConfig().getInt("world_border.warning_interval", 300);
-        List<String> warningLore = new ArrayList<>();
-        warningLore.add("§7Warning distance: §e" + warningDistance + " blocks");
-        warningLore.add("§7Warning interval: §e" + warningInterval + " seconds");
-        warningLore.add("§7Left/Right: distance ±10 (±50 shift)");
-        warningLore.add("§7Shift modifies interval ±30s");
-        ItemStack warningItem = createGuiButton(Material.BELL, "§e§lWarning Settings", warningLore, "world_border_warning");
-        inventory.setItem(22, warningItem);
-
-        // Back button
-        inventory.setItem(26, createGuiButton(Material.BARRIER, BACK_BUTTON_TITLE, List.of("§7Return to Dream menu"), "back_dream_menu"));
-
-        openInventorySoon(player, inventory);
-    }
+    // -----------------------------------------------------------------
+    // Public entry points
 
     public void openMainMenu(Player player) {
-        // Route to mode-specific menu with proper handling
-        switch (plugin.getCurrentMode()) {
-            case DREAM:
-                openDreamMenu(player);
-                break;
-            case SAPNAP:
-                // Use enhanced ControlGui for Sapnap mode
-                try {
-                    new com.example.speedrunnerswap.gui.ControlGui(plugin).openMainMenu(player);
-                } catch (Throwable t) {
-                    player.sendMessage("§cFailed to open Sapnap menu: " + t.getMessage());
-                    plugin.getLogger().warning("Sapnap GUI error: " + t.getMessage());
-                }
-                break;
-            case TASK:
-                openTaskManagerMenu(player);
-                break;
-        }
-    }
-    
-    public void openDreamMenu(Player player) {
-        try {
-            String title = "§a§lDream: Speedrunners vs Hunters";
-            int rows = 6;
-
-            Inventory inventory = com.example.speedrunnerswap.utils.GuiCompat.createInventory(null, rows * 9, title);
-
-            // Use green glass pane for Dream mode theme
-            ItemStack filler = createItem(Material.GREEN_STAINED_GLASS_PANE, " ");
-            fillBorder(inventory, filler);
-
-            boolean gameRunning = plugin.getGameManager().isGameRunning();
-            boolean gamePaused = plugin.getGameManager().isGamePaused();
-            int runnerCount = plugin.getGameManager().getRunners().size();
-            int hunterCount = plugin.getGameManager().getHunters().size();
-
-            // Back to mode selector
-            inventory.setItem(0, createGuiButton(Material.ARROW, "§7§lBack", 
-                java.util.List.of("§7Return to mode selector"), "back_mode"));
-
-            // === GAME CONTROL SECTION (Top Row) ===
-            // Start/Stop Game
-            if (!gameRunning) {
-                List<String> startLore = new ArrayList<>();
-                startLore.add("§7Begin manhunt gameplay");
-                if (runnerCount == 0 || hunterCount == 0) {
-                    startLore.add("§cNeed both runners and hunters!");
-                    startLore.add("§cRunners: " + runnerCount + ", Hunters: " + hunterCount);
-                    inventory.setItem(10, createItem(Material.GRAY_CONCRETE, "§c§lCannot Start", startLore));
-                } else {
-                    startLore.add("§7Ready: §b" + runnerCount + " runners§7, §c" + hunterCount + " hunters");
-                    startLore.add("§7Swap interval: §e" + plugin.getConfigManager().getSwapInterval() + "s");
-                    inventory.setItem(10, createGuiButton(Material.LIME_CONCRETE, "§a§lStart Hunt", startLore, "start_game"));
-                }
-            } else {
-                List<String> stopLore = new ArrayList<>();
-                stopLore.add("§7End current manhunt");
-                stopLore.add("§7Status: " + (gamePaused ? "§ePaused" : "§aRunning"));
-                inventory.setItem(10, createGuiButton(Material.RED_CONCRETE, "§c§lStop Hunt", stopLore, "stop_game"));
-            }
-
-            // Pause/Resume Game
-            if (gameRunning && !gamePaused) {
-                inventory.setItem(11, createGuiButton(Material.YELLOW_CONCRETE, "§e§lPause Hunt", 
-                    List.of("§7Temporarily pause the game"), "pause_game"));
-            } else if (gameRunning && gamePaused) {
-                inventory.setItem(11, createGuiButton(Material.ORANGE_CONCRETE, "§a§lResume Hunt", 
-                    List.of("§7Resume the manhunt"), "resume_game"));
-            } else {
-                inventory.setItem(11, createItem(Material.GRAY_CONCRETE, "§7Pause Hunt", 
-                    List.of("§7Game not running")));
-            }
-
-            // Game Status
-            List<String> statusLore = new ArrayList<>();
-            statusLore.add("§7Current game information");
-            statusLore.add("§7Running: " + (gameRunning ? "§aYes" : "§cNo"));
-            statusLore.add("§7Runners: §b" + runnerCount);
-            statusLore.add("§7Hunters: §c" + hunterCount);
-            if (gameRunning) {
-                Player activeRunner = plugin.getGameManager().getActiveRunner();
-                statusLore.add("§7Active: §f" + (activeRunner != null ? activeRunner.getName() : "None"));
-                statusLore.add("§7Next Swap: §e" + plugin.getGameManager().getTimeUntilNextSwap() + "s");
-            }
-            inventory.setItem(13, createItem(Material.CLOCK, "§6§lGame Status", statusLore));
-
-            // === TEAM MANAGEMENT SECTION ===
-            inventory.setItem(19, createGuiButton(Material.PLAYER_HEAD, "§e§lTeam Selector", 
-                List.of("§7Assign players to Runner/Hunter teams", 
-                        "§7Current: §b" + runnerCount + " runners§7, §c" + hunterCount + " hunters"), 
-                "team_selector"));
-
-            // === DREAM-SPECIFIC FEATURES ===
-            inventory.setItem(21, createGuiButton(Material.COMPASS, "§6§lHunter Tracking", 
-                List.of("§7Configure compass tracking system", 
-                        "§7Current: " + (plugin.getConfigManager().isTrackerEnabled() ? "§aEnabled" : "§cDisabled"),
-                        "§7§oHunters use compasses to find runners",
-                        "§7§oAdjust update rate and jamming settings",
-                        "§7§nClick to configure tracking"), 
-                "dream_tracking"));
-
-            inventory.setItem(23, createGuiButton(Material.POTION, "§d§lPower-ups", 
-                List.of("§7Random effects on swap", 
-                        "§7Current: " + (plugin.getConfigManager().isPowerUpsEnabled() ? "§aEnabled" : "§cDisabled"),
-                        "§7§oBoth positive and negative effects",
-                        "§7§oAdds unpredictability to gameplay",
-                        "§7§nClick to configure effects"), 
-                "power_ups"));
-
-            inventory.setItem(25, createGuiButton(Material.BARRIER, "§c§lWorld Border", 
-                List.of("§7Shrinking world boundary", 
-                        "§7Forces final confrontation",
-                        "§7§oGradually shrinks over time",
-                        "§7§oCreates intense endgame scenarios",
-                        "§7§nClick to configure border"), 
-                "world_border"));
-
-            // === ADVANCED FEATURES ===
-            inventory.setItem(28, createGuiButton(Material.GOLD_INGOT, "§6§lBounty System", 
-                List.of("§7Special hunter rewards", 
-                        "§7Current: " + (plugin.getConfig().getBoolean("bounty.enabled", false) ? "§aEnabled" : "§cDisabled"),
-                        "§7§oTarget specific runners for bonuses",
-                        "§7§oGives glowing effect to targets",
-                        "§7§nClick to configure bounties"), 
-                "bounty"));
-
-            inventory.setItem(30, createGuiButton(Material.TOTEM_OF_UNDYING, "§e§lLast Stand", 
-                List.of("§7Final runner power boost", 
-                        "§7Current: " + (plugin.getConfigManager().isLastStandEnabled() ? "§aEnabled" : "§cDisabled"),
-                        "§7§oStrength and speed when low health",
-                        "§7§oGives runners final fighting chance",
-                        "§7§nClick to configure effects"), 
-                "last_stand"));
-
-            inventory.setItem(32, createGuiButton(Material.DRAGON_HEAD, "§4§lSudden Death", 
-                List.of("§7End dimension final battle", 
-                        "§7Current: " + (plugin.getConfig().getBoolean("sudden_death.enabled", false) ? "§aEnabled" : "§cDisabled"),
-                        "§7§oForces final showdown in The End",
-                        "§7§oActivates after set time limit",
-                        "§7§nClick to configure sudden death"), 
-                "sudden_death"));
-
-            inventory.setItem(34, createGuiButton(Material.DIAMOND_CHESTPLATE, "§b§lCustom Kits", 
-                List.of("§7Starting equipment setup", 
-                        "§7Current: " + (plugin.getConfigManager().isKitsEnabled() ? "§aEnabled" : "§cDisabled"),
-                        "§7§oDifferent kits for each team",
-                        "§7§oBalances early game advantages",
-                        "§7§nClick to edit kits"), 
-                "kits"));
-
-            // === SETTINGS & ADMIN ===
-            inventory.setItem(40, createGuiButton(Material.REDSTONE, "§6§lAdvanced Settings", 
-                List.of("§7Access all configuration options", 
-                        "§7Swap intervals, timers, safety settings"), 
-                "advanced_settings"));
-
-            inventory.setItem(42, createGuiButton(Material.BOOK, "§a§lStatistics", 
-                List.of("§7View and manage game statistics", 
-                        "§7Track performance across games"), 
-                "statistics"));
-
-            openInventorySoon(player, inventory);
-        } catch (Exception e) {
-            plugin.getLogger().log(Level.SEVERE, "Error opening Dream main menu", e);
-            player.sendMessage("§cFailed to open Dream menu: " + e.getMessage());
-        }
+        open(player, MenuKey.MAIN, null, false);
     }
 
-    public void openTaskManagerMenu(Player player) {
-        try {
-            String title = "§6§lTask Manager: Secret Missions";
-            int rows = 6;
-            Inventory inventory = com.example.speedrunnerswap.utils.GuiCompat.createInventory(null, rows * 9, title);
-            
-            // Use orange glass pane for Task Manager theme
-            ItemStack filler = createItem(Material.ORANGE_STAINED_GLASS_PANE, " ");
-            fillBorder(inventory, filler);
-
-            boolean gameRunning = plugin.getGameManager().isGameRunning();
-            boolean gamePaused = plugin.getGameManager().isGamePaused();
-            int runnerCount = plugin.getGameManager().getRunners().size();
-            var taskMode = plugin.getTaskManagerMode();
-            int assignedTasks = taskMode != null ? taskMode.getAssignments().size() : 0;
-
-            // Back to mode selector
-            inventory.setItem(0, createGuiButton(Material.ARROW, "§7§lBack", 
-                java.util.List.of("§7Return to mode selector"), "back_mode"));
-
-            // === GAME CONTROL SECTION ===
-            // Start/Stop Game
-            if (!gameRunning) {
-                List<String> startLore = new ArrayList<>();
-                startLore.add("§7Begin secret task competition");
-                if (runnerCount < 2) {
-                    startLore.add("§cNeed at least 2 runners!");
-                    startLore.add("§cCurrent runners: " + runnerCount);
-                    inventory.setItem(10, createItem(Material.GRAY_CONCRETE, "§c§lCannot Start", startLore));
-                } else {
-                    startLore.add("§7Ready: §b" + runnerCount + " runners");
-                    startLore.add("§7Each will get a secret task");
-                    startLore.add("§7First to complete wins!");
-                    inventory.setItem(10, createGuiButton(Material.LIME_CONCRETE, "§a§lStart Competition", startLore, "start_game"));
-                }
-            } else {
-                List<String> stopLore = new ArrayList<>();
-                stopLore.add("§7End current task competition");
-                stopLore.add("§7Status: " + (gamePaused ? "§ePaused" : "§aRunning"));
-                if (assignedTasks > 0) {
-                    stopLore.add("§7Tasks assigned: §e" + assignedTasks);
-                }
-                inventory.setItem(10, createGuiButton(Material.RED_CONCRETE, "§c§lEnd Competition", stopLore, "stop_game"));
-            }
-
-            // Pause/Resume Game
-            if (gameRunning && !gamePaused) {
-                inventory.setItem(11, createGuiButton(Material.YELLOW_CONCRETE, "§e§lPause Competition", 
-                    List.of("§7Temporarily pause all tasks"), "pause_game"));
-            } else if (gameRunning && gamePaused) {
-                inventory.setItem(11, createGuiButton(Material.ORANGE_CONCRETE, "§a§lResume Competition", 
-                    List.of("§7Resume task competition"), "resume_game"));
-            } else {
-                inventory.setItem(11, createItem(Material.GRAY_CONCRETE, "§7Pause Competition", 
-                    List.of("§7Game not running")));
-            }
-
-            // Game Status
-            List<String> statusLore = new ArrayList<>();
-            statusLore.add("§7Current competition status");
-            statusLore.add("§7Running: " + (gameRunning ? "§aYes" : "§cNo"));
-            statusLore.add("§7Runners: §b" + runnerCount);
-            if (gameRunning) {
-                Player activeRunner = plugin.getGameManager().getActiveRunner();
-                statusLore.add("§7Active: §f" + (activeRunner != null ? activeRunner.getName() : "None"));
-                statusLore.add("§7Tasks Assigned: §e" + assignedTasks);
-                statusLore.add("§7Next Swap: §e" + plugin.getGameManager().getTimeUntilNextSwap() + "s");
-            }
-            inventory.setItem(13, createItem(Material.CLOCK, "§6§lCompetition Status", statusLore));
-
-            // === RUNNER MANAGEMENT (No hunters in Task Manager mode) ===
-            List<String> runnerLore = new ArrayList<>();
-            runnerLore.add("§7Manage competition participants");
-            runnerLore.add("§7Current: §b" + runnerCount + " runners");
-            runnerLore.add("§7Each runner gets a secret task");
-            runnerLore.add("§cNote: No hunters in Task Manager mode");
-            inventory.setItem(19, createGuiButton(Material.PLAYER_HEAD, "§b§lRunner Management", runnerLore, "team_selector"));
-
-            // === TASK MANAGEMENT SECTION ===
-            inventory.setItem(21, createGuiButton(Material.TARGET, "§d§lTask Settings", 
-                List.of("§7Configure task competition rules", 
-                        "§7Timeouts, late joiners, disconnects",
-                        "§7§oPause on disconnect behavior",
-                        "§7§oRejoin grace periods and timeouts",
-                        "§7§oGame ending conditions",
-                        "§7§nClick to configure rules"), 
-                "task_settings"));
-
-            inventory.setItem(23, createGuiButton(Material.WRITABLE_BOOK, "§6§lCustom Tasks", 
-                List.of("§7Manage custom task pool", 
-                        "§7Add, remove, or modify tasks", 
-                        "§7Built-in tasks: " + (plugin.getConfig().getBoolean("task_manager.include_default_tasks", true) ? "§aIncluded" : "§cExcluded"),
-                        "§7§oCreate your own challenge tasks",
-                        "§7§oEdit descriptions and requirements",
-                        "§7§nClick to manage tasks"), 
-                "custom_tasks_menu"));
-
-            inventory.setItem(25, createGuiButton(Material.BOOK, "§b§lTask Assignments", 
-                List.of("§7View current task assignments", 
-                        "§7Reroll tasks (when not running)", 
-                        "§7Currently assigned: §e" + assignedTasks,
-                        "§7§oSee who has which secret task",
-                        "§7§oReassign tasks before game starts",
-                        "§7§nClick to view assignments"), 
-                "task_assignments"));
-
-            // === COMPETITION FEATURES ===
-            inventory.setItem(28, createGuiButton(Material.EXPERIENCE_BOTTLE, "§a§lTask Statistics", 
-                List.of("§7View competition statistics", 
-                        "§7Track completion rates and times",
-                        "§7§oPlayer performance metrics",
-                        "§7§oGame duration and success rates",
-                        "§7§nClick to view statistics"), 
-                "statistics"));
-
-            inventory.setItem(30, createGuiButton(Material.NETHER_STAR, "§e§lShuffle Tasks", 
-                List.of("§7Reassign all runner tasks", 
-                        gameRunning ? "§cCannot shuffle during game" : "§7Generate new task assignments",
-                        "§7§oGives everyone new secret tasks",
-                        "§7§oOnly works before game starts",
-                        gameRunning ? "" : "§7§nClick to reroll tasks"), 
-                gameRunning ? "" : "reroll_tasks"));
-
-            // === SETTINGS & ADMIN ===
-            inventory.setItem(40, createGuiButton(Material.REDSTONE, "§6§lAdvanced Settings", 
-                List.of("§7Access all configuration options", 
-                        "§7Swap intervals, timers, disconnection handling"), 
-                "advanced_settings"));
-
-            // === TASK MANAGER SPECIFIC INFO ===
-            List<String> infoLore = new ArrayList<>();
-            infoLore.add("§6Task Manager Mode Information:");
-            infoLore.add("§b• §7Each runner gets a secret task");
-            infoLore.add("§b• §7First to complete their task wins");
-            infoLore.add("§b• §7No hunters - pure competition");
-            infoLore.add("§b• §7Tasks are hidden from other players");
-            infoLore.add("§b• §7Swap control to give everyone chances");
-            inventory.setItem(49, createItem(Material.PAPER, "§e§lMode Information", infoLore));
-
-            openInventorySoon(player, inventory);
-        } catch (Exception e) {
-            plugin.getLogger().log(Level.SEVERE, "Error opening Task Manager menu", e);
-            player.sendMessage("§cFailed to open Task Manager menu: " + e.getMessage());
-        }
+    public void openDirectGamemodeSelector(Player player) {
+        if (player == null) return;
+        resetNavigation(player);
+        open(player, MenuKey.MODE_SELECT_DIRECT, null, false);
     }
 
-    public void openTaskSettingsMenu(Player player) {
-        Inventory inv = com.example.speedrunnerswap.utils.GuiCompat.createInventory(null, 54, "§6§lTask Settings");
-        ItemStack filler = createItem(Material.BLACK_STAINED_GLASS_PANE, " ");
-        fillBorder(inv, filler);
-        addGameControlsHeader(inv);
-
-        // Back
-        inv.setItem(0, createItem(Material.ARROW, "§7§lBack", List.of("§7Return to Task Manager")));
-
-        boolean pause = plugin.getConfig().getBoolean("task_manager.pause_on_disconnect", true);
-        ItemStack pauseToggle = createItem(pause ? Material.REDSTONE_TORCH : Material.LEVER,
-                "§e§lPause On Disconnect: " + (pause ? "§aEnabled" : "§cDisabled"),
-                List.of("§7When a runner disconnects, pause the game"));
-        inv.setItem(10, pauseToggle);
-
-        int grace = plugin.getConfig().getInt("task_manager.rejoin_grace_seconds", 180);
-        ItemStack graceItem = createItem(Material.CLOCK, "§6§lRejoin Grace (s)",
-                List.of("§7Current: §f" + grace, "§7Left/Right: ±10", "§7Shift: ±30"));
-        inv.setItem(12, graceItem);
-
-        boolean remove = plugin.getConfig().getBoolean("task_manager.remove_on_timeout", true);
-        ItemStack removeToggle = createItem(remove ? Material.BARRIER : Material.IRON_DOOR,
-                "§e§lRemove On Timeout: " + (remove ? "§aYes" : "§cNo"),
-                List.of("§7If runner exceeds grace, remove from queue"));
-        inv.setItem(14, removeToggle);
-
-        boolean allowLate = plugin.getConfig().getBoolean("task_manager.allow_late_joiners", false);
-        ItemStack allowToggle = createItem(allowLate ? Material.LIME_DYE : Material.GRAY_DYE,
-                "§e§lAllow Late Joiners: " + (allowLate ? "§aYes" : "§cNo"),
-                List.of("§7Allow players to join mid-game and receive tasks"));
-        inv.setItem(16, allowToggle);
-
-        boolean endOne = plugin.getConfig().getBoolean("task_manager.end_when_one_left", false);
-        ItemStack endOneToggle = createItem(endOne ? Material.REDSTONE_BLOCK : Material.GRAY_DYE,
-                "§e§lEnd When One Left: " + (endOne ? "§aYes" : "§cNo"),
-                List.of("§7End the game automatically when only one runner remains"));
-        inv.setItem(18, endOneToggle);
-
-        // Reroll Tasks button (only enabled before game starts)
-        boolean gameRunning = plugin.getGameManager().isGameRunning();
-        ItemStack rerollTasks = createGuiButton(
-                gameRunning ? Material.GRAY_DYE : Material.BOOK,
-                "§d§lReroll Tasks" + (gameRunning ? " §8(Game Running)" : ""),
-                gameRunning ? 
-                    List.of("§7Reroll tasks for all selected runners", "§c§lDisabled while game is running") :
-                    List.of("§7Reroll tasks for all selected runners", "§7Must have runners selected via Team Selector"),
-                "reroll_tasks");
-        inv.setItem(20, rerollTasks);
-
-        // Show Task Assignments button
-        ItemStack showAssignments = createGuiButton(
-                Material.WRITTEN_BOOK,
-                "§b§lShow Task Assignments",
-                List.of("§7Display current task assignments", "§7Shows assignments in chat"),
-                "show_assignments");
-        inv.setItem(22, showAssignments);
-
-        // Assignment viewer
-        var tmm = plugin.getTaskManagerMode();
-        if (tmm != null) {
-            int slot = 28;
-            for (var entry : tmm.getAssignments().entrySet()) {
-                java.util.UUID uuid = entry.getKey();
-                String taskId = entry.getValue();
-                var def = tmm.getTask(taskId);
-                String name = plugin.getServer().getOfflinePlayer(uuid).getName();
-                if (name == null) name = uuid.toString().substring(0, 8);
-                ItemStack it = createItem(Material.PAPER, "§e" + name, List.of("§7" + (def != null ? def.description() : taskId)));
-                inv.setItem(slot++, it);
-                if (slot >= 44) break;
-            }
-            if (tmm.getAssignments().isEmpty()) {
-                inv.setItem(31, createItem(Material.BOOK, "§7No assignments yet", List.of("§7Start a Task game to assign")));
-            }
-        }
-
-        // Reload tasks button
-        inv.setItem(53, createItem(Material.BOOK, "§6§lReload Tasks", List.of("§7Reload tasks from config")));
-
-        openInventorySoon(player, inv);
-    }
-
-    public void openDreamSettingsMenu(Player player) {
-        Inventory inv = com.example.speedrunnerswap.utils.GuiCompat.createInventory(null, 27, "§a§lDream Settings");
-        ItemStack filler = createItem(Material.BLACK_STAINED_GLASS_PANE, " ");
-        fillBorder(inv, filler);
-        inv.setItem(0, createItem(Material.ARROW, "§7§lBack", List.of("§7Return to Dream menu")));
-        addGameControlsHeader(inv);
-
-        boolean tracker = plugin.getConfigManager().isTrackerEnabled();
-        ItemStack trackerToggle = createGuiButton(tracker ? Material.COMPASS : Material.GRAY_DYE,
-                "§e§lTracker: " + (tracker ? "§aEnabled" : "§cDisabled"),
-                List.of("§7Toggle hunter tracking compass"),
-                "dream_tracker_toggle");
-        inv.setItem(11, trackerToggle);
-
-        boolean singleSleep = plugin.getConfigManager().isSinglePlayerSleepEnabled();
-        ItemStack sleepToggle = createGuiButton(singleSleep ? Material.RED_BED : Material.GRAY_BED,
-                "§e§lSingle Player Sleep: " + (singleSleep ? "§aEnabled" : "§cDisabled"),
-                List.of("§7Only active runner can sleep"),
-                "dream_single_sleep_toggle");
-        inv.setItem(15, sleepToggle);
-
-        openInventorySoon(player, inv);
+    public void openModeSelector(Player player) {
+        open(player, MenuKey.MODE_SELECT, null, false);
     }
 
     public void openTeamSelector(Player player) {
-        String title = plugin.getConfigManager().getGuiTeamSelectorTitle();
-        int rows = plugin.getConfigManager().getGuiTeamSelectorRows();
-        rows = Math.max(rows, 4); // ensure space for selector + player heads row
-        rows = clampRows(rows);
-        
-        Inventory inventory = com.example.speedrunnerswap.utils.GuiCompat.createInventory(null, rows * 9, title);
-        
-        // Border-only filler for better visual organization
-        ItemStack filler = createItem(Material.BLACK_STAINED_GLASS_PANE, " ");
-        fillBorder(inventory, filler);
-        
-        // Back button with enhanced tooltip
-        List<String> backLore = new ArrayList<>();
-        backLore.add("§7Return to main menu");
-        backLore.add("§7Current selections will be saved");
-        ItemStack back = createItem(Material.ARROW, "§7§lBack", backLore);
-        inventory.setItem(0, back);
-        
-        // Clear teams quick action
-        ItemStack clearTeams = createGuiButton(Material.BARRIER, "§c§lClear All Teams", List.of(
-            "§7Remove all existing team assignments"
-        ), "clear_teams");
-        inventory.setItem(8, clearTeams);
-        
-        // Check current mode and adjust UI accordingly
-        com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode currentMode = plugin.getCurrentMode();
-        
-        if (currentMode == com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode.TASK) {
-            // Task Manager mode - ONLY show runners
-            List<String> runnerLore = new ArrayList<>();
-            runnerLore.add("§7Click to select players as runners");
-            runnerLore.add("");
-            runnerLore.add("§7Current Runners: §b" + plugin.getGameManager().getRunners().size());
-            runnerLore.add("§7Role:");
-            runnerLore.add("§7• Complete secret tasks");
-            runnerLore.add("§7• Compete to finish first");
-            runnerLore.add("§7• Swap between players");
-            ItemStack runnerTeam = createItem(Material.DIAMOND_BOOTS, "§b§lRunners", runnerLore);
-            inventory.setItem(4, plugin.getGameManager().getPlayerState(player).getSelectedTeam() == Team.RUNNER ? 
-                createGlowingItem(runnerTeam) : createNormalItem(runnerTeam));
-            
-            // Task mode instructions
-            List<String> instructionsLore = new ArrayList<>();
-            instructionsLore.add("§6§lTask Manager Mode:");
-            instructionsLore.add("§71. Select runners for competition");
-            instructionsLore.add("§72. Each gets a secret task");
-            instructionsLore.add("§73. First to complete wins");
-            instructionsLore.add("§c§lNo hunters in Task Manager mode!");
-            ItemStack instructions = createItem(Material.TARGET, "§e§lTask Competition", instructionsLore);
-            inventory.setItem(2, instructions);
-            inventory.setItem(6, instructions); // Fill both sides for symmetry
-        } else {
-            // Dream mode - show both runners and hunters
-            List<String> runnerLore = new ArrayList<>();
-            runnerLore.add("§7Click to select players as runners");
-            runnerLore.add("");
-            runnerLore.add("§7Current Runners: §b" + plugin.getGameManager().getRunners().size());
-            runnerLore.add("§7Role:");
-            runnerLore.add("§7• Complete objectives");
-            runnerLore.add("§7• Avoid hunters");
-            runnerLore.add("§7• Swap between players");
-            ItemStack runnerTeam = createItem(Material.DIAMOND_BOOTS, "§b§lRunners", runnerLore);
-            inventory.setItem(2, plugin.getGameManager().getPlayerState(player).getSelectedTeam() == Team.RUNNER ? 
-                createGlowingItem(runnerTeam) : createNormalItem(runnerTeam));
-            
-            // Hunter team button with enhanced information
-            List<String> hunterLore = new ArrayList<>();
-            hunterLore.add("§7Click to select players as hunters");
-            hunterLore.add("");
-            hunterLore.add("§7Current Hunters: §c" + plugin.getGameManager().getHunters().size());
-            hunterLore.add("§7Role:");
-            hunterLore.add("§7• Track runners");
-            hunterLore.add("§7• Eliminate runners");
-            hunterLore.add("§7• Prevent objectives");
-            ItemStack hunterTeam = createItem(Material.IRON_SWORD, "§c§lHunters", hunterLore);
-            inventory.setItem(6, plugin.getGameManager().getPlayerState(player).getSelectedTeam() == Team.HUNTER ? 
-                createGlowingItem(hunterTeam) : createNormalItem(hunterTeam));
-            
-            // Team selection instructions
-            List<String> instructionsLore = new ArrayList<>();
-            instructionsLore.add("§7How to assign teams:");
-            instructionsLore.add("§71. Select a team above");
-            instructionsLore.add("§72. Click player heads below");
-            instructionsLore.add("§73. Confirm your selections");
-            ItemStack instructions = createItem(Material.BOOK, "§e§lInstructions", instructionsLore);
-            inventory.setItem(4, instructions);
-        }
-        
-        // Player heads with enhanced information
-        int slot = 18;
-        for (Player onlinePlayer : Bukkit.getOnlinePlayers()) {
-            if (slot >= inventory.getSize()) break;
-            
-            ItemStack playerHead = new ItemStack(Material.PLAYER_HEAD);
-            SkullMeta meta = (SkullMeta) playerHead.getItemMeta();
-            meta.setOwningPlayer(onlinePlayer);
-
-            Team currentTeam = plugin.getGameManager().getPlayerState(onlinePlayer).getSelectedTeam();
-            // Apply team color to player name using legacy codes via GuiCompat
-            String coloredName = switch (currentTeam) {
-                case RUNNER -> "§b" + onlinePlayer.getName();
-                case HUNTER -> "§c" + onlinePlayer.getName();
-                default -> "§f" + onlinePlayer.getName();
-            };
-            com.example.speedrunnerswap.utils.GuiCompat.setDisplayName(meta, coloredName);
-
-            List<String> lore = new ArrayList<>();
-            if (plugin.getGameManager().isRunner(onlinePlayer)) {
-                lore.add("§bCurrently a Runner");
-                lore.add("§7Click while Hunter team is selected");
-                lore.add("§7to change to Hunter");
-            } else if (plugin.getGameManager().isHunter(onlinePlayer)) {
-                lore.add("§cCurrently a Hunter");
-                lore.add("§7Click while Runner team is selected");
-                lore.add("§7to change to Runner");
-            } else {
-                lore.add("§7No team assigned");
-                lore.add("§7Select a team above first");
-                lore.add("§7then click to assign");
-            }
-
-            lore.add("§7Shift-click to remove from teams");
-            
-            // Add online status
-            lore.add("");
-            lore.add(onlinePlayer.isOnline() ? "§a✔ Online" : "§c✘ Offline");
-            
-            com.example.speedrunnerswap.utils.GuiCompat.setLore(meta, lore);
-            playerHead.setItemMeta(meta);
-            
-            // Add glow effect for current team members
-            if (currentTeam != Team.NONE) {
-                playerHead = createGlowingItem(playerHead);
-            }
-            
-            inventory.setItem(slot++, playerHead);
-        }
-        
-        openInventorySoon(player, inventory);
+        open(player, MenuKey.TEAM_MANAGEMENT, null, false);
     }
-    
+
     public void openSettingsMenu(Player player) {
-        String title = "§6§lAdvanced Settings - All Options";
-        int rows = 6;
-        rows = clampRows(rows);
-        
-        Inventory inventory = com.example.speedrunnerswap.utils.GuiCompat.createInventory(null, rows * 9, title);
-        
-        // Use redstone glass pane for advanced settings theme
-        ItemStack filler = createItem(Material.RED_STAINED_GLASS_PANE, " ");
-        fillBorder(inventory, filler);
-        
-        // Back button with enhanced tooltip
-        inventory.setItem(0, createGuiButton(Material.ARROW, "§7§lBack", 
-            List.of("§7Return to main menu"), "back_main"));
-
-        // Always show basic game controls in header
-        addGameControlsHeader(inventory);
-
-        // === SWAP MECHANICS SECTION (Row 1) ===
-        // Swap Type Toggle
-        boolean isRandomized = plugin.getConfigManager().isSwapRandomized();
-        inventory.setItem(10, createGuiButton(
-                isRandomized ? Material.CLOCK : Material.REPEATER,
-                "§e§lSwap Type: " + (isRandomized ? "§aRandom" : "§bFixed"),
-                List.of("§7Toggle between fixed and random intervals",
-                        isRandomized ? "§7Random adds unpredictability" : "§7Fixed provides consistent timing"),
-                "random_swaps"));
-
-        // Swap Interval Controls
-        int currentInterval = plugin.getConfigManager().getSwapInterval();
-        boolean isBeta = plugin.getConfigManager().isBetaIntervalEnabled();
-        List<String> intervalLore = new ArrayList<>();
-        intervalLore.add("§7Current: §e" + currentInterval + " seconds");
-        intervalLore.add("§7Use arrows to adjust (±5s)");
-        if (isBeta && currentInterval < 30) {
-            intervalLore.add("§cBETA: Below 30s may be unstable");
-        }
-        inventory.setItem(11, createGuiButton(Material.PAPER, "§e§lSwap Interval", intervalLore, "swap_interval"));
-        inventory.setItem(12, createGuiButton(Material.ARROW, "§c-5s", List.of("§7Decrease interval"), "interval_minus"));
-        inventory.setItem(14, createGuiButton(Material.ARROW, "§a+5s", List.of("§7Increase interval"), "interval_plus"));
-
-        // Experimental Mode Toggle
-        inventory.setItem(15, createGuiButton(
-                isBeta ? Material.REDSTONE_TORCH : Material.LEVER,
-                "§e§lExperimental: " + (isBeta ? "§aON" : "§cOFF"),
-                List.of("§7Allow <30s and >max intervals",
-                        "§7Shows warnings when used"),
-                "beta_intervals"));
-
-        // Random Interval Range (only if randomized)
-        if (isRandomized) {
-            int minInterval = plugin.getConfigManager().getMinSwapInterval();
-            int maxInterval = plugin.getConfigManager().getMaxSwapInterval();
-            inventory.setItem(16, createGuiButton(Material.COMPASS, "§6§lRandom Range",
-                List.of("§7Min: §e" + minInterval + "s", 
-                        "§7Max: §e" + maxInterval + "s",
-                        "§7Left/Right: ±5s, Shift: ±15s"),
-                "random_range"));
-        }
-
-        // === SAFETY & MECHANICS SECTION (Row 2) ===
-        // Safe Swap Toggle
-        boolean safeSwap = plugin.getConfigManager().isSafeSwapEnabled();
-        inventory.setItem(19, createGuiButton(
-                safeSwap ? Material.SLIME_BLOCK : Material.MAGMA_BLOCK,
-                "§e§lSafe Swaps: " + (safeSwap ? "§aON" : "§cOFF"),
-                List.of(
-                        "§7Scan surroundings before swapping",
-                        "§7Avoids lava, fire, cacti, etc.",
-                        "§7Radius: §e" + plugin.getConfigManager().getSafeSwapHorizontalRadius() + " blocks",
-                        "§8Edit hazardous blocks via Dangerous Blocks"),
-                "safe_swaps"));
-
-        // Grace Period
-        int graceTicks = plugin.getConfigManager().getGracePeriodTicks();
-        inventory.setItem(20, createGuiButton(Material.SHIELD, "§6§lGrace Period",
-                List.of(
-                        "§7Invulnerability after each swap",
-                        "§7Current duration: §e" + (graceTicks / 20.0) + "s",
-                        "§7Left/Right: ±0.5s, Shift: ±2s"),
-                "grace_period"));
-
-        // Pause on Disconnect
-        boolean pauseDisconnect = plugin.getConfigManager().isPauseOnDisconnect();
-        inventory.setItem(21, createGuiButton(
-                pauseDisconnect ? Material.REDSTONE_TORCH : Material.LEVER,
-                "§e§lPause on Disconnect: " + (pauseDisconnect ? "§aON" : "§cOFF"),
-                List.of(
-                        "§7Stops the timer if the active runner quits",
-                        "§7Prevents the queue from progressing without them"),
-                "pause_disconnect"));
-
-        // Inactive Runner State
-        String freezeMode = plugin.getConfigManager().getFreezeMode();
-        Material freezeIcon = switch (freezeMode.toUpperCase()) {
-            case "SPECTATOR" -> Material.ENDER_EYE;
-            case "LIMBO" -> Material.ENDER_PEARL;
-            case "CAGE" -> Material.BEDROCK;
-            default -> Material.POTION;
-        };
-        inventory.setItem(22, createGuiButton(freezeIcon, "§6§lInactive State: §a" + freezeMode,
-                List.of(
-                        "§7Choose how queued players are managed:",
-                        "§bEFFECTS §7– Freeze in place with slowness.",
-                        "§bSPECTATOR §7– Switch to spectator mode.",
-                        "§bLIMBO §7– Teleport to configured limbo spawn.",
-                        "§bCAGE §7– Trap inside obsidian cage.",
-                        "§7Click to cycle through options."),
-                "freeze_mode"));
-
-        // === TIMER VISIBILITY SECTION (Row 3) ===
-        // Runner Timer Visibility
-        String runnerVis = plugin.getConfigManager().getRunnerTimerVisibility();
-        inventory.setItem(28, createGuiButton(Material.CLOCK, "§b§lActive Runner Timer",
-                List.of("§7Current: §e" + getVisibilityDisplay(runnerVis),
-                        "§7Click to cycle visibility"),
-                "runner_timer"));
-
-        // Waiting Timer Visibility
-        String waitingVis = plugin.getConfigManager().getWaitingTimerVisibility();
-        inventory.setItem(29, createGuiButton(Material.CLOCK, "§d§lWaiting Runner Timer",
-                List.of("§7Current: §e" + getVisibilityDisplay(waitingVis),
-                        "§7Click to cycle visibility"),
-                "waiting_timer"));
-
-        // Hunter Timer Visibility
-        String hunterVis = plugin.getConfigManager().getHunterTimerVisibility();
-        inventory.setItem(30, createGuiButton(Material.CLOCK, "§c§lHunter Timer",
-                List.of("§7Current: §e" + getVisibilityDisplay(hunterVis),
-                        "§7Click to cycle visibility"),
-                "hunter_timer"));
-
-        // === HUNTER-SPECIFIC FEATURES (Row 4) ===
-        // Tracker Toggle (Dream mode only)
-        if (plugin.getCurrentMode() == com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode.DREAM) {
-            boolean trackerEnabled = plugin.getConfigManager().isTrackerEnabled();
-            inventory.setItem(37, createGuiButton(
-                    trackerEnabled ? Material.COMPASS : Material.GRAY_DYE,
-                    "§e§lHunter Tracking: " + (trackerEnabled ? "§aON" : "§cOFF"),
-                    List.of("§7Hunters get tracking compasses",
-                            "§7Update rate: §e" + (plugin.getConfigManager().getTrackerUpdateTicks() / 20) + "s"),
-                    "tracker_toggle"));
-
-            // Hunter Swap Feature
-            boolean hunterSwap = plugin.getConfigManager().isHunterSwapEnabled();
-            inventory.setItem(38, createGuiButton(
-                    hunterSwap ? Material.CROSSBOW : Material.GRAY_DYE,
-                    "§e§lHunter Swap: " + (hunterSwap ? "§aON" : "§cOFF"),
-                    List.of("§7Periodically shuffle hunter focus",
-                            "§7Interval: §e" + plugin.getConfigManager().getHunterSwapInterval() + "s"),
-                    "hunter_swap"));
-
-            // Hot Potato Mode
-            boolean hotPotato = plugin.getConfigManager().isHotPotatoModeEnabled();
-            inventory.setItem(39, createGuiButton(
-                    hotPotato ? Material.BLAZE_POWDER : Material.GRAY_DYE,
-                    "§e§lHot Potato: " + (hotPotato ? "§aON" : "§cOFF"),
-                    List.of("§7Swap when runner takes damage",
-                            "§7Overrides normal timer"),
-                    "hot_potato"));
-        }
-
-        // === QUALITY OF LIFE SECTION (Row 5) ===
-        // Single Player Sleep
-        boolean singleSleep = plugin.getConfigManager().isSinglePlayerSleepEnabled();
-        inventory.setItem(46, createGuiButton(
-                singleSleep ? Material.WHITE_BED : Material.RED_BED,
-                "§e§lSingle Player Sleep: " + (singleSleep ? "§aON" : "§cOFF"),
-                List.of(
-                        "§7Active runner can skip the night solo",
-                        "§7Prevents spectators from blocking sleep",
-                        "§7Recommended when using cages or spectator mode"),
-                "single_sleep"));
-
-        // Voice Chat Integration
-        boolean voiceChat = plugin.getConfigManager().isVoiceChatIntegrationEnabled();
-        inventory.setItem(47, createGuiButton(
-                voiceChat ? Material.NOTE_BLOCK : Material.GRAY_DYE,
-                "§e§lVoice Chat: " + (voiceChat ? "§aON" : "§cOFF"),
-                List.of("§7Integrate with Simple Voice Chat",
-                        "§7Mute inactive runners: " + (plugin.getConfigManager().isMuteInactiveRunners() ? "§aYes" : "§cNo")),
-                "voice_chat"));
-
-        // Statistics Tracking
-        boolean statsEnabled = plugin.getConfig().getBoolean("stats.enabled", true);
-        inventory.setItem(48, createGuiButton(
-                statsEnabled ? Material.BOOK : Material.GRAY_DYE,
-                "§e§lStatistics: " + (statsEnabled ? "§aON" : "§cOFF"),
-                List.of("§7Track game performance metrics",
-                        "§7Distance, time, completion rates"),
-                "stats_toggle"));
-
-        // === QUICK ACCESS BUTTONS ===
-        // Mode-specific feature access
-        switch (plugin.getCurrentMode()) {
-            case DREAM -> {
-                inventory.setItem(43, createGuiButton(Material.POTION, "§d§lPower-ups Settings",
-                    List.of("§7Configure random effects on swap"), "power_ups"));
-                inventory.setItem(44, createGuiButton(Material.BARRIER, "§c§lWorld Border Settings",
-                    List.of("§7Configure shrinking world boundary"), "world_border"));
-            }
-            case TASK -> {
-                inventory.setItem(43, createGuiButton(Material.TARGET, "§6§lTask Settings",
-                    List.of("§7Configure task competition rules"), "task_settings"));
-                inventory.setItem(44, createGuiButton(Material.WRITABLE_BOOK, "§6§lCustom Tasks",
-                    List.of("§7Manage custom task pool"), "custom_tasks_menu"));
-            }
-            case SAPNAP -> {
-                inventory.setItem(43, createGuiButton(Material.BEDROCK, "§b§lCage Settings",
-                    List.of("§7Configure cage behavior"), "cage_settings"));
-            }
-        }
-
-        // Dangerous Blocks Editor (Safe Swap)
-        if (safeSwap) {
-            inventory.setItem(49, createGuiButton(Material.MAGMA_BLOCK, "§6§lDangerous Blocks",
-                List.of("§7Edit list of avoided blocks"), "dangerous_blocks"));
-        }
-        
-        // === ADVANCED CONFIG SECTIONS (Row 6) ===
-        // Broadcast Settings
-        inventory.setItem(50, createGuiButton(Material.BELL, "§e§lBroadcast Settings",
-            List.of("§7Configure game event announcements",
-                    "§7Swap events, team changes, etc."), "broadcast_settings"));
-        
-        // Limbo Configuration (if freeze mode is LIMBO)
-        if ("LIMBO".equalsIgnoreCase(freezeMode)) {
-            inventory.setItem(51, createGuiButton(Material.ENDER_PEARL, "§6§lLimbo Settings",
-                List.of("§7Configure limbo world and coordinates"), "limbo_settings"));
-        }
-        
-        // UI Performance Settings
-        inventory.setItem(52, createGuiButton(Material.COMPARATOR, "§d§lUI Performance",
-            List.of("§7Update frequencies for timers",
-                    "§7Actionbar and title refresh rates"), "ui_performance"));
-        
-        // Full Config Browser
-        inventory.setItem(53, createGuiButton(Material.WRITABLE_BOOK, "§c§lAdvanced Config Browser",
-            List.of("§7Direct access to all config values",
-                    "§7Edit any setting not in main GUI"), "advanced_config_root"));
-
-        // Reset to Defaults (place at 45 to avoid overriding Advanced Config)
-        inventory.setItem(45, createGuiButton(Material.BARRIER, "§c§lReset All Settings",
-            List.of("§7Reset all settings to defaults",
-                    "§cThis cannot be undone!"),
-            "reset_all_settings"));
-
-        openInventorySoon(player, inventory);
+        open(player, MenuKey.SETTINGS_HOME, null, false);
     }
 
-
-    
-    public void openCustomTasksMenu(Player player) {
-        Inventory inv = com.example.speedrunnerswap.utils.GuiCompat.createInventory(null, 54, "§d§lCustom Tasks Manager");
-        ItemStack filler = createItem(Material.BLACK_STAINED_GLASS_PANE, " ");
-        fillBorder(inv, filler);
-        addGameControlsHeader(inv);
-        
-        ItemStack back = createItem(Material.ARROW, "§7§lBack", List.of("§7Return to Settings"));
-        inv.setItem(0, back);
-        
-        // Header info
-        boolean includeDefaults = plugin.getConfig().getBoolean("task_manager.include_default_tasks", true);
-        ItemStack toggleDefaults = createItem(
-            includeDefaults ? Material.LIME_DYE : Material.GRAY_DYE,
-            "§e§lInclude Default Tasks: " + (includeDefaults ? "§aEnabled" : "§cDisabled"),
-            List.of("§7Toggle whether built-in tasks are included")
-        );
-        inv.setItem(4, toggleDefaults);
-        
-        // Add new task button
-        ItemStack addTask = createItem(Material.EMERALD, "§a§lAdd New Task", 
-            List.of("§7Click to add a custom task", "§7You'll be prompted in chat"));
-        inv.setItem(8, addTask);
-        
-        // Reload tasks button
-        ItemStack reloadTasks = createItem(Material.BOOK, "§6§lReload Tasks",
-            List.of("§7Reload all tasks from config"));
-        inv.setItem(53, reloadTasks);
-        
-        // Display custom tasks
-        var taskMode = plugin.getTaskManagerMode();
-        if (taskMode != null) {
-            List<String> customIds = taskMode.getCustomTaskIds();
-            int slot = 9;
-            for (String taskId : customIds) {
-                if (slot >= 45) break; // Leave room for bottom border
-                
-                var task = taskMode.getTask(taskId);
-                if (task != null) {
-                    ItemStack taskItem = createItem(Material.PAPER, "§e" + taskId,
-                        List.of("§7" + task.description(), "", "§cClick to remove"));
-                    inv.setItem(slot, taskItem);
-                }
-                slot++;
-            }
-            
-            // If no custom tasks
-            if (customIds.isEmpty()) {
-                ItemStack noTasks = createItem(Material.BARRIER, "§cNo Custom Tasks",
-                    List.of("§7Click 'Add New Task' to create one"));
-                inv.setItem(22, noTasks);
-            }
-        }
-        
-        openInventorySoon(player, inv);
-    }
-    
-    // Method to prompt player for task input
-    public void promptTaskInput(Player player, String type) {
-        player.closeInventory();
-        if (type.equals("id")) {
-            player.sendMessage("§e[Task Manager] Enter a unique task ID (e.g., 'build_nether_house'):");
-            player.sendMessage("§7Type 'cancel' to abort");
-            // Store state for chat listener
-            plugin.getChatInputHandler().expectTaskId(player);
-        } else if (type.equals("description")) {
-            player.sendMessage("§e[Task Manager] Enter the task description:");
-            player.sendMessage("§7Type 'cancel' to abort");
-            // Store state for chat listener
-            plugin.getChatInputHandler().expectTaskDescription(player);
-        }
-    }
-    
-    private int clampRows(int rows) {
-        if (rows < 1) return 1;
-        if (rows > 6) return 6;
-        return rows;
+    public void openPowerUpsMenu(Player player) {
+        open(player, MenuKey.POWERUPS_ROOT, null, false);
     }
 
-    public ItemStack createItem(Material material, String name, String... lore) {
-        ItemStack item = new ItemStack(material);
-        ItemMeta meta = item.getItemMeta();
-        com.example.speedrunnerswap.utils.GuiCompat.setDisplayName(meta, name);
-        if (lore.length > 0) {
-            List<String> loreList = new ArrayList<>();
-            java.util.Collections.addAll(loreList, lore);
-            com.example.speedrunnerswap.utils.GuiCompat.setLore(meta, loreList);
-        }
-        item.setItemMeta(meta);
-        return item;
+    public void openDangerousBlocksMenu(Player player) {
+        open(player, MenuKey.DANGEROUS_BLOCKS, null, false);
     }
 
-    public ItemStack createGlowingItem(ItemStack item) {
-        ItemStack glowingItem = item.clone();
-        ItemMeta meta = glowingItem.getItemMeta();
-        meta.addEnchant(Enchantment.UNBREAKING, 1, true);
-        meta.addItemFlags(org.bukkit.inventory.ItemFlag.HIDE_ENCHANTS);
-        glowingItem.setItemMeta(meta);
-        return glowingItem;
+    public void openTaskManagerMenu(Player player) {
+        open(player, MenuKey.TASK_HOME, null, false);
     }
 
-    public ItemStack createNormalItem(ItemStack item) {
-        ItemStack normalItem = item.clone();
-        ItemMeta meta = normalItem.getItemMeta();
-        meta.removeEnchant(Enchantment.UNBREAKING);
-        meta.removeItemFlags(org.bukkit.inventory.ItemFlag.HIDE_ENCHANTS);
-        normalItem.setItemMeta(meta);
-        return normalItem;
-    }
-    
-    public ItemStack createItem(Material material, String name, List<String> lore) {
-        ItemStack item = new ItemStack(material);
-        ItemMeta meta = item.getItemMeta();
-        com.example.speedrunnerswap.utils.GuiCompat.setDisplayName(meta, name);
-        if (lore != null && !lore.isEmpty()) {
-            com.example.speedrunnerswap.utils.GuiCompat.setLore(meta, lore);
-        }
-        item.setItemMeta(meta);
-        return item;
-    }
-
-    // Insert consistent game controls in slots 10/11/13 of any menu (start/stop, pause/resume, status)
-    private void addGameControlsHeader(Inventory inventory) {
-        boolean running = plugin.getGameManager().isGameRunning();
-        boolean paused = plugin.getGameManager().isGamePaused();
-        int runnerCount = plugin.getGameManager().getRunners().size();
-        int hunterCount = 0;
-        try { hunterCount = plugin.getGameManager().getHunters().size(); } catch (Throwable ignored) {}
-
-        // Start / Stop
-        int base = 0;
-
-        if (!running) {
-            List<String> startLore = new ArrayList<>();
-            if (plugin.getCurrentMode() == com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode.DREAM) {
-                if (runnerCount == 0 || hunterCount == 0) {
-                    startLore.add("§cNeed both runners and hunters!");
-                    startLore.add("§cRunners: " + runnerCount + ", Hunters: " + hunterCount);
-                    inventory.setItem(base + 1, createItem(Material.GRAY_CONCRETE, "§c§lCannot Start", startLore));
-                } else {
-                    startLore.add("§7Ready: §b" + runnerCount + " runners§7, §c" + hunterCount + " hunters");
-                    startLore.add("§7Swap interval: §e" + plugin.getConfigManager().getSwapInterval() + "s");
-                    inventory.setItem(base + 1, createGuiButton(Material.LIME_CONCRETE, "§a§lStart Game", startLore, "start_game"));
-                }
-            } else {
-                if (runnerCount < 1) {
-                    startLore.add("§cNeed at least 1 runner!");
-                    inventory.setItem(base + 1, createItem(Material.GRAY_CONCRETE, "§c§lCannot Start", startLore));
-                } else {
-                    startLore.add("§7Ready: §b" + runnerCount + " runners");
-                    startLore.add("§7Swap interval: §e" + plugin.getConfigManager().getSwapInterval() + "s");
-                    inventory.setItem(base + 1, createGuiButton(Material.LIME_CONCRETE, "§a§lStart Game", startLore, "start_game"));
-                }
-            }
-        } else {
-            List<String> stopLore = new ArrayList<>();
-            stopLore.add("§7End the current game");
-            stopLore.add("§7Status: " + (paused ? "§ePaused" : "§aRunning"));
-            inventory.setItem(base + 1, createGuiButton(Material.RED_CONCRETE, "§c§lStop Game", stopLore, "stop_game"));
-        }
-
-        // Pause / Resume
-        if (running && !paused) {
-            inventory.setItem(base + 2, createGuiButton(Material.YELLOW_CONCRETE, "§e§lPause", List.of("§7Temporarily pause the game"), "pause_game"));
-        } else if (running) {
-            inventory.setItem(base + 2, createGuiButton(Material.ORANGE_CONCRETE, "§a§lResume", List.of("§7Resume the game"), "resume_game"));
-        } else {
-            inventory.setItem(base + 2, createItem(Material.GRAY_CONCRETE, "§7Pause", List.of("§7Game not running")));
-        }
-
-        // Status
-        List<String> status = new ArrayList<>();
-        status.add("§7Running: " + (running ? "§aYes" : "§cNo"));
-        status.add("§7Runners: §b" + runnerCount);
-        if (plugin.getCurrentMode() == com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode.DREAM) {
-            status.add("§7Hunters: §c" + hunterCount);
-        }
-        if (running) {
-            try {
-                Player active = plugin.getGameManager().getActiveRunner();
-                status.add("§7Active: §f" + (active != null ? active.getName() : "None"));
-                status.add("§7Next Swap: §e" + plugin.getGameManager().getTimeUntilNextSwap() + "s");
-            } catch (Throwable ignored) {}
-        }
-        inventory.setItem(base + 4, createItem(Material.CLOCK, "§6§lGame Status", status));
-    }
-
-    // Visual utility: fill only the outer border of an inventory with a filler item
-    private void fillBorder(Inventory inv, ItemStack filler) {
-        if (inv == null || filler == null) return;
-        int size = inv.getSize();
-        if (size < 9) return;
-        int rows = size / 9;
-        // Top and bottom rows
-        for (int c = 0; c < 9; c++) {
-            inv.setItem(c, filler);
-            inv.setItem((rows - 1) * 9 + c, filler);
-        }
-        // Left and right columns
-        for (int r = 0; r < rows; r++) {
-            inv.setItem(r * 9, filler);
-            inv.setItem(r * 9 + 8, filler);
-        }
-    }
-    
-    
-    // Advanced Config Browser
-    public void openAdvancedConfigMenu(Player player, String path, int page) {
-        if (path == null) path = "";
-        org.bukkit.configuration.file.FileConfiguration cfg = plugin.getConfig();
-        org.bukkit.configuration.ConfigurationSection section = path.isEmpty() ? cfg.getConfigurationSection("") : cfg.getConfigurationSection(path);
-        if (section == null) {
-            // If leaf value, bounce to parent
-            String parent = getParentPath(path);
-            section = parent == null ? cfg.getConfigurationSection("") : cfg.getConfigurationSection(parent);
-            path = parent == null ? "" : parent;
-        }
-        java.util.Set<String> keys = section == null ? java.util.Collections.emptySet() : section.getKeys(false);
-
-        int rows = 6;
-        String title = "§6§lAdvanced Config" + (path.isEmpty() ? "" : " §7(" + path + ")");
-        Inventory inv = com.example.speedrunnerswap.utils.GuiCompat.createInventory(null, rows * 9, title);
-        ItemStack filler = createItem(Material.GRAY_STAINED_GLASS_PANE, " ");
-        fillBorder(inv, filler);
-        addGameControlsHeader(inv);
-
-        // Back to Settings or parent
-        if (path.isEmpty()) {
-            inv.setItem(0, createGuiButton(Material.ARROW, "§7§lBack", List.of("§7Return to Settings"), "back_settings"));
-        } else {
-            String parent = getParentPath(path);
-            String id = parent == null ? "advanced_config_root" : ("cfg:nav:" + parent);
-            inv.setItem(0, createGuiButton(Material.ARROW, "§7§lUp: §f" + (parent == null ? "root" : parent), List.of("§7Go to parent section"), id));
-        }
-
-        // Pagination
-        java.util.List<String> sorted = new java.util.ArrayList<>(keys);
-        java.util.Collections.sort(sorted);
-        int start = page * 28;
-        int end = Math.min(start + 28, sorted.size());
-        int slot = 10;
-        for (int i = start; i < end; i++) {
-            String key = sorted.get(i);
-            String full = path.isEmpty() ? key : path + "." + key;
-            Object val = cfg.get(full);
-            ItemStack it;
-            if (val instanceof org.bukkit.configuration.ConfigurationSection) {
-                it = createGuiButton(Material.CHEST, "§e§l" + key + "/", List.of("§7Open section", "§8" + full), "cfg:nav:" + full);
-            } else if (val instanceof Boolean) {
-                boolean b = (Boolean) val;
-                it = createGuiButton(b ? Material.LIME_DYE : Material.GRAY_DYE, "§a§l" + key + " = " + (b ? "§atrue" : "§cfalse"), List.of("§7Toggle", "§8" + full), "cfg:bool:" + full);
-            } else if (val instanceof Number) {
-                String display = String.valueOf(val);
-                it = createGuiButton(Material.REPEATER, "§6§l" + key + " = §e" + display, List.of("§7Left/Right: ±1", "§7Shift: ±10", "§8" + full), "cfg:num:" + full);
-            } else if (val instanceof java.util.List) {
-                // assume string list for generic editor
-                it = createGuiButton(Material.PAPER, "§b§l" + key + "[]", List.of("§7Edit list", "§8" + full), "cfg:list:" + full);
-            } else {
-                String s = cfg.getString(full, String.valueOf(val));
-                it = createGuiButton(Material.NAME_TAG, "§d§l" + key + " = §f" + (s == null ? "null" : truncate(s, 20)), List.of("§7Click to edit string", "§8" + full), "cfg:str:" + full);
-            }
-            inv.setItem(slot, it);
-            slot++;
-            if ((slot + 1) % 9 == 0) slot += 2; // skip border columns
-        }
-
-        // Page controls
-        if (page > 0) inv.setItem(45, createGuiButton(Material.ARROW, "§7§lPrev Page", List.of(), "cfg:page:" + path + ":" + (page - 1)));
-        if (end < sorted.size()) inv.setItem(53, createGuiButton(Material.ARROW, "§7§lNext Page", List.of(), "cfg:page:" + path + ":" + (page + 1)));
-
-        openInventorySoon(player, inv);
-    }
-
-    public void openConfigListEditor(Player player, String path, int page) {
-        org.bukkit.configuration.file.FileConfiguration cfg = plugin.getConfig();
-        java.util.List<String> list = cfg.getStringList(path);
-        int rows = 6;
-        String title = "§6§lList Editor §7(" + path + ")";
-        Inventory inv = com.example.speedrunnerswap.utils.GuiCompat.createInventory(null, rows * 9, title);
-        ItemStack filler = createItem(Material.GRAY_STAINED_GLASS_PANE, " ");
-        fillBorder(inv, filler);
-        addGameControlsHeader(inv);
-
-        // Back
-        inv.setItem(0, createGuiButton(Material.ARROW, "§7§lBack", List.of("§7Return to Advanced Config"), "cfg:nav:" + getParentPath(path)));
-        // Add new
-        inv.setItem(8, createGuiButton(Material.EMERALD, "§a§lAdd Item", List.of("§7Click to add via chat"), "cfg:list_add:" + path));
-
-        // Items
-        int start = page * 28;
-        int end = Math.min(start + 28, list.size());
-        int slot = 10;
-        for (int i = start; i < end; i++) {
-            String item = list.get(i);
-            String id = "cfg:list_del:" + path + ":" + i;
-            inv.setItem(slot, createGuiButton(Material.PAPER, "§f" + truncate(item, 30), List.of("§cClick to remove", "§8index:" + i), id));
-            slot++;
-            if ((slot + 1) % 9 == 0) slot += 2;
-        }
-        // Pages
-        if (page > 0) inv.setItem(45, createGuiButton(Material.ARROW, "§7§lPrev Page", List.of(), "cfg:list_page:" + path + ":" + (page - 1)));
-        if (end < list.size()) inv.setItem(53, createGuiButton(Material.ARROW, "§7§lNext Page", List.of(), "cfg:list_page:" + path + ":" + (page + 1)));
-
-        openInventorySoon(player, inv);
-    }
-
-    private String getParentPath(String path) {
-        if (path == null || path.isEmpty()) return null;
-        int idx = path.lastIndexOf('.');
-        if (idx < 0) return null;
-        return path.substring(0, idx);
-    }
-
-    private String truncate(String s, int n) {
-        if (s == null) return "null";
-        if (s.length() <= n) return s;
-        return s.substring(0, n - 1) + "…";
-    }
-    
-    // Cross-version safe way to get the plain title of the open inventory for the first viewer
-    private String getOpenInventoryPlainTitle(Inventory inventory) {
-        try {
-            if (inventory == null || inventory.getViewers().isEmpty()) return "";
-            var viewer = inventory.getViewers().get(0);
-            var view = viewer.getOpenInventory();
-            if (view == null) return "";
-            // Try Paper's title() via reflection
-            try {
-                java.lang.reflect.Method m = view.getClass().getMethod("title");
-                Object comp = m.invoke(view);
-                if (comp != null) {
-                    try {
-                        Class<?> serCls = Class.forName("net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer");
-                        java.lang.reflect.Method plainText = serCls.getMethod("plainText");
-                        Object serializer = plainText.invoke(null);
-                        Class<?> componentCls = Class.forName("net.kyori.adventure.text.Component");
-                        java.lang.reflect.Method serialize = serializer.getClass().getMethod("serialize", componentCls);
-                        Object s = serialize.invoke(serializer, comp);
-                        if (s != null) return String.valueOf(s);
-                    } catch (Throwable ignored) {
-                        try {
-                            java.lang.reflect.Method content = comp.getClass().getMethod("content");
-                            Object s2 = content.invoke(comp);
-                            if (s2 != null) return String.valueOf(s2);
-                        } catch (Throwable ignored2) {}
-                        return String.valueOf(comp);
-                    }
-                }
-            } catch (Throwable ignored) {}
-            // Spigot-style getTitle()
-            try {
-                java.lang.reflect.Method m2 = view.getClass().getMethod("getTitle");
-                Object s3 = m2.invoke(view);
-                return s3 != null ? String.valueOf(s3) : "";
-            } catch (Throwable ignored) {}
-        } catch (Throwable ignored) {}
-        return "";
-    }
-    
-    // Helper methods for menu identification
-    private boolean isItem(ItemStack item, Material material, String name) {
-        if (item == null || item.getType() != material || !item.hasItemMeta()) {
-            return false;
-        }
-        String displayName = com.example.speedrunnerswap.utils.GuiCompat.getDisplayName(item.getItemMeta());
-        return name.equals(displayName);
-    }
-    
-    public boolean isMainMenu(Inventory inventory) {
-        if (inventory == null || inventory.getHolder() != null || inventory.getViewers().isEmpty()) {
-            return false;
-        }
-        String title = getOpenInventoryPlainTitle(inventory);
-        return plugin.getConfigManager().getGuiMainMenuTitle().equals(title);
-    }
-    
-    public boolean isTeamSelector(Inventory inventory) {
-        if (inventory == null || inventory.getHolder() != null || inventory.getViewers().isEmpty()) {
-            return false;
-        }
-        String title = getOpenInventoryPlainTitle(inventory);
-        return plugin.getConfigManager().getGuiTeamSelectorTitle().equals(title);
-    }
-    
-    public boolean isSettingsMenu(Inventory inventory) {
-        if (inventory == null || inventory.getHolder() != null || inventory.getViewers().isEmpty()) {
-            return false;
-        }
-        String title = getOpenInventoryPlainTitle(inventory);
-        return plugin.getConfigManager().getGuiSettingsTitle().equals(title);
-    }
-    
-    // Helper methods for item identification
-    public boolean isBackButton(ItemStack item) {
-        return isItem(item, Material.ARROW, "§7§lBack");
-    }
-    
-    public boolean isStartButton(ItemStack item) {
-        return isItem(item, Material.GREEN_CONCRETE, "§a§lStart Game");
-    }
-    
-    public boolean isStopButton(ItemStack item) {
-        return isItem(item, Material.RED_CONCRETE, "§c§lStop Game");
-    }
-    
-    public boolean isPauseButton(ItemStack item) {
-        return isItem(item, Material.YELLOW_CONCRETE, "§e§lPause Game");
-    }
-    
-    public boolean isResumeButton(ItemStack item) {
-        return isItem(item, Material.LIME_CONCRETE, "§a§lResume Game");
-    }
-    
-    public boolean isTeamSelectorButton(ItemStack item) {
-        return isItem(item, Material.PLAYER_HEAD, "§e§lTeam Selector");
-    }
-    
-    public boolean isSettingsButton(ItemStack item) {
-        return isItem(item, Material.COMPARATOR, "§a§lSettings");
-    }
-    
-    public boolean isRunnerTeamButton(ItemStack item) {
-        return isItem(item, Material.DIAMOND_BOOTS, "§b§lRunners");
-    }
-    
-    public boolean isHunterTeamButton(ItemStack item) {
-        return isItem(item, Material.IRON_SWORD, "§c§lHunters");
-    }
-    
-    private static final String BUTTON_ID_KEY = "ssw_button_id";
-
-    public ItemStack createGuiButton(Material material, String name, List<String> lore, String buttonId) {
-        ItemStack item = createItem(material, name, lore);
-        ItemMeta meta = item.getItemMeta();
-        if (meta != null) {
-            org.bukkit.persistence.PersistentDataContainer pdc = meta.getPersistentDataContainer();
-            // New compact key used by updated listeners
-            pdc.set(new org.bukkit.NamespacedKey(plugin, "btn"), org.bukkit.persistence.PersistentDataType.STRING, buttonId);
-            // Legacy key maintained for backward compatibility
-            pdc.set(new org.bukkit.NamespacedKey(plugin, BUTTON_ID_KEY), org.bukkit.persistence.PersistentDataType.STRING, buttonId);
-            item.setItemMeta(meta);
-        }
-        return item;
-    }
-
-    public String getButtonId(ItemStack item) {
-        if (item != null && item.hasItemMeta()) {
-            org.bukkit.persistence.PersistentDataContainer pdc = item.getItemMeta().getPersistentDataContainer();
-            String id = pdc.get(new org.bukkit.NamespacedKey(plugin, "btn"), org.bukkit.persistence.PersistentDataType.STRING);
-            if (id != null && !id.isEmpty()) return id;
-            return pdc.get(new org.bukkit.NamespacedKey(plugin, BUTTON_ID_KEY), org.bukkit.persistence.PersistentDataType.STRING);
-        }
-        return null;
-    }
-
-    public boolean isSwapIntervalButton(ItemStack item) {
-        String buttonId = getButtonId(item);
-        return "swap_interval".equals(buttonId) && item != null && item.getType() == Material.CLOCK;
-    }
-
-    public boolean isRandomizeSwapButton(ItemStack item) {
-        String buttonId = getButtonId(item);
-        return "random_swaps".equals(buttonId) && item != null && 
-               (item.getType() == Material.CLOCK || item.getType() == Material.REPEATER);
-    }
-
-    public boolean isSafeSwapButton(ItemStack item) {
-        String buttonId = getButtonId(item);
-        return "safe_swaps".equals(buttonId) && item != null && 
-               (item.getType() == Material.TOTEM_OF_UNDYING || item.getType() == Material.BARRIER);
-    }
-
-    public boolean isActiveRunnerTimerButton(ItemStack item) {
-        return isItem(item, Material.CLOCK, "§e§lActive Runner Timer");
-    }
-
-    public boolean isWaitingRunnerTimerButton(ItemStack item) {
-        return isItem(item, Material.CLOCK, "§e§lWaiting Runner Timer");
-    }
-
-    public boolean isHunterTimerButton(ItemStack item) {
-        return isItem(item, Material.CLOCK, "§e§lHunter Timer");
-    }
-
-    private String getVisibilityDisplay(String visibility) {
-        switch (visibility) {
-            case "always":
-                return "§aAlways Show";
-            case "last_10":
-                return "§eLast 10 Seconds";
-            case "never":
-                return "§cNever Show";
-            default:
-                return "§7Unknown";
-        }
-    }
-
-    public String getNextVisibility(String current) {
-        switch (current) {
-            case "always":
-                return "last_10";
-            case "last_10":
-                return "never";
-            case "never":
-                return "always";
-            default:
-                return "last_10";
-        }
-    }
-    
-    // Helper methods for team management
-    public void setPlayerTeam(Player player, Team team) {
-        try {
-            var state = plugin.getGameManager().getPlayerState(player);
-            if (state != null) {
-                state.setSelectedTeam(team);
-            }
-        } catch (Throwable ignored) {}
-
-        String label = switch (team) {
-            case RUNNER -> "§bRunners";
-            case HUNTER -> "§cHunters";
-            case NONE -> "§7No team";
-        };
-        player.sendMessage("§eTeam selector focus: " + label + "§e.");
-        updateTeamSelectors();
-    }
-    
-    public void updateTeamSelectors() {
-        for (Player player : Bukkit.getOnlinePlayers()) {
-            if (isTeamSelector(player.getOpenInventory().getTopInventory())) {
-                openTeamSelector(player);
-            }
-        }
-    }
-    
-    // Helper methods for game state
-    public void updateMainMenus() {
-        for (Player player : Bukkit.getOnlinePlayers()) {
-            if (isMainMenu(player.getOpenInventory().getTopInventory())) {
-                openMainMenu(player);
-            }
-        }
-    }
-    
-    public void updateSettingsMenus() {
-        for (Player player : Bukkit.getOnlinePlayers()) {
-            if (isSettingsMenu(player.getOpenInventory().getTopInventory())) {
-                openSettingsMenu(player);
-            }
-        }
-    }
-    
-    
-    // Fix for missing getSelectedTeam method
-    public Team getSelectedTeam(Player player) {
-        return plugin.getGameManager().getPlayerState(player).getSelectedTeam();
-    }
-    
-    // Fix for missing isSwapRandomized method
-    public boolean isSwapRandomized() {
-        return plugin.getConfigManager().isSwapRandomized();
-    }
-    
-    // Statistics Menu
-    public enum StatsParent {
-        MAIN,
-        SETTINGS
+    public void openStatisticsMenu(Player player, StatsParent parent) {
+        statsParents.put(player.getUniqueId(), parent);
+        open(player, MenuKey.STATS_ROOT, null, false);
     }
 
     public void openStatisticsMenu(Player player) {
         openStatisticsMenu(player, StatsParent.SETTINGS);
     }
 
-    public void openStatisticsMenu(Player player, StatsParent parent) {
-        Inventory inventory = com.example.speedrunnerswap.utils.GuiCompat.createInventory(null, 54, "§b§lStatistics & Tracking");
-        statsMenuParent.put(player.getUniqueId(), parent);
-        ItemStack filler = createItem(Material.BLACK_STAINED_GLASS_PANE, " ");
-        fillBorder(inventory, filler);
-        addGameControlsHeader(inventory);
-        
-        // Back button
-        String backId = parent == StatsParent.MAIN ? "stats_back_main" : "back_settings";
-        String backLore = parent == StatsParent.MAIN ? "§7Return to main menu" : "§7Return to Settings";
-        inventory.setItem(0, createGuiButton(Material.ARROW, "§7§lBack", 
-            List.of(backLore), backId));
-        
-        // Statistics toggles
-        boolean statsEnabled = plugin.getConfig().getBoolean("stats.enabled", true);
-        boolean distanceTracking = plugin.getConfig().getBoolean("stats.distance_tracking", true);
-        int distanceUpdateTicks = plugin.getConfig().getInt("stats.distance_update_ticks", 20);
-        
-        ItemStack statsToggle = createGuiButton(
-            statsEnabled ? Material.LIME_DYE : Material.GRAY_DYE,
-            "§e§lStatistics: " + (statsEnabled ? "§aEnabled" : "§cDisabled"),
-            List.of("§7Toggle statistics collection", "§7Currently: " + (statsEnabled ? "§aOn" : "§cOff")),
-            "toggle_stats");
-        inventory.setItem(11, statsToggle);
-        
-        ItemStack distanceToggle = createGuiButton(
-            distanceTracking ? Material.COMPASS : Material.BARRIER,
-            "§6§lDistance Tracking: " + (distanceTracking ? "§aEnabled" : "§cDisabled"),
-            List.of("§7Track distance between players", "§7Update Rate: §f" + distanceUpdateTicks + " ticks"),
-            "toggle_distance_tracking");
-        inventory.setItem(13, distanceToggle);
-        
-        ItemStack updateRate = createGuiButton(Material.REPEATER, "§6§lUpdate Rate",
-            List.of("§7Current: §f" + distanceUpdateTicks + " ticks", "§7Left/Right click: ±5 ticks"),
-            "stats_update_rate");
-        inventory.setItem(15, updateRate);
-        
-        openInventorySoon(player, inventory);
+    // -----------------------------------------------------------------
+    // Menu engine
+
+    private void open(Player player, MenuKey key, Object data, boolean replaceHistory) {
+        if (player == null) return;
+        MenuBuilder builder = builders.get(key);
+        if (builder == null) {
+            player.closeInventory();
+            player.sendMessage("§cMenu not implemented: " + key.name());
+            return;
+        }
+
+        MenuRequest request = new MenuRequest(key, data);
+        MenuContext context = new MenuContext(this, player, request);
+        MenuScreen screen = builder.build(context);
+
+        Inventory inventory = GuiCompat.createInventory(null, screen.size(), screen.title());
+        fill(inventory, screen, context);
+
+        sessions.put(player.getUniqueId(), new MenuSession(request, screen, inventory));
+
+        Deque<MenuRequest> stack = history.computeIfAbsent(player.getUniqueId(), id -> new ArrayDeque<>());
+        if (replaceHistory && !stack.isEmpty()) {
+            stack.pop();
+        }
+        if (stack.isEmpty() || !stack.peek().equals(request)) {
+            stack.push(request);
+        }
+
+        player.openInventory(inventory);
     }
 
-    public StatsParent getStatsMenuParent(Player player) {
-        return statsMenuParent.getOrDefault(player.getUniqueId(), StatsParent.SETTINGS);
+    void reopen(Player player) {
+        MenuSession session = sessions.get(player.getUniqueId());
+        if (session == null) return;
+        open(player, session.request.key(), session.request.data(), true);
     }
-    
-    // Kits Menu
-    public void openKitsMenu(Player player) {
-        Inventory inventory = com.example.speedrunnerswap.utils.GuiCompat.createInventory(null, 54, "§6§lKit Management");
-        ItemStack filler = createItem(Material.BLACK_STAINED_GLASS_PANE, " ");
-        fillBorder(inventory, filler);
-        addGameControlsHeader(inventory);
-        
-        // Back button
-        inventory.setItem(0, createGuiButton(Material.ARROW, "§7§lBack", 
-            List.of("§7Return to Settings"), "back_settings"));
-        
-        // Kit options
-        boolean runnerKitEnabled = plugin.getConfig().getBoolean("kits.runner_kit.enabled", false);
-        boolean hunterKitEnabled = plugin.getConfig().getBoolean("kits.hunter_kit.enabled", false);
-        
-        ItemStack runnerKit = createGuiButton(
-            runnerKitEnabled ? Material.DIAMOND_SWORD : Material.WOODEN_SWORD,
-            "§a§lRunner Kit: " + (runnerKitEnabled ? "§aEnabled" : "§cDisabled"),
-            List.of("§7Starting equipment for runners", "§7Click to edit kit contents"),
-            "edit_runner_kit");
-        inventory.setItem(20, runnerKit);
-        
-        ItemStack hunterKit = createGuiButton(
-            hunterKitEnabled ? Material.BOW : Material.STICK,
-            "§c§lHunter Kit: " + (hunterKitEnabled ? "§aEnabled" : "§cDisabled"),
-            List.of("§7Starting equipment for hunters", "§7Click to edit kit contents"),
-            "edit_hunter_kit");
-        inventory.setItem(24, hunterKit);
-        
-        openInventorySoon(player, inventory);
-    }
-    
-    // Kit Editor
-    public void openKitEditor(Player player, String kitType) {
-        String title = kitType.equals("runner") ? "§a§lRunner Kit Editor" : "§c§lHunter Kit Editor";
-        Inventory inventory = com.example.speedrunnerswap.utils.GuiCompat.createInventory(null, 54, title);
-        
-        // Instructions
-        ItemStack instructions = createItem(Material.PAPER, "§e§lInstructions",
-            List.of("§7Place items you want in the kit", "§7Empty slots will be ignored", 
-                    "§7Click 'Save Kit' when finished"));
-        inventory.setItem(4, instructions);
-        
-        // Save button
-        ItemStack save = createGuiButton(Material.EMERALD, "§a§lSave Kit",
-            List.of("§7Save current contents as kit"), "save_" + kitType + "_kit");
-        inventory.setItem(49, save);
-        
-        // Back button
-        inventory.setItem(45, createGuiButton(Material.ARROW, "§7§lBack", 
-            List.of("§7Return to Kit Menu"), "back_kits"));
-        
-        openInventorySoon(player, inventory);
-    }
-    
-    // Bounty Menu
-    public void openBountyMenu(Player player) {
-        Inventory inventory = com.example.speedrunnerswap.utils.GuiCompat.createInventory(null, 54, "§6§lBounty System");
-        ItemStack filler = createItem(Material.BLACK_STAINED_GLASS_PANE, " ");
-        fillBorder(inventory, filler);
-        addGameControlsHeader(inventory);
-        
-        // Back button
-        inventory.setItem(0, createGuiButton(Material.ARROW, "§7§lBack", 
-            List.of("§7Return to Settings"), "back_settings"));
-        
-        // Bounty system settings
-        boolean bountyEnabled = plugin.getConfig().getBoolean("bounty.enabled", false);
-        int baseBounty = plugin.getConfig().getInt("bounty.base_amount", 10);
-        int killMultiplier = plugin.getConfig().getInt("bounty.kill_multiplier", 2);
-        int maxBounty = plugin.getConfig().getInt("bounty.max_amount", 100);
-        
-        ItemStack enableToggle = createGuiButton(
-            bountyEnabled ? Material.GOLD_INGOT : Material.BARRIER,
-            "§6§lBounty System: " + (bountyEnabled ? "§aEnabled" : "§cDisabled"),
-            List.of("§7Toggle bounty rewards for kills"),
-            "toggle_bounty");
-        inventory.setItem(11, enableToggle);
-        
-        ItemStack baseAmount = createGuiButton(Material.GOLD_NUGGET, "§6§lBase Bounty",
-            List.of("§7Current: §f" + baseBounty + " gold", "§7Left/Right click: ±5"),
-            "bounty_base");
-        inventory.setItem(13, baseAmount);
-        
-        ItemStack multiplier = createGuiButton(Material.EXPERIENCE_BOTTLE, "§6§lKill Multiplier",
-            List.of("§7Current: §fx" + killMultiplier, "§7Increases bounty per kill"),
-            "bounty_multiplier");
-        inventory.setItem(15, multiplier);
-        
-        ItemStack maxAmount = createGuiButton(Material.GOLD_BLOCK, "§6§lMax Bounty",
-            List.of("§7Current: §f" + maxBounty + " gold", "§7Left/Right click: ±10"),
-            "bounty_max");
-        inventory.setItem(17, maxAmount);
-        
-        openInventorySoon(player, inventory);
-    }
-    
-    // Last Stand Menu
-    public void openLastStandMenu(Player player) {
-        Inventory inventory = com.example.speedrunnerswap.utils.GuiCompat.createInventory(null, 54, "§c§lLast Stand Mode");
-        ItemStack filler = createItem(Material.BLACK_STAINED_GLASS_PANE, " ");
-        fillBorder(inventory, filler);
-        addGameControlsHeader(inventory);
-        
-        // Back button
-        inventory.setItem(0, createGuiButton(Material.ARROW, "§7§lBack", 
-            List.of("§7Return to Settings"), "back_settings"));
-        
-        // Last Stand settings
-        boolean lastStandEnabled = plugin.getConfig().getBoolean("last_stand.enabled", false);
-        int healthThreshold = plugin.getConfig().getInt("last_stand.health_threshold", 4);
-        ItemStack enableToggle = createGuiButton(
-            lastStandEnabled ? Material.TOTEM_OF_UNDYING : Material.BARRIER,
-            "§c§lLast Stand: " + (lastStandEnabled ? "§aEnabled" : "§cDisabled"),
-            List.of("§7Special effects when low on health",
-                    "§7Click to toggle on/off"),
-            "toggle_last_stand");
-        inventory.setItem(11, enableToggle);
-        
-        ItemStack threshold = createGuiButton(Material.RED_DYE, "§c§lHealth Threshold",
-            List.of("§7Current: §f" + healthThreshold + " hearts", 
-                    "§7Left click: +1 heart",
-                    "§7Right click: -1 heart"),
-            "last_stand_threshold");
-        inventory.setItem(13, threshold);
-        
-        int durationTicks = plugin.getConfigManager().getLastStandDuration();
-        ItemStack durationItem = createGuiButton(Material.CLOCK, "§c§lDuration",
-            List.of("§7Current: §f" + (durationTicks / 20) + " seconds",
-                    "§7Left click: +1 second",
-                    "§7Shift + Left: +5 seconds",
-                    "§7Right click: -1 second",
-                    "§7Shift + Right: -5 seconds"),
-            "last_stand_duration");
-        inventory.setItem(15, durationItem);
-        
-        ItemStack strengthAmp = createGuiButton(Material.IRON_SWORD, "§e§lStrength Amplifier",
-            List.of("§7Current: §f" + plugin.getConfigManager().getLastStandStrengthAmplifier(),
-                    "§7Left click: +1 level",
-                    "§7Right click: -1 level"),
-            "last_stand_strength");
-        inventory.setItem(20, strengthAmp);
-        
-        ItemStack speedAmp = createGuiButton(Material.SUGAR, "§b§lSpeed Amplifier",
-            List.of("§7Current: §f" + plugin.getConfigManager().getLastStandSpeedAmplifier(),
-                    "§7Left click: +1 level",
-                    "§7Right click: -1 level"),
-            "last_stand_speed");
-        inventory.setItem(24, speedAmp);
-        
-        openInventorySoon(player, inventory);
-    }
-    
-    // Compass Settings Menu
-    public void openCompassSettingsMenu(Player player) {
-        Inventory inventory = com.example.speedrunnerswap.utils.GuiCompat.createInventory(null, 54, "§b§lCompass Settings");
-        ItemStack filler = createItem(Material.BLACK_STAINED_GLASS_PANE, " ");
-        fillBorder(inventory, filler);
-        addGameControlsHeader(inventory);
-        
-        // Back button
-        inventory.setItem(0, createGuiButton(Material.ARROW, "§7§lBack", 
-            List.of("§7Return to Settings"), "back_settings"));
-        
-        // Compass settings
-        boolean compassEnabled = plugin.getConfig().getBoolean("tracker.enabled", true);
-        int updateInterval = plugin.getConfig().getInt("tracker.update_ticks", 20);
-        int trackingRange = plugin.getConfig().getInt("tracker.max_distance", 1000);
-        boolean showDistance = plugin.getConfig().getBoolean("tracker.show_distance", true);
-        
-        ItemStack enableToggle = createGuiButton(
-            compassEnabled ? Material.COMPASS : Material.BARRIER,
-            "§b§lCompass Tracking: " + (compassEnabled ? "§aEnabled" : "§cDisabled"),
-            List.of("§7Toggle compass tracking system"),
-            "toggle_compass");
-        inventory.setItem(11, enableToggle);
-        
-        ItemStack updateRate = createGuiButton(Material.REPEATER, "§b§lUpdate Interval",
-            List.of("§7Current: §f" + updateInterval + " ticks", "§7Left/Right click: ±5"),
-            "compass_update");
-        inventory.setItem(13, updateRate);
-        
-        ItemStack range = createGuiButton(Material.SPYGLASS, "§b§lTracking Range",
-            List.of("§7Current: §f" + trackingRange + " blocks",
-                    "§7Left/Right click: ±10",
-                    "§7Shift + Left/Right: ±50"),
-            "compass_range");
-        inventory.setItem(15, range);
-        
-        ItemStack distanceToggle = createGuiButton(
-            showDistance ? Material.MAP : Material.PAPER,
-            "§b§lShow Distance: " + (showDistance ? "§aEnabled" : "§cDisabled"),
-            List.of("§7Show distance to tracked player"),
-            "compass_distance");
-        inventory.setItem(17, distanceToggle);
-        
-        openInventorySoon(player, inventory);
-    }
-    
-    // Sudden Death Menu
-    public void openSuddenDeathMenu(Player player) {
-        Inventory inventory = com.example.speedrunnerswap.utils.GuiCompat.createInventory(null, 54, "§4§lSudden Death Mode");
-        ItemStack filler = createItem(Material.BLACK_STAINED_GLASS_PANE, " ");
-        fillBorder(inventory, filler);
-        addGameControlsHeader(inventory);
-        
-        // Back button
-        inventory.setItem(0, createGuiButton(Material.ARROW, "§7§lBack", 
-            List.of("§7Return to Settings"), "back_settings"));
-        
-        // Sudden Death settings
-        boolean suddenDeathEnabled = plugin.getConfig().getBoolean("sudden_death.enabled", false);
-        int triggerTime = plugin.getConfig().getInt("sudden_death.trigger_time", 1800); // 30 minutes
-        boolean noRegen = plugin.getConfig().getBoolean("sudden_death.no_regen", true);
-        boolean oneHit = plugin.getConfig().getBoolean("sudden_death.one_hit_kill", false);
-        boolean gameRunning = plugin.getGameManager().isGameRunning();
-        boolean suddenDeathActive = plugin.getSuddenDeathManager().isActive();
-        
-        ItemStack enableToggle = createGuiButton(
-            suddenDeathEnabled ? Material.WITHER_SKELETON_SKULL : Material.BARRIER,
-            "§4§lSudden Death: " + (suddenDeathEnabled ? "§aEnabled" : "§cDisabled"),
-            List.of("§7Activate after long games",
-                    "§7Click to toggle on/off"),
-            "toggle_sudden_death");
-        inventory.setItem(11, enableToggle);
-        
-        ItemStack triggerTimeItem = createGuiButton(Material.CLOCK, "§4§lTrigger Time",
-            List.of("§7Current: §f" + (triggerTime/60) + " minutes", 
-                    "§7Left click: +5 minutes",
-                    "§7Right click: -5 minutes"),
-            "sudden_death_time");
-        inventory.setItem(13, triggerTimeItem);
-        
-        ItemStack noRegenToggle = createGuiButton(
-            noRegen ? Material.ROTTEN_FLESH : Material.GOLDEN_APPLE,
-            "§4§lNo Regeneration: " + (noRegen ? "§aEnabled" : "§cDisabled"),
-            List.of("§7Disable natural health regen",
-                    "§7Click to toggle"),
-            "sudden_death_no_regen");
-        inventory.setItem(15, noRegenToggle);
-        
-        ItemStack oneHitToggle = createGuiButton(
-            oneHit ? Material.NETHERITE_SWORD : Material.WOODEN_SWORD,
-            "§4§lOne Hit Kill: " + (oneHit ? "§aEnabled" : "§cDisabled"),
-            List.of("§7Any damage kills instantly",
-                    "§7§cExtremely dangerous mode!",
-                    "§7Click to toggle"),
-            "sudden_death_one_hit");
-        inventory.setItem(17, oneHitToggle);
-        
-        // Control buttons
-        if (gameRunning && !suddenDeathActive) {
-            ItemStack activateNow = createGuiButton(Material.TNT, "§c§lActivate Now",
-                List.of("§7Force immediate sudden death",
-                        "§7§cWarning: Will teleport all players!"),
-                "activate_sudden_death_now");
-            inventory.setItem(29, activateNow);
-        }
-        
-        if (plugin.getSuddenDeathManager().isScheduled()) {
-            ItemStack cancel = createGuiButton(Material.BARRIER, "§e§lCancel Scheduled",
-                List.of("§7Cancel automatic sudden death"),
-                "cancel_sudden_death");
-            inventory.setItem(31, cancel);
-        } else if (gameRunning) {
-            ItemStack schedule = createGuiButton(Material.CLOCK, "§e§lSchedule Activation",
-                List.of("§7Auto-activate after delay time"),
-                "schedule_sudden_death");
-            inventory.setItem(31, schedule);
-        }
-        
-        openInventorySoon(player, inventory);
-    }
-    
-    public void openBroadcastSettingsMenu(Player player) {
-        Inventory inventory = com.example.speedrunnerswap.utils.GuiCompat.createInventory(null, 27, "§e§lBroadcast Settings");
-        ItemStack filler = createItem(Material.YELLOW_STAINED_GLASS_PANE, " ");
-        fillBorder(inventory, filler);
-        addGameControlsHeader(inventory);
-        
-        // Back button
-        inventory.setItem(0, createGuiButton(Material.ARROW, "§7§lBack",
-            List.of("§7Return to Advanced Settings"), "back_settings"));
-        
-        // Broadcast toggles
-        boolean broadcastEnabled = plugin.getConfig().getBoolean("broadcasts.enabled", true);
-        inventory.setItem(10, createGuiButton(
-            broadcastEnabled ? Material.BELL : Material.GRAY_DYE,
-            "§e§lBroadcast Events: " + (broadcastEnabled ? "§aON" : "§cOFF"),
-            List.of("§7Toggle all broadcast messages"), "toggle_broadcasts"));
-        
-        boolean gameEvents = plugin.getConfig().getBoolean("broadcasts.game_events", true);
-        inventory.setItem(12, createGuiButton(
-            gameEvents ? Material.EMERALD : Material.GRAY_DYE,
-            "§e§lGame Events: " + (gameEvents ? "§aON" : "§cOFF"),
-            List.of("§7Broadcast start/stop/pause events"), "toggle_game_events"));
-        
-        boolean teamChanges = plugin.getConfig().getBoolean("broadcasts.team_changes", true);
-        inventory.setItem(14, createGuiButton(
-            teamChanges ? Material.PLAYER_HEAD : Material.GRAY_DYE,
-            "§e§lTeam Changes: " + (teamChanges ? "§aON" : "§cOFF"),
-            List.of("§7Broadcast team assignment changes"), "toggle_team_changes"));
-        
-        openInventorySoon(player, inventory);
-    }
-    
-    public void openLimboSettingsMenu(Player player) {
-        Inventory inventory = com.example.speedrunnerswap.utils.GuiCompat.createInventory(null, 27, "§6§lLimbo Configuration");
-        ItemStack filler = createItem(Material.PURPLE_STAINED_GLASS_PANE, " ");
-        fillBorder(inventory, filler);
-        addGameControlsHeader(inventory);
-        
-        // Back button
-        inventory.setItem(0, createGuiButton(Material.ARROW, "§7§lBack",
-            List.of("§7Return to Advanced Settings"), "back_settings"));
-        
-        // Current limbo settings
-        String limboWorld = plugin.getConfig().getString("limbo.world", "world");
-        double limboX = plugin.getConfig().getDouble("limbo.x", 0.5);
-        double limboY = plugin.getConfig().getDouble("limbo.y", 200.0);
-        double limboZ = plugin.getConfig().getDouble("limbo.z", 0.5);
-        
-        inventory.setItem(10, createGuiButton(Material.GRASS_BLOCK, "§e§lLimbo World",
-            List.of("§7Current: §f" + limboWorld,
-                    "§7Click to change world"), "limbo_world"));
-        
-        inventory.setItem(12, createGuiButton(Material.COMPASS, "§e§lLimbo Coordinates",
-            List.of("§7X: §f" + limboX,
-                    "§7Y: §f" + limboY,
-                    "§7Z: §f" + limboZ,
-                    "§7Click to edit coordinates"), "limbo_coords"));
-        
-        inventory.setItem(14, createGuiButton(Material.ENDER_PEARL, "§a§lSet to Current Location",
-            List.of("§7Set limbo to your current position"), "limbo_set_current"));
-        
-        openInventorySoon(player, inventory);
-    }
-    
-    public void openUIPerformanceMenu(Player player) {
-        Inventory inventory = com.example.speedrunnerswap.utils.GuiCompat.createInventory(null, 27, "§d§lUI Performance Settings");
-        ItemStack filler = createItem(Material.MAGENTA_STAINED_GLASS_PANE, " ");
-        fillBorder(inventory, filler);
-        addGameControlsHeader(inventory);
 
-        
-        // Back button
-        inventory.setItem(0, createGuiButton(Material.ARROW, "§7§lBack",
-            List.of("§7Return to Advanced Settings"), "back_settings"));
-        
-        // Update frequency settings
-        int actionbarTicks = plugin.getConfig().getInt("ui.update_ticks.actionbar", 20);
-        int titleTicks = plugin.getConfig().getInt("ui.update_ticks.title", 10);
-        int trackerTicks = plugin.getConfig().getInt("tracker.update_ticks", 20);
-        
-        inventory.setItem(10, createGuiButton(Material.CLOCK, "§e§lActionbar Update Rate",
-            List.of("§7Current: §f" + actionbarTicks + " ticks (" + (actionbarTicks/20.0) + "s)",
-                    "§7How often timer actionbars update",
-                    "§7Left/Right: ±5 ticks"), "actionbar_rate"));
-        
-        inventory.setItem(12, createGuiButton(Material.EXPERIENCE_BOTTLE, "§e§lTitle Update Rate",
-            List.of("§7Current: §f" + titleTicks + " ticks (" + (titleTicks/20.0) + "s)",
-                    "§7How often waiting runner titles update",
-                    "§7Left/Right: ±5 ticks"), "title_rate"));
-        
-        inventory.setItem(14, createGuiButton(Material.COMPASS, "§e§lTracker Update Rate",
-            List.of("§7Current: §f" + trackerTicks + " ticks (" + (trackerTicks/20.0) + "s)",
-                    "§7How often hunter compasses update",
-                    "§7Left/Right: ±5 ticks"), "tracker_rate"));
-        
-        inventory.setItem(16, createGuiButton(Material.REDSTONE, "§c§lPerformance Tips",
-            List.of("§7Lower values = more responsive UI",
-                    "§7Higher values = better server performance",
-                    "§7Recommended: 10-20 ticks"), "performance_info"));
-        
-        openInventorySoon(player, inventory);
+    void open(Player player, MenuKey key) {
+        open(player, key, null, false);
     }
+
+    void open(Player player, MenuKey key, Object data) {
+        open(player, key, data, false);
+    }
+
+    void openPrevious(Player player) {
+        Deque<MenuRequest> stack = history.get(player.getUniqueId());
+        if (stack == null || stack.isEmpty()) {
+            player.closeInventory();
+            return;
+        }
+        stack.pop(); // current
+        if (stack.isEmpty()) {
+            player.closeInventory();
+            return;
+        }
+        MenuRequest previous = stack.peek();
+        open(player, previous.key(), previous.data(), true);
+    }
+
+    private void fill(Inventory inventory, MenuScreen screen, MenuContext context) {
+        int rows = inventory.getSize() / 9;
+        for (int i = 0; i < inventory.getSize(); i++) {
+            int row = i / 9;
+            int col = i % 9;
+            ItemStack filler;
+            if (row == 0 || row == rows - 1 || col == 0 || col == 8) {
+                filler = FILLER_BORDER.clone();
+            } else {
+                boolean usePrimary = ((row + col) % 2) == 0;
+                filler = (usePrimary ? FILLER_PRIMARY : FILLER_ACCENT).clone();
+            }
+            inventory.setItem(i, filler);
+        }
+        for (MenuItem item : screen.items()) {
+            if (item.slot() < 0 || item.slot() >= inventory.getSize()) continue;
+            ItemStack icon = item.icon().apply(context);
+            ItemMeta meta = icon.getItemMeta();
+            meta.getPersistentDataContainer().set(BUTTON_KEY, PersistentDataType.STRING, item.id());
+            icon.setItemMeta(meta);
+            inventory.setItem(item.slot(), icon);
+        }
+    }
+
+    @EventHandler
+    public void onInventoryClick(InventoryClickEvent event) {
+        if (!(event.getWhoClicked() instanceof Player player)) return;
+        MenuSession session = sessions.get(player.getUniqueId());
+        if (session == null) return;
+        if (!Objects.equals(event.getView().getTopInventory(), session.inventory())) return;
+
+        event.setCancelled(true);
+        ItemStack current = event.getCurrentItem();
+        if (current == null || current.getType() == Material.AIR) return;
+        ItemMeta meta = current.getItemMeta();
+        if (meta == null) return;
+        PersistentDataContainer container = meta.getPersistentDataContainer();
+        String id = container.get(BUTTON_KEY, PersistentDataType.STRING);
+        if (id == null) return;
+
+        MenuItem item = session.screen.button(id);
+        if (item == null || item.action() == null) return;
+
+        MenuClickContext ctx = new MenuClickContext(this, player, session.request, event.isShiftClick(), event.getClick());
+        item.action().accept(ctx);
+    }
+
+    @EventHandler
+    public void onInventoryDrag(InventoryDragEvent event) {
+        if (!(event.getWhoClicked() instanceof Player player)) return;
+        MenuSession session = sessions.get(player.getUniqueId());
+        if (session == null) return;
+        if (Objects.equals(event.getView().getTopInventory(), session.inventory())) {
+            event.setCancelled(true);
+        }
+    }
+
+    @EventHandler
+    public void onInventoryClose(InventoryCloseEvent event) {
+        if (!(event.getPlayer() instanceof Player player)) return;
+        MenuSession session = sessions.get(player.getUniqueId());
+        if (session != null && Objects.equals(session.inventory(), event.getInventory())) {
+            sessions.remove(player.getUniqueId());
+        }
+    }
+
+    // -----------------------------------------------------------------
+    // Menu registrations
+
+    private void registerBuilders() {
+        builders.put(MenuKey.MAIN, ctx -> buildMainMenu(ctx));
+        builders.put(MenuKey.MODE_SELECT, ctx -> buildModeSelect(ctx, false));
+        builders.put(MenuKey.MODE_SELECT_DIRECT, ctx -> buildModeSelect(ctx, true));
+        builders.put(MenuKey.TEAM_MANAGEMENT, this::buildTeamMenu);
+        builders.put(MenuKey.SETTINGS_HOME, this::buildSettingsHome);
+        builders.put(MenuKey.SETTINGS_SWAP, this::buildSwapSettings);
+        builders.put(MenuKey.SETTINGS_SAFETY, this::buildSafetySettings);
+        builders.put(MenuKey.SETTINGS_HUNTER, this::buildHunterSettings);
+        builders.put(MenuKey.POWERUPS_ROOT, this::buildPowerUpsRoot);
+        builders.put(MenuKey.POWERUPS_EFFECTS, this::buildPowerUpEffects);
+        builders.put(MenuKey.POWERUPS_DURATION, this::buildPowerUpDurations);
+        builders.put(MenuKey.DANGEROUS_BLOCKS, this::buildDangerousBlocks);
+        builders.put(MenuKey.SETTINGS_WORLD_BORDER, this::buildWorldBorder);
+        builders.put(MenuKey.SETTINGS_BOUNTY, this::buildBounty);
+        builders.put(MenuKey.SETTINGS_LAST_STAND, this::buildLastStand);
+        builders.put(MenuKey.SETTINGS_SUDDEN_DEATH, this::buildSuddenDeath);
+        builders.put(MenuKey.STATS_ROOT, this::buildStatsRoot);
+        builders.put(MenuKey.STATS_ADVANCED, this::buildStatsAdvanced);
+        builders.put(MenuKey.SETTINGS_TASK, this::buildTaskSettings);
+        builders.put(MenuKey.TASK_HOME, this::buildTaskHome);
+        builders.put(MenuKey.TASK_CUSTOM, this::buildTaskCustom);
+        builders.put(MenuKey.TASK_POOL, this::buildTaskPool);
+        builders.put(MenuKey.TASK_ASSIGNMENTS, this::buildTaskAssignments);
+        builders.put(MenuKey.SETTINGS_VOICE_CHAT, this::buildVoiceChat);
+        builders.put(MenuKey.SETTINGS_BROADCAST, this::buildBroadcast);
+        builders.put(MenuKey.SETTINGS_UI, this::buildUiSettings);
+        builders.put(MenuKey.KIT_MANAGER, this::buildKitManager);
+    }
+
+    // -----------------------------------------------------------------
+    // Menu builders
+
+    private void resetNavigation(Player player) {
+        UUID id = player.getUniqueId();
+        sessions.remove(id);
+        history.remove(id);
+    }
+
+    private MenuScreen buildMainMenu(MenuContext ctx) {
+        List<MenuItem> items = new ArrayList<>();
+        GameManager gm = plugin.getGameManager();
+        ConfigManager cfg = plugin.getConfigManager();
+        boolean running = gm.isGameRunning();
+        boolean paused = gm.isGamePaused();
+        SpeedrunnerSwap.SwapMode mode = plugin.getCurrentMode();
+
+        items.add(backButton(0, "§7§lBack", null, null, null));
+
+        List<String> statusLore = new ArrayList<>();
+        statusLore.add("§7Mode: §f" + mode.name());
+        statusLore.add("§7Running: " + (running ? "§aYes" : "§cNo"));
+        statusLore.add("§7Paused: " + (paused ? "§eYes" : "§cNo"));
+        statusLore.add("§7Speed Owners: §b" + gm.getRunners().size());
+        if (mode == SpeedrunnerSwap.SwapMode.DREAM) {
+            statusLore.add("§7Hunters: §c" + gm.getHunters().size());
+        } else {
+            statusLore.add("§7Hunters: §8Not used in this mode");
+        }
+        items.add(simpleItem(4, () -> icon(Material.CLOCK, "§6§lGame Status", statusLore)));
+
+        if (!running) {
+            items.add(clickItem(10, () -> icon(Material.LIME_CONCRETE, "§a§lStart Game",
+                    List.of("§7Swap interval: §f" + cfg.getSwapInterval() + "s")), ctxClick -> {
+                if (gm.startGame()) {
+                    Msg.send(ctxClick.player(), "§aGame started!");
+                } else {
+                    Msg.send(ctxClick.player(), "§cCannot start. Check team assignments.");
+                }
+                ctxClick.reopen();
+            }));
+        } else {
+            items.add(clickItem(10, () -> icon(Material.RED_CONCRETE, "§c§lStop Game", List.of("§7End the current game")), ctxClick -> {
+                gm.stopGame();
+                Msg.send(ctxClick.player(), "§cGame stopped.");
+                ctxClick.reopen();
+            }));
+            if (paused) {
+                items.add(clickItem(12, () -> icon(Material.ORANGE_CONCRETE, "§a§lResume", List.of("§7Resume swaps")), ctxClick -> {
+                    gm.resumeGame();
+                    ctxClick.reopen();
+                }));
+            } else {
+                items.add(clickItem(12, () -> icon(Material.YELLOW_CONCRETE, "§e§lPause", List.of("§7Pause swaps")), ctxClick -> {
+                    gm.pauseGame();
+                    ctxClick.reopen();
+                }));
+            }
+            items.add(clickItem(14, () -> icon(Material.NETHER_STAR, "§e§lForce Swap", List.of("§7Trigger immediate swap")), ctxClick -> {
+                gm.triggerImmediateSwap();
+                Msg.send(ctxClick.player(), "§eSwap triggered.");
+            }));
+        }
+
+        items.add(clickItem(18, () -> icon(Material.NETHER_STAR, "§d§lAbout muj3b",
+                List.of(
+                        "§7Click to show support info",
+                        "§7and share the donation link.")), ctxClick -> {
+            plugin.getGameManager().sendDonationMessage(ctxClick.player());
+            Msg.send(ctxClick.player(), "§dThanks for supporting muj3b!");
+        }));
+
+        items.add(clickItem(20, () -> icon(Material.PLAYER_HEAD, "§b§lTeam Management", List.of("§7Assign runners & hunters")),
+                ctxClick -> open(ctxClick.player(), MenuKey.TEAM_MANAGEMENT, null, false)));
+        items.add(clickItem(21, () -> icon(Material.ENDER_EYE, "§d§lChoose Mode", List.of("§7Switch Dream/Sapnap/Task")),
+                ctxClick -> open(ctxClick.player(), MenuKey.MODE_SELECT, null, false)));
+        items.add(clickItem(22, () -> icon(Material.COMPARATOR, "§6§lSettings", List.of("§7Configure every mechanic")),
+                ctxClick -> open(ctxClick.player(), MenuKey.SETTINGS_HOME, null, false)));
+        items.add(clickItem(23, () -> icon(Material.BOOK, "§b§lStatistics", List.of("§7Adjust stat tracking")),
+                ctxClick -> openStatisticsMenu(ctxClick.player(), StatsParent.MAIN)));
+        items.add(clickItem(24, () -> icon(Material.TARGET, "§6§lTask Manager", List.of("§7Manage secret tasks")),
+                ctxClick -> open(ctxClick.player(), MenuKey.TASK_HOME, null, false)));
+
+        items.add(clickItem(30, () -> icon(Material.POTION, "§d§lPower-ups", List.of("§7Configure swap effects")),
+                ctxClick -> open(ctxClick.player(), MenuKey.POWERUPS_ROOT, null, false)));
+        items.add(clickItem(31, () -> icon(Material.BARRIER, "§c§lDangerous Blocks", List.of("§7Safe swap blacklist")),
+                ctxClick -> open(ctxClick.player(), MenuKey.DANGEROUS_BLOCKS, null, false)));
+        items.add(clickItem(32, () -> icon(Material.GOLD_INGOT, "§6§lBounty System", List.of("§7Hunter rewards")),
+                ctxClick -> open(ctxClick.player(), MenuKey.SETTINGS_BOUNTY, null, false)));
+        items.add(clickItem(33, () -> icon(Material.DRAGON_HEAD, "§4§lSudden Death", List.of("§7Endgame showdown")),
+                ctxClick -> open(ctxClick.player(), MenuKey.SETTINGS_SUDDEN_DEATH, null, false)));
+
+        if (mode == SpeedrunnerSwap.SwapMode.SAPNAP) {
+            items.add(clickItem(40, () -> icon(Material.CLOCK, "§b§lQueue Shuffle", List.of("§7Randomize runner order")),
+                    ctxClick -> {
+                        if (plugin.getGameManager().shuffleQueue()) {
+                            Msg.send(ctxClick.player(), "§aRunner queue shuffled.");
+                        } else {
+                            Msg.send(ctxClick.player(), "§cNot enough runners to shuffle.");
+                        }
+                    }));
+        }
+
+        return new MenuScreen(plugin.getConfigManager().getGuiMainMenuTitle(), 54, items);
+    }
+
+    private MenuScreen buildModeSelect(MenuContext ctx, boolean direct) {
+        List<MenuItem> items = new ArrayList<>();
+        SpeedrunnerSwap.SwapMode current = plugin.getCurrentMode();
+
+        if (direct) {
+            items.add(simpleItem(4, () -> icon(Material.NETHER_STAR, "§e§lWelcome to Speedrunner Swap",
+                    List.of("§7Pick the challenge you want to run","§7and jump straight into setup."))));
+            items.add(modeItem(10, SpeedrunnerSwap.SwapMode.DREAM, true, current));
+            items.add(modeItem(13, SpeedrunnerSwap.SwapMode.SAPNAP, true, current));
+            items.add(modeItem(16, SpeedrunnerSwap.SwapMode.TASK, true, current));
+            items.add(simpleItem(22, () -> icon(Material.MAP, "§b§lCurrent Mode",
+                    List.of("§7Active: §f" + current.name(), "", "§7Select another icon to switch."))));
+            items.add(clickItem(29, () -> icon(Material.PLAYER_HEAD, "§a§lTeam Manager",
+                    List.of("§7Assign runners & hunters")),
+                    context -> open(context.player(), MenuKey.TEAM_MANAGEMENT, null, false)));
+            items.add(clickItem(31, () -> icon(Material.EMERALD, "§a§lOpen Control Hub",
+                    List.of("§7Go straight to the main dashboard")),
+                    context -> open(context.player(), MenuKey.MAIN, null, false)));
+            items.add(clickItem(33, () -> icon(Material.COMPARATOR, "§6§lQuick Settings",
+                    List.of("§7Tweak core mechanics instantly")),
+                    context -> open(context.player(), MenuKey.SETTINGS_HOME, null, false)));
+            items.add(backButton(35, "§7§lBack", null, null, null));
+        } else {
+            items.add(modeItem(11, SpeedrunnerSwap.SwapMode.DREAM, false, current));
+            items.add(modeItem(13, SpeedrunnerSwap.SwapMode.SAPNAP, false, current));
+            items.add(modeItem(15, SpeedrunnerSwap.SwapMode.TASK, false, current));
+            items.add(backButton(22, "§7§lBack", MenuKey.MAIN, null,
+                    player -> openPrevious(player)));
+        }
+
+        int size = direct ? 36 : 27;
+        String title = direct ? "§9§lSpeedrunner Swap Hub" : "§6§lMode Selector";
+        return new MenuScreen(title, size, items);
+    }
+
+    private MenuItem modeItem(int slot, SpeedrunnerSwap.SwapMode mode, boolean direct, SpeedrunnerSwap.SwapMode current) {
+        boolean selected = mode == current;
+        Material mat = switch (mode) {
+            case DREAM -> Material.DIAMOND_SWORD;
+            case SAPNAP -> Material.DIAMOND_BOOTS;
+            case TASK -> Material.TARGET;
+        };
+        List<String> lore = new ArrayList<>();
+        lore.add("§8────────────────");
+        switch (mode) {
+            case DREAM -> lore.addAll(List.of("§e§lSpeedrunners vs Hunters", "§7Classic chase experience"));
+            case SAPNAP -> lore.addAll(List.of("§b§lMulti-runner Control", "§7Share one body cooperatively"));
+            case TASK -> lore.addAll(List.of("§6§lTask Master", "§7Secret objectives and deception"));
+        }
+        if (direct) {
+            lore.add("");
+            switch (mode) {
+                case DREAM -> lore.addAll(List.of("§7Recommended: §f3+ players", "§7(1 runner, 2+ hunters)"));
+                case SAPNAP -> lore.addAll(List.of("§7Recommended: §f2-4 players", "§7Perfect for co-op runs"));
+                case TASK -> lore.addAll(List.of("§7Recommended: §f3+ players", "§7For strategic chaos"));
+            }
+        }
+        lore.add("");
+        lore.add(selected ? "§aCurrently active" : "§eClick to switch");
+
+        return clickItem(slot, () -> {
+            ItemStack icon = icon(mat, (selected ? "§a§l" : "§e§l") + switch (mode) {
+                case DREAM -> "Dream";
+                case SAPNAP -> "Sapnap";
+                case TASK -> "Task Master";
+            }, lore);
+            if (selected) {
+                ItemMeta meta = icon.getItemMeta();
+                meta.addEnchant(org.bukkit.enchantments.Enchantment.UNBREAKING, 1, true);
+                meta.addItemFlags(org.bukkit.inventory.ItemFlag.HIDE_ENCHANTS);
+                icon.setItemMeta(meta);
+            }
+            return icon;
+        }, ctx -> {
+            if (selected) {
+                Msg.send(ctx.player(), "§eAlready using that mode.");
+                return;
+            }
+            if (plugin.getGameManager().isGameRunning()) {
+                Msg.send(ctx.player(), "§cStop the current game before switching modes.");
+                return;
+            }
+            plugin.setCurrentMode(mode);
+            Msg.send(ctx.player(), "§aSwitched to §f" + mode.name() + "§a mode.");
+            if (direct) {
+                open(ctx.player(), MenuKey.MAIN, null, false);
+            } else {
+                ctx.reopen();
+            }
+        });
+    }
+
+    private MenuScreen buildTeamMenu(MenuContext ctx) {
+        Player viewer = ctx.player();
+        GameManager gm = plugin.getGameManager();
+        Team initialFocus = teamFocus.computeIfAbsent(viewer.getUniqueId(), uuid -> Team.RUNNER);
+
+        boolean huntersAvailable = plugin.getCurrentMode() == SpeedrunnerSwap.SwapMode.DREAM;
+        if (!huntersAvailable && initialFocus == Team.HUNTER) {
+            initialFocus = Team.RUNNER;
+            teamFocus.put(viewer.getUniqueId(), Team.RUNNER);
+        }
+        final Team focus = initialFocus;
+
+        List<MenuItem> items = new ArrayList<>();
+
+        items.add(backButton(0, "§7§lBack", MenuKey.MAIN, null, this::openMainMenu));
+
+        items.add(clickItem(2, () -> icon(Material.DIAMOND_BOOTS,
+                focus == Team.RUNNER ? "§a§lAssigning Runners" : "§b§lAssign Runners",
+                List.of("§7Click to set focus")), ctxClick -> {
+            teamFocus.put(ctxClick.player().getUniqueId(), Team.RUNNER);
+            ctxClick.reopen();
+        }));
+
+        List<String> instructionLore = new ArrayList<>();
+        instructionLore.add("§71. Select runner/hunter focus");
+        instructionLore.add("§72. Click player head to assign");
+        instructionLore.add("§73. Shift-click to remove");
+        if (plugin.getCurrentMode() != SpeedrunnerSwap.SwapMode.DREAM) {
+            instructionLore.add("§cThis mode uses speed owners only.");
+            instructionLore.add("§7Assigning hunters is disabled.");
+        }
+        items.add(simpleItem(4, () -> icon(Material.BOOK, "§e§lInstructions", instructionLore)));
+
+        items.add(clickItem(6, () -> icon(Material.IRON_SWORD,
+                huntersAvailable
+                        ? (focus == Team.HUNTER ? "§a§lAssigning Hunters" : "§c§lAssign Hunters")
+                        : "§7§lHunters Disabled",
+                huntersAvailable
+                        ? List.of("§7Click to set focus")
+                        : List.of("§7Dream mode only")), ctxClick -> {
+            if (!huntersAvailable) {
+                Msg.send(ctxClick.player(), "§eHunters are only available in Dream mode.");
+                return;
+            }
+            teamFocus.put(ctxClick.player().getUniqueId(), Team.HUNTER);
+            ctxClick.reopen();
+        }));
+
+        items.add(clickItem(8, () -> icon(Material.BARRIER, "§c§lClear All", List.of("§7Remove all assignments")), ctxClick -> {
+            Set<Player> affected = new HashSet<>();
+            affected.addAll(gm.getRunners());
+            affected.addAll(gm.getHunters());
+            gm.clearAllTeams();
+            Msg.send(ctxClick.player(), "§cCleared all teams.");
+            for (Player p : affected) {
+                if (p != null && p.isOnline() && p != ctxClick.player()) {
+                    Msg.send(p, "§eYour team assignment was cleared by §f" + ctxClick.player().getName());
+                }
+            }
+            ctxClick.reopen();
+        }));
+
+        int slot = 9;
+        for (Player online : Bukkit.getOnlinePlayers()) {
+            if (slot >= 54) break;
+            Team assigned = gm.isRunner(online) ? Team.RUNNER : gm.isHunter(online) ? Team.HUNTER : Team.NONE;
+            ItemStack head = new ItemStack(Material.PLAYER_HEAD);
+            SkullMeta meta = (SkullMeta) head.getItemMeta();
+            meta.setOwningPlayer(online);
+            String prefix = switch (assigned) {
+                case RUNNER -> "§b";
+                case HUNTER -> "§c";
+                case NONE -> "§7";
+            };
+            GuiCompat.setDisplayName(meta, prefix + online.getName());
+            Team currentFocus = huntersAvailable ? focus : Team.RUNNER;
+            List<String> lore = new ArrayList<>();
+            lore.add("§7Team: " + switch (assigned) {
+                case RUNNER -> "§bRunner";
+                case HUNTER -> "§cHunter";
+                case NONE -> "§7Unassigned";
+            });
+            lore.add("§7Focus: " + (currentFocus == Team.RUNNER ? "§bSpeed Owners" : "§cHunters"));
+            lore.add("§7Click to assign, shift-click to clear");
+            GuiCompat.setLore(meta, lore);
+            head.setItemMeta(meta);
+
+            items.add(clickItem(slot, () -> head, ctxClick -> {
+                Team targetTeam = ctxClick.shift() ? Team.NONE : teamFocus.getOrDefault(ctxClick.player().getUniqueId(), Team.RUNNER);
+                if (!huntersAvailable && targetTeam == Team.HUNTER) {
+                    teamFocus.put(ctxClick.player().getUniqueId(), Team.RUNNER);
+                    Msg.send(ctxClick.player(), "§eAssign hunters only when Dream mode is active.");
+                    ctxClick.reopen();
+                    return;
+                }
+                if (targetTeam == Team.HUNTER && !huntersAvailable) {
+                    Msg.send(ctxClick.player(), "§eAssign hunters only when Dream mode is active.");
+                    return;
+                }
+                boolean changed = gm.assignPlayerToTeam(online, targetTeam);
+                if (!changed) {
+                    Msg.send(ctxClick.player(), "§eNo change for §f" + online.getName());
+                } else if (targetTeam == Team.NONE) {
+                    Msg.send(ctxClick.player(), "§eRemoved §f" + online.getName() + "§e from teams.");
+                    if (online != ctxClick.player()) Msg.send(online, "§eYou were removed from all teams by §f" + ctxClick.player().getName());
+                } else {
+                    String label = targetTeam == Team.RUNNER ? "§bSpeed Owners" : "§cHunters";
+                    Msg.send(ctxClick.player(), "§aAdded §f" + online.getName() + "§a to " + label + "§a.");
+                    if (online != ctxClick.player()) Msg.send(online, "§eYou were assigned to " + label + " §eby §f" + ctxClick.player().getName());
+                }
+                ctxClick.reopen();
+            }));
+
+            slot++;
+            if ((slot + 1) % 9 == 0) slot += 2;
+        }
+
+        return new MenuScreen(plugin.getConfigManager().getGuiTeamSelectorTitle(), 54, items);
+    }
+
+    private MenuScreen buildSettingsHome(MenuContext ctx) {
+        List<MenuItem> items = new ArrayList<>();
+        items.add(backButton(0, "§7§lBack", MenuKey.MAIN, null, this::openMainMenu));
+
+        items.add(navigateItem(10, Material.CLOCK, "§e§lSwap & Timing", MenuKey.SETTINGS_SWAP,
+                "§7Intervals, randomness, hunter swap"));
+        items.add(navigateItem(11, Material.SHIELD, "§c§lSafety & Freeze", MenuKey.SETTINGS_SAFETY,
+                "§7Safe swap, freeze modes, sleep"));
+        items.add(navigateItem(12, Material.COMPASS, "§c§lHunter Tools", MenuKey.SETTINGS_HUNTER,
+                "§7Tracker, compass jamming"));
+        items.add(navigateItem(13, Material.POTION, "§d§lPower-ups", MenuKey.POWERUPS_ROOT,
+                "§7Manage effects"));
+        items.add(navigateItem(14, Material.BARRIER, "§4§lWorld Border", MenuKey.SETTINGS_WORLD_BORDER,
+                "§7Shrink timing"));
+        items.add(navigateItem(15, Material.GOLD_INGOT, "§6§lBounty", MenuKey.SETTINGS_BOUNTY,
+                "§7Hunter reward system"));
+        items.add(navigateItem(16, Material.TOTEM_OF_UNDYING, "§6§lLast Stand", MenuKey.SETTINGS_LAST_STAND,
+                "§7Final runner boost"));
+
+        items.add(navigateItem(19, Material.DRAGON_HEAD, "§4§lSudden Death", MenuKey.SETTINGS_SUDDEN_DEATH,
+                "§7Endgame showdown"));
+        items.add(navigateItem(20, Material.BOOK, "§b§lStatistics", MenuKey.STATS_ROOT,
+                "§7Tracking toggles"));
+        items.add(navigateItem(21, Material.TARGET, "§6§lTask Master", MenuKey.SETTINGS_TASK,
+                "§7Competition rules"));
+        items.add(navigateItem(22, Material.NOTE_BLOCK, "§d§lVoice Chat", MenuKey.SETTINGS_VOICE_CHAT,
+                "§7Simple Voice Chat integration"));
+        items.add(navigateItem(23, Material.BELL, "§e§lBroadcasts", MenuKey.SETTINGS_BROADCAST,
+                "§7Announcement settings"));
+        items.add(navigateItem(24, Material.COMPARATOR, "§b§lUI & Timers", MenuKey.SETTINGS_UI,
+                "§7Actionbars, titles, visibility"));
+
+        items.add(navigateItem(28, Material.CHEST, "§a§lKits", MenuKey.KIT_MANAGER,
+                "§7Toggle kits and quick actions"));
+        items.add(navigateItem(29, Material.MAGMA_BLOCK, "§c§lDangerous Blocks", MenuKey.DANGEROUS_BLOCKS,
+                "§7Edit safe-swap blacklist"));
+
+        return new MenuScreen(plugin.getConfigManager().getGuiSettingsTitle(), 54, items);
+    }
+
+    private MenuScreen buildSwapSettings(MenuContext ctx) {
+        ConfigManager cfg = plugin.getConfigManager();
+        List<MenuItem> items = new ArrayList<>();
+        items.add(backButton(0, "§7§lBack", MenuKey.SETTINGS_HOME, null, this::openSettingsMenu));
+
+        items.add(toggleItem(10, Material.REPEATER, "§e§lRandomized Swaps",
+                cfg::isSwapRandomized,
+                value -> cfg.setSwapRandomized(value),
+                "§7Gaussian distribution around interval"));
+
+        items.add(adjustItem(11, Material.CLOCK, "§e§lBase Interval",
+                cfg::getSwapInterval,
+                value -> cfg.setSwapInterval(value),
+                5, 15, 5, 600,
+                "§7Swap every X seconds"));
+
+        items.add(toggleItem(12, Material.REDSTONE_TORCH, "§e§lExperimental Intervals",
+                cfg::isBetaIntervalEnabled,
+                value -> cfg.setBetaIntervalEnabled(value),
+                "§7Allow intervals <30s or above max"));
+
+        items.add(adjustItem(13, Material.COMPASS, "§6§lMin Interval",
+                cfg::getMinSwapInterval,
+                value -> plugin.getConfig().set("swap.min_interval", value),
+                5, 15, 5, 600,
+                "§7Minimum random interval"));
+
+        items.add(adjustItem(14, Material.COMPASS, "§6§lMax Interval",
+                cfg::getSwapIntervalMax,
+                value -> plugin.getConfig().set("swap.max_interval", value),
+                5, 15, 5, 1800,
+                "§7Maximum random interval"));
+
+        items.add(adjustItem(15, Material.SPYGLASS, "§6§lJitter Std Dev",
+                () -> (int) Math.round(cfg.getJitterStdDev()),
+                value -> plugin.getConfig().set("swap.jitter.stddev", (double) value),
+                1, 5, 0, 600,
+                "§7Standard deviation for random interval"));
+
+        items.add(toggleItem(16, Material.LEVER, "§e§lClamp Jitter",
+                cfg::isClampJitter,
+                value -> plugin.getConfig().set("swap.jitter.clamp", value),
+                "§7Restrict random interval within min/max"));
+
+        items.add(toggleItem(19, Material.PISTON, "§e§lHunter Swap",
+                cfg::isHunterSwapEnabled,
+                value -> plugin.getConfig().set("swap.hunter_swap.enabled", value),
+                "§7Rotate which hunter chases"));
+
+        items.add(adjustItem(20, Material.ARROW, "§6§lHunter Swap Interval",
+                cfg::getHunterSwapInterval,
+                value -> plugin.getConfig().set("swap.hunter_swap.interval", value),
+                10, 30, 10, 600,
+                "§7Seconds between hunter rotations"));
+
+        items.add(toggleItem(21, Material.BLAZE_POWDER, "§e§lHot Potato Mode",
+                cfg::isHotPotatoModeEnabled,
+                value -> plugin.getConfig().set("swap.hot_potato_mode.enabled", value),
+                "§7Swap to damaged runner immediately"));
+
+        items.add(toggleItem(22, Material.REDSTONE_TORCH, "§e§lPause on Disconnect",
+                cfg::isPauseOnDisconnect,
+                value -> plugin.getConfig().set("swap.pause_on_disconnect", value),
+                "§7Auto-pause when active runner leaves"));
+
+        items.add(toggleItem(23, Material.BOOK, "§e§lApply Mode Defaults",
+                cfg::getApplyDefaultOnModeSwitch,
+                value -> plugin.getConfig().set("swap.apply_default_on_mode_switch", value),
+                "§7Reset interval when switching mode"));
+
+        items.add(adjustItem(24, Material.DIAMOND_SWORD, "§6§lDream Default",
+                () -> cfg.getModeDefaultInterval(SpeedrunnerSwap.SwapMode.DREAM),
+                value -> cfg.setModeDefaultInterval(SpeedrunnerSwap.SwapMode.DREAM, value),
+                5, 15, 5, 600,
+                "§7Default interval for Dream mode"));
+        items.add(adjustItem(25, Material.DIAMOND_BOOTS, "§6§lSapnap Default",
+                () -> cfg.getModeDefaultInterval(SpeedrunnerSwap.SwapMode.SAPNAP),
+                value -> cfg.setModeDefaultInterval(SpeedrunnerSwap.SwapMode.SAPNAP, value),
+                5, 15, 5, 600,
+                "§7Default interval for Sapnap mode"));
+        items.add(adjustItem(26, Material.TARGET, "§6§lTask Default",
+                () -> cfg.getModeDefaultInterval(SpeedrunnerSwap.SwapMode.TASK),
+                value -> cfg.setModeDefaultInterval(SpeedrunnerSwap.SwapMode.TASK, value),
+                5, 15, 5, 600,
+                "§7Default interval for Task mode"));
+
+        items.add(adjustItem(28, Material.SHIELD, "§6§lGrace Period (s)",
+                () -> (int) Math.round(plugin.getConfig().getInt("swap.grace_period_ticks", 40) / 20.0),
+                value -> plugin.getConfig().set("swap.grace_period_ticks", Math.max(0, value) * 20),
+                1, 5, 0, 600,
+                "§7Seconds of invulnerability after swapping"));
+
+        items.add(toggleConfigItem(30, Material.PLAYER_HEAD, "§e§lPreserve Runner Progress",
+                "swap.preserve_runner_progress_on_end", false,
+                "§7Copy final runner inventory to everyone"));
+
+        items.add(backButton(44, "§7§lBack", MenuKey.SETTINGS_HOME, null, this::openSettingsMenu));
+
+        return new MenuScreen("§e§lSwap & Timing", 54, items);
+    }
+
+    private MenuScreen buildSafetySettings(MenuContext ctx) {
+        ConfigManager cfg = plugin.getConfigManager();
+        List<MenuItem> items = new ArrayList<>();
+        items.add(backButton(0, "§7§lBack", MenuKey.SETTINGS_HOME, null, this::openSettingsMenu));
+
+        items.add(toggleItem(10, Material.SLIME_BLOCK, "§e§lSafe Swaps",
+                cfg::isSafeSwapEnabled,
+                value -> cfg.setSafeSwapEnabled(value),
+                "§7Scan area before swapping"));
+
+        items.add(adjustItem(11, Material.MAP, "§6§lHorizontal Radius",
+                cfg::getSafeSwapHorizontalRadius,
+                value -> plugin.getConfig().set("safe_swap.horizontal_radius", value),
+                1, 5, 1, 32,
+                "§7Scan radius in blocks"));
+
+        items.add(adjustItem(12, Material.LADDER, "§6§lVertical Distance",
+                cfg::getSafeSwapVerticalDistance,
+                value -> plugin.getConfig().set("safe_swap.vertical_distance", value),
+                1, 5, 1, 32,
+                "§7Vertical search range"));
+
+        items.add(clickItem(13, () -> icon(Material.MAGMA_BLOCK, "§c§lDangerous Blocks", List.of("§7Edit blacklist")),
+                ctxClick -> open(ctxClick.player(), MenuKey.DANGEROUS_BLOCKS, null, false)));
+
+        items.add(cycleItem(19, Material.ICE, "§6§lFreeze Mode", cfg::getFreezeMode,
+                value -> {
+                    String next = switch (value.toUpperCase(Locale.ROOT)) {
+                        case "EFFECTS" -> "SPECTATOR";
+                        case "SPECTATOR" -> "LIMBO";
+                        case "LIMBO" -> "CAGE";
+                        default -> "EFFECTS";
+                    };
+                    plugin.getConfigManager().setFreezeMode(next);
+                    plugin.getGameManager().refreshFreezeMechanic();
+                    return next;
+                },
+                List.of("§7How inactive runners are handled",
+                        "§bEFFECTS §7- heavy slowness",
+                        "§bSPECTATOR §7- spectator mode",
+                        "§bLIMBO §7- teleport to limbo",
+                        "§bCAGE §7- trap in cage")));
+
+        items.add(toggleItem(20, Material.REDSTONE_TORCH, "§e§lFreeze Mechanic",
+                cfg::isFreezeMechanicEnabled,
+                value -> {
+                    plugin.getConfig().set("freeze_mechanic.enabled", value);
+                    plugin.getGameManager().refreshFreezeMechanic();
+                },
+                "§7Force inactive runners near active one"));
+
+        items.add(adjustItem(21, Material.CLOCK, "§6§lFreeze Duration",
+                cfg::getFreezeDurationTicks,
+                value -> {
+                    plugin.getConfig().set("freeze_mechanic.duration_ticks", value);
+                    plugin.getGameManager().refreshFreezeMechanic();
+                },
+                20, 100, 20, 20 * 60 * 5,
+                "§7Ticks freeze persists"));
+
+        items.add(adjustItem(22, Material.REPEATER, "§6§lCheck Interval",
+                cfg::getFreezeCheckIntervalTicks,
+                value -> {
+                    plugin.getConfig().set("freeze_mechanic.check_interval_ticks", value);
+                    plugin.getGameManager().refreshFreezeMechanic();
+                },
+                5, 20, 5, 200,
+                "§7Ticks between freeze checks"));
+
+        items.add(adjustItem(23, Material.COMPASS, "§6§lMax Distance",
+                () -> (int) Math.round(cfg.getFreezeMaxDistance()),
+                value -> {
+                    plugin.getConfig().set("freeze_mechanic.max_distance", value);
+                    plugin.getGameManager().refreshFreezeMechanic();
+                },
+                5, 20, 5, 256,
+                "§7Maximum distance before freeze"));
+
+        items.add(toggleItem(30, Material.BARRIER, "§e§lCancel Movement",
+                cfg::isCancelMovement,
+                value -> plugin.getConfig().set("cancel.movement", value),
+                "§7Block inactive runner movement"));
+
+        items.add(toggleItem(31, Material.STICK, "§e§lCancel Interactions",
+                cfg::isCancelInteractions,
+                value -> plugin.getConfig().set("cancel.interactions", value),
+                "§7Block inactive runner interactions"));
+
+        items.add(toggleItem(32, Material.WHITE_BED, "§e§lSingle Player Sleep",
+                cfg::isSinglePlayerSleepEnabled,
+                value -> cfg.setSinglePlayerSleepEnabled(value),
+                "§7Only active runner must sleep"));
+
+        items.add(toggleConfigItem(33, Material.RESPAWN_ANCHOR, "§e§lForce Global Spawn",
+                "spawn.force_global", true,
+                "§7Override personal beds"));
+
+        items.add(clickItem(34, () -> {
+            org.bukkit.Location spawn = plugin.getConfigManager().getSpawnLocation();
+            String worldName = spawn.getWorld() != null ? spawn.getWorld().getName() : "unknown";
+            return icon(Material.COMPASS, "§b§lSet Spawn",
+                    List.of("§7World: §f" + worldName,
+                            String.format(Locale.ROOT, "§7Coords: §f%.1f / %.1f / %.1f", spawn.getX(), spawn.getY(), spawn.getZ()),
+                            "",
+                            "§eClick to use your position"));
+        }, ctxClick -> {
+            plugin.getConfigManager().setGlobalSpawn(ctxClick.player().getLocation(), true);
+            Msg.send(ctxClick.player(), "§aGlobal spawn updated to your current position.");
+            ctxClick.reopen();
+        }));
+
+        items.add(clickItem(35, () -> {
+            org.bukkit.Location limbo = cfg.getLimboLocation();
+            String world = limbo.getWorld() != null ? limbo.getWorld().getName() : "unknown";
+            String coords = String.format(Locale.ROOT, "§f%.1f §7/ §f%.1f §7/ §f%.1f", limbo.getX(), limbo.getY(), limbo.getZ());
+            return icon(Material.ENDER_PEARL, "§b§lSet Limbo Location",
+                    List.of("§7World: §f" + world, "§7Coords: " + coords, "", "§eClick to use your position"));
+        }, ctxClick -> {
+            org.bukkit.Location loc = ctxClick.player().getLocation();
+            plugin.getConfig().set("limbo.world", loc.getWorld() != null ? loc.getWorld().getName() : "world");
+            plugin.getConfig().set("limbo.x", loc.getX());
+            plugin.getConfig().set("limbo.y", loc.getY());
+            plugin.getConfig().set("limbo.z", loc.getZ());
+            plugin.saveConfig();
+            Msg.send(ctxClick.player(), "§aLimbo location updated to your current position.");
+            ctxClick.reopen();
+        }));
+
+        items.add(backButton(44, "§7§lBack", MenuKey.SETTINGS_HOME, null, this::openSettingsMenu));
+
+        return new MenuScreen("§c§lSafety & Freeze", 54, items);
+    }
+
+    private MenuScreen buildHunterSettings(MenuContext ctx) {
+        ConfigManager cfg = plugin.getConfigManager();
+        List<MenuItem> items = new ArrayList<>();
+        items.add(backButton(0, "§7§lBack", MenuKey.SETTINGS_HOME, null, this::openSettingsMenu));
+
+        items.add(toggleItem(10, Material.COMPASS, "§e§lTracker",
+                cfg::isTrackerEnabled,
+                value -> {
+                    cfg.setTrackerEnabled(value);
+                    if (plugin.getGameManager().isGameRunning()) {
+                        if (value) {
+                            plugin.getTrackerManager().startTracking();
+                            plugin.getTrackerManager().updateAllHunterCompasses();
+                        } else {
+                            plugin.getTrackerManager().stopTracking();
+                        }
+                    }
+                },
+                "§7Give hunters tracking compasses"));
+
+        items.add(adjustItem(11, Material.REPEATER, "§6§lUpdate Ticks",
+                cfg::getTrackerUpdateTicks,
+                value -> {
+                    plugin.getConfig().set("tracker.update_ticks", value);
+                    if (plugin.getGameManager().isGameRunning() && cfg.isTrackerEnabled()) {
+                        plugin.getTrackerManager().startTracking();
+                    }
+                },
+                5, 20, 1, 200,
+                "§7Compass update frequency"));
+
+        items.add(toggleItem(12, Material.BLAZE_ROD, "§e§lCompass Jamming",
+                cfg::isCompassJammingEnabled,
+                value -> plugin.getConfig().set("tracker.compass_jamming.enabled", value),
+                "§7Scramble compass after swap"));
+
+        items.add(adjustItem(13, Material.CLOCK, "§6§lJam Duration",
+                cfg::getCompassJamDuration,
+                value -> plugin.getConfig().set("tracker.compass_jamming.duration_ticks", value),
+                20, 100, 20, 20 * 60,
+                "§7Ticks compasses stay jammed"));
+
+        items.add(adjustItem(14, Material.SPYGLASS, "§6§lJam Distance",
+                cfg::getCompassJamMaxDistance,
+                value -> cfg.setCompassJamMaxDistance(value),
+                10, 50, 0, 5000,
+                "§7Maximum random offset"));
+
+        items.add(clickItem(44, () -> icon(Material.BARRIER, "§7§lBack", Collections.emptyList()),
+                ctxClick -> open(ctxClick.player(), MenuKey.SETTINGS_HOME, null, false)));
+
+        return new MenuScreen("§c§lHunter Tools", 27, items);
+    }
+
+    private MenuScreen buildPowerUpsRoot(MenuContext ctx) {
+        ConfigManager cfg = plugin.getConfigManager();
+        List<MenuItem> items = new ArrayList<>();
+        items.add(backButton(0, "§7§lBack", MenuKey.SETTINGS_HOME, null, this::openSettingsMenu));
+
+        items.add(toggleItem(11, Material.LIME_DYE, "§e§lPower-ups",
+                cfg::isPowerUpsEnabled,
+                value -> cfg.setPowerUpsEnabled(value),
+                "§7Enable random swap effects"));
+
+        items.add(navigateItem(13, Material.SPLASH_POTION, "§a§lPositive Effects", MenuKey.POWERUPS_EFFECTS,
+                "§7Configure buffs", "positive"));
+        items.add(navigateItem(15, Material.POISONOUS_POTATO, "§c§lNegative Effects", MenuKey.POWERUPS_EFFECTS,
+                "§7Configure debuffs", "negative"));
+
+        items.add(navigateItem(22, Material.CLOCK, "§6§lDurations & Levels", MenuKey.POWERUPS_DURATION,
+                "§7Modify duration range"));
+
+        items.add(clickItem(44, () -> icon(Material.BARRIER, "§7§lBack", Collections.emptyList()),
+                ctxClick -> open(ctxClick.player(), MenuKey.SETTINGS_HOME, null, false)));
+
+        return new MenuScreen("§d§lPower-ups", 27, items);
+    }
+
+    private MenuScreen buildPowerUpEffects(MenuContext ctx) {
+        boolean positive = "positive".equalsIgnoreCase(String.valueOf(ctx.request().data()));
+        List<String> list = positive ? plugin.getConfigManager().getGoodPowerUps() : plugin.getConfigManager().getBadPowerUps();
+        Set<String> enabled = new HashSet<>();
+        for (String id : list) {
+            enabled.add(id.toUpperCase(Locale.ROOT));
+        }
+
+        List<MenuItem> items = new ArrayList<>();
+        items.add(backButton(0, "§7§lBack", MenuKey.POWERUPS_ROOT, null, this::openPowerUpsMenu));
+
+        int slot = 9;
+        @SuppressWarnings("deprecation")
+        PotionEffectType[] effectTypes = PotionEffectType.values();
+        for (PotionEffectType type : effectTypes) {
+            if (type == null || type.getKey() == null) continue;
+            String id = type.getKey().getKey().toUpperCase(Locale.ROOT);
+            String prefix = positive ? "§a" : "§c";
+            Material material = positive ? Material.HONEY_BOTTLE : Material.SPIDER_EYE;
+            items.add(toggleItem(slot, material, prefix + id,
+                    () -> enabled.contains(id), value -> {
+                        List<String> editable = positive ? plugin.getConfig().getStringList("power_ups.good_effects") : plugin.getConfig().getStringList("power_ups.bad_effects");
+                        if (value && !editable.contains(id)) editable.add(id);
+                        if (!value) editable.remove(id);
+                        if (positive) plugin.getConfig().set("power_ups.good_effects", editable);
+                        else plugin.getConfig().set("power_ups.bad_effects", editable);
+                        plugin.saveConfig();
+                        Msg.send(ctx.player(), "§e" + id + ": " + (value ? "§aEnabled" : "§cDisabled"));
+                    }, "§7Click to toggle"));
+
+            slot++;
+            if ((slot + 1) % 9 == 0) slot += 2;
+            if (slot >= 54) break;
+        }
+
+        return new MenuScreen(positive ? "§a§lPositive Effects" : "§c§lNegative Effects", 54, items);
+    }
+
+    private MenuScreen buildPowerUpDurations(MenuContext ctx) {
+        ConfigManager cfg = plugin.getConfigManager();
+        List<MenuItem> items = new ArrayList<>();
+        items.add(backButton(0, "§7§lBack", MenuKey.POWERUPS_ROOT, null, this::openPowerUpsMenu));
+
+        items.add(adjustItem(12, Material.CLOCK, "§6§lMin Duration", cfg::getPowerUpsMinSeconds,
+                value -> cfg.setPowerUpsMinSeconds(value), 5, 20, 1, 1800,
+                "§7Seconds minimum"));
+        items.add(adjustItem(14, Material.CLOCK, "§6§lMax Duration", cfg::getPowerUpsMaxSeconds,
+                value -> cfg.setPowerUpsMaxSeconds(value), 5, 20, 1, 3600,
+                "§7Seconds maximum"));
+        items.add(adjustItem(21, Material.EXPERIENCE_BOTTLE, "§6§lMin Level", cfg::getPowerUpsMinLevel,
+                value -> cfg.setPowerUpsMinLevel(value), 1, 1, 1, 5,
+                "§7Potion amplifier minimum"));
+        items.add(adjustItem(23, Material.EXPERIENCE_BOTTLE, "§6§lMax Level", cfg::getPowerUpsMaxLevel,
+                value -> cfg.setPowerUpsMaxLevel(value), 1, 1, 1, 5,
+                "§7Potion amplifier maximum"));
+
+        return new MenuScreen("§6§lDuration & Level", 45, items);
+    }
+
+    private MenuScreen buildDangerousBlocks(MenuContext ctx) {
+        List<MenuItem> items = new ArrayList<>();
+        items.add(backButton(0, "§7§lBack", MenuKey.SETTINGS_HOME, null, this::openSettingsMenu));
+
+        Set<Material> blocks = new HashSet<>(plugin.getConfigManager().getDangerousBlocks());
+        List<Material> sorted = new ArrayList<>(blocks);
+        sorted.sort(java.util.Comparator.comparing(Enum::name));
+
+        int slot = 9;
+        for (Material material : sorted) {
+            items.add(clickItem(slot, () -> icon(material, "§e" + material.name(), List.of("§cClick to remove")), ctxClick -> {
+                Set<Material> set = plugin.getConfigManager().getDangerousBlocks();
+                set.remove(material);
+                List<String> updated = new ArrayList<>();
+                for (Material m : set) updated.add(m.name());
+                plugin.getConfig().set("safe_swap.dangerous_blocks", updated);
+                plugin.saveConfig();
+                Msg.send(ctxClick.player(), "§eRemoved §f" + material.name());
+                ctxClick.reopen();
+            }));
+            slot++;
+            if ((slot + 1) % 9 == 0) slot += 2;
+        }
+
+        items.add(clickItem(44, () -> icon(Material.EMERALD_BLOCK, "§a§lAdd Block", List.of("§7Type block ID in chat")), ctxClick -> {
+            plugin.getChatInputHandler().expectConfigListAdd(ctxClick.player(), "safe_swap.dangerous_blocks");
+            ctxClick.player().closeInventory();
+            Msg.send(ctxClick.player(), "§eType a block ID (or 'cancel').");
+        }));
+
+        return new MenuScreen("§c§lDangerous Blocks", 54, items);
+    }
+
+    private MenuScreen buildWorldBorder(MenuContext ctx) {
+        List<MenuItem> items = new ArrayList<>();
+        items.add(backButton(0, "§7§lBack", MenuKey.SETTINGS_HOME, null, this::openSettingsMenu));
+
+        items.add(toggleConfigItem(10, Material.BARRIER, "§e§lWorld Border", "world_border.enabled", false,
+                "§7Enable shrinking border"));
+
+        items.add(adjustConfigItem(12, Material.GRASS_BLOCK, "§6§lInitial Size",
+                "world_border.initial_size", 2000,
+                50, 100, 50, 100000,
+                "§7Blocks at start"));
+        items.add(adjustConfigItem(14, Material.BEDROCK, "§6§lFinal Size",
+                "world_border.final_size", 100,
+                25, 100, 25, 5000,
+                "§7Blocks at end"));
+        items.add(adjustConfigItem(16, Material.CLOCK, "§6§lShrink Duration",
+                "world_border.shrink_duration", 1800,
+                60, 300, 60, 21600,
+                "§7Seconds to shrink"));
+
+        items.add(adjustConfigItem(20, Material.SPYGLASS, "§6§lWarning Distance",
+                "world_border.warning_distance", 50,
+                5, 25, 0, 5000,
+                "§7Blocks before warning"));
+
+        items.add(adjustConfigItem(22, Material.BELL, "§6§lWarning Interval (s)",
+                "world_border.warning_interval", 300,
+                30, 60, 30, 3600,
+                "§7Seconds between alerts"));
+
+        return new MenuScreen("§4§lWorld Border", 45, items);
+    }
+
+    private MenuScreen buildBounty(MenuContext ctx) {
+        List<MenuItem> items = new ArrayList<>();
+        items.add(backButton(0, "§7§lBack", MenuKey.SETTINGS_HOME, null, this::openSettingsMenu));
+
+        items.add(toggleItem(10, Material.GOLD_INGOT, "§6§lBounty Enabled",
+                () -> plugin.getConfig().getBoolean("bounty.enabled", false),
+                value -> {
+                    plugin.getConfig().set("bounty.enabled", value);
+                    plugin.saveConfig();
+                    if (!value) plugin.getBountyManager().clearBounty();
+                },
+                "§7Enable hunter bounty challenges"));
+
+        items.add(adjustItem(12, Material.CLOCK, "§6§lCooldown (s)",
+                () -> plugin.getConfig().getInt("bounty.cooldown", 300),
+                value -> plugin.getConfig().set("bounty.cooldown", Math.max(0, value)),
+                30, 60, 0, 3600,
+                "§7Minimum seconds between bounties"));
+
+        items.add(adjustItem(14, Material.GLOWSTONE_DUST, "§6§lGlow Duration (s)",
+                () -> plugin.getConfig().getInt("bounty.glow_duration", 300),
+                value -> plugin.getConfig().set("bounty.glow_duration", Math.max(10, value)),
+                30, 60, 10, 3600,
+                "§7Seconds the target glows"));
+
+        items.add(adjustItem(21, Material.SUGAR, "§6§lSpeed Reward (s)",
+                () -> plugin.getConfig().getInt("bounty.rewards.speed_duration", 300),
+                value -> plugin.getConfig().set("bounty.rewards.speed_duration", Math.max(10, value)),
+                30, 60, 10, 6000,
+                "§7Speed effect duration for killer"));
+
+        items.add(adjustItem(23, Material.BLAZE_POWDER, "§6§lStrength Reward (s)",
+                () -> plugin.getConfig().getInt("bounty.rewards.strength_duration", 300),
+                value -> plugin.getConfig().set("bounty.rewards.strength_duration", Math.max(10, value)),
+                30, 60, 10, 6000,
+                "§7Strength effect duration for killer"));
+
+        items.add(clickItem(30, () -> icon(Material.TARGET, "§a§lAssign New Bounty", List.of("§7Pick a new target")), ctxClick -> {
+            plugin.getBountyManager().assignNewBounty();
+            Msg.send(ctxClick.player(), "§aNew bounty assigned.");
+        }));
+        items.add(clickItem(32, () -> icon(Material.BARRIER, "§c§lClear Bounty", List.of("§7Remove current target")), ctxClick -> {
+            plugin.getBountyManager().clearBounty();
+            Msg.send(ctxClick.player(), "§cBounty cleared.");
+        }));
+
+        return new MenuScreen("§6§lBounty System", 45, items);
+    }
+
+    private MenuScreen buildLastStand(MenuContext ctx) {
+        ConfigManager cfg = plugin.getConfigManager();
+        List<MenuItem> items = new ArrayList<>();
+        items.add(backButton(0, "§7§lBack", MenuKey.SETTINGS_HOME, null, this::openSettingsMenu));
+
+        items.add(toggleItem(10, Material.TOTEM_OF_UNDYING, "§6§lLast Stand",
+                cfg::isLastStandEnabled,
+                value -> plugin.getConfig().set("last_stand.enabled", value),
+                "§7Boost final runner"));
+
+        items.add(adjustItem(12, Material.CLOCK, "§6§lDuration",
+                cfg::getLastStandDuration,
+                value -> plugin.getConfig().set("last_stand.duration_ticks", value),
+                20, 100, 20, 20 * 60 * 5,
+                "§7Ticks boost lasts"));
+
+        items.add(adjustItem(14, Material.IRON_SWORD, "§6§lStrength Level",
+                cfg::getLastStandStrengthAmplifier,
+                value -> plugin.getConfig().set("last_stand.strength_amplifier", value),
+                1, 1, 0, 5,
+                "§7Amplifier (level-1)"));
+
+        items.add(adjustItem(16, Material.SUGAR, "§6§lSpeed Level",
+                cfg::getLastStandSpeedAmplifier,
+                value -> plugin.getConfig().set("last_stand.speed_amplifier", value),
+                1, 1, 0, 5,
+                "§7Amplifier (level-1)"));
+
+        return new MenuScreen("§6§lLast Stand", 45, items);
+    }
+
+    private MenuScreen buildSuddenDeath(MenuContext ctx) {
+        List<MenuItem> items = new ArrayList<>();
+        items.add(backButton(0, "§7§lBack", MenuKey.SETTINGS_HOME, null, this::openSettingsMenu));
+
+        items.add(toggleConfigItem(10, Material.DRAGON_HEAD, "§4§lSudden Death",
+                "sudden_death.enabled", false,
+                "§7Enable end dimension showdown"));
+
+        items.add(adjustItem(12, Material.CLOCK, "§6§lActivation Delay (s)",
+                () -> plugin.getConfig().getInt("sudden_death.activation_delay", 1200),
+                value -> plugin.getConfig().set("sudden_death.activation_delay", Math.max(30, value)),
+                60, 300, 30, 36000,
+                "§7Seconds before sudden death begins"));
+
+        items.add(adjustItem(14, Material.SHIELD, "§6§lResistance (s)",
+                () -> (int) Math.round(plugin.getConfig().getInt("sudden_death.effects.resistance_duration", 200) / 20.0),
+                value -> plugin.getConfig().set("sudden_death.effects.resistance_duration", Math.max(1, value) * 20),
+                5, 20, 1, 600,
+                "§7Duration of Resistance IV"));
+
+        items.add(adjustItem(16, Material.GOLDEN_APPLE, "§6§lRegeneration (s)",
+                () -> (int) Math.round(plugin.getConfig().getInt("sudden_death.effects.regeneration_duration", 200) / 20.0),
+                value -> plugin.getConfig().set("sudden_death.effects.regeneration_duration", Math.max(1, value) * 20),
+                5, 20, 1, 600,
+                "§7Duration of Regeneration III"));
+
+        items.add(adjustItem(20, Material.SPYGLASS, "§6§lMax Jam Distance",
+                () -> plugin.getConfig().getInt("sudden_death.arena.max_jam_distance", 100),
+                value -> plugin.getConfig().set("sudden_death.arena.max_jam_distance", Math.max(0, value)),
+                10, 50, 0, 10000,
+                "§7Blocks for random compass offsets"));
+
+        items.add(clickItem(22, () -> {
+            double x = plugin.getConfig().getDouble("sudden_death.arena.x", 100.0);
+            double y = plugin.getConfig().getDouble("sudden_death.arena.y", 50.0);
+            double z = plugin.getConfig().getDouble("sudden_death.arena.z", 0.0);
+            String worldName = plugin.getConfig().getString("sudden_death.arena.world", "world_the_end");
+            return icon(Material.ENDER_EYE, "§b§lSet Arena Location",
+                    List.of("§7Current: §f" + x + ", " + y + ", " + z,
+                            "§7World: §f" + worldName,
+                            "", "§eClick to use your position"));
+        }, ctxClick -> {
+            org.bukkit.Location loc = ctxClick.player().getLocation();
+            plugin.getConfig().set("sudden_death.arena.x", loc.getX());
+            plugin.getConfig().set("sudden_death.arena.y", loc.getY());
+            plugin.getConfig().set("sudden_death.arena.z", loc.getZ());
+            plugin.getConfig().set("sudden_death.arena.world", loc.getWorld() != null ? loc.getWorld().getName() : "world_the_end");
+            plugin.saveConfig();
+            Msg.send(ctxClick.player(), "§aArena position updated.");
+            ctxClick.reopen();
+        }));
+
+        items.add(clickItem(30, () -> icon(Material.CLOCK, "§e§lSchedule", List.of("§7Start countdown")), ctxClick -> {
+            plugin.getSuddenDeathManager().scheduleSuddenDeath();
+            Msg.send(ctxClick.player(), "§eSudden death scheduled.");
+        }));
+        items.add(clickItem(32, () -> icon(Material.BARRIER, "§c§lCancel Schedule", Collections.emptyList()), ctxClick -> {
+            plugin.getSuddenDeathManager().cancelSchedule();
+            Msg.send(ctxClick.player(), "§cSchedule cancelled.");
+        }));
+        items.add(clickItem(34, () -> icon(Material.TNT, "§4§lActivate Now", Collections.emptyList()), ctxClick -> {
+            plugin.getSuddenDeathManager().activateSuddenDeath();
+            Msg.send(ctxClick.player(), "§4Sudden death activated!");
+        }));
+
+        return new MenuScreen("§4§lSudden Death", 45, items);
+    }
+
+    private MenuScreen buildStatsRoot(MenuContext ctx) {
+        StatsParent parent = statsParents.getOrDefault(ctx.player().getUniqueId(), StatsParent.SETTINGS);
+        List<MenuItem> items = new ArrayList<>();
+        items.add(backButton(0, "§7§lBack", parent == StatsParent.MAIN ? MenuKey.MAIN : MenuKey.SETTINGS_HOME, null,
+                player -> {
+                    if (parent == StatsParent.MAIN) open(player, MenuKey.MAIN, null, false);
+                    else openSettingsMenu(player);
+                }));
+
+        items.add(toggleItem(11, Material.LIME_DYE, "§e§lStatistics",
+                () -> plugin.getConfig().getBoolean("stats.enabled", true),
+                value -> {
+                    plugin.getConfig().set("stats.enabled", value);
+                    plugin.saveConfig();
+                    if (!value) plugin.getStatsManager().stopTracking();
+                    else if (plugin.getGameManager().isGameRunning()) plugin.getStatsManager().startTracking();
+                },
+                "§7Toggle server-side tracking"));
+
+        items.add(toggleItem(13, Material.COMPASS, "§6§lDistance Tracking",
+                () -> plugin.getConfig().getBoolean("stats.distance_tracking", true),
+                value -> {
+                    plugin.getConfig().set("stats.distance_tracking", value);
+                    plugin.saveConfig();
+                }, "§7Enable runner-hunter distance metric"));
+
+        items.add(adjustItem(15, Material.REPEATER, "§6§lDistance Update",
+                () -> plugin.getConfig().getInt("stats.distance_update_ticks", 20),
+                value -> {
+                    plugin.getConfig().set("stats.distance_update_ticks", value);
+                    plugin.saveConfig();
+                }, 5, 20, 1, 200,
+                "§7Ticks between distance updates"));
+
+        items.add(toggleConfigItem(17, Material.CLOCK, "§e§lPeriodic Display",
+                "stats.periodic_display", false,
+                "§7Announce stats automatically"));
+
+        items.add(adjustConfigItem(26, Material.CLOCK, "§6§lDisplay Interval (s)",
+                "stats.periodic_display_interval", 300,
+                30, 60, 30, 3600,
+                "§7Seconds between stat announcements"));
+
+        items.add(clickItem(22, () -> icon(Material.PAPER, "§b§lBroadcast Snapshot", List.of("§7Send stats to chat")), ctxClick -> plugin.getStatsManager().displayStats()));
+
+        items.add(navigateItem(24, Material.SPYGLASS, "§6§lAdvanced", MenuKey.STATS_ADVANCED, "§7Additional settings"));
+
+        return new MenuScreen("§b§lStatistics", 45, items);
+    }
+
+    private MenuScreen buildStatsAdvanced(MenuContext ctx) {
+        ConfigManager cfg = plugin.getConfigManager();
+        List<MenuItem> items = new ArrayList<>();
+        items.add(backButton(0, "§7§lBack", MenuKey.STATS_ROOT, null, player -> open(player, MenuKey.STATS_ROOT, null, false)));
+
+        items.add(adjustItem(11, Material.CLOCK, "§6§lActionbar Update",
+                cfg::getActionBarUpdateTicks,
+                value -> plugin.getConfig().set("ui.update_ticks.actionbar", value),
+                5, 20, 1, 200,
+                "§7Ticks between actionbar refresh"));
+
+        items.add(adjustItem(13, Material.EXPERIENCE_BOTTLE, "§6§lTitle Update",
+                cfg::getTitleUpdateTicks,
+                value -> plugin.getConfig().set("ui.update_ticks.title", value),
+                1, 5, 1, 200,
+                "§7Ticks between title refresh"));
+
+        items.add(adjustItem(15, Material.COMPASS, "§6§lTracker Update",
+                cfg::getTrackerUpdateTicks,
+                value -> plugin.getConfig().set("tracker.update_ticks", value),
+                5, 20, 1, 200,
+                "§7Compass refresh interval"));
+
+        items.add(cycleItem(20, Material.CLOCK, "§6§lRunner Timer", cfg::getRunnerTimerVisibility,
+                current -> {
+                    String next = nextVisibility(current);
+                    cfg.setRunnerTimerVisibility(next);
+                    return next;
+                }, timerLore("Active runner")));
+        items.add(cycleItem(22, Material.CLOCK, "§6§lWaiting Timer", cfg::getWaitingTimerVisibility,
+                current -> {
+                    String next = nextVisibility(current);
+                    cfg.setWaitingTimerVisibility(next);
+                    return next;
+                }, timerLore("Waiting runners")));
+        items.add(cycleItem(24, Material.CLOCK, "§6§lHunter Timer", cfg::getHunterTimerVisibility,
+                current -> {
+                    String next = nextVisibility(current);
+                    cfg.setHunterTimerVisibility(next);
+                    return next;
+                }, timerLore("Hunters")));
+
+        return new MenuScreen("§b§lStats - Advanced", 45, items);
+    }
+
+    private MenuScreen buildTaskHome(MenuContext ctx) {
+        TaskManagerMode mode = plugin.getTaskManagerMode();
+        int assignments = mode != null ? mode.getAssignments().size() : 0;
+        List<MenuItem> items = new ArrayList<>();
+        items.add(backButton(0, "§7§lBack", MenuKey.MAIN, null, this::openMainMenu));
+
+        items.add(navigateItem(10, Material.WRITABLE_BOOK, "§6§lCompetition Rules", MenuKey.SETTINGS_TASK,
+                "§7Pause behaviour, grace timers"));
+        items.add(navigateItem(12, Material.EMERALD, "§a§lCustom Tasks", MenuKey.TASK_CUSTOM,
+                "§7Manage custom entries"));
+        items.add(clickItem(14, () -> icon(Material.FEATHER, "§b§lReroll Tasks", List.of("§7Assign new secret tasks")), ctxClick -> {
+            if (plugin.getGameManager().isGameRunning()) {
+                Msg.send(ctxClick.player(), "§cStop the game before rerolling tasks.");
+                return;
+            }
+            if (mode != null) {
+                mode.assignAndAnnounceTasks(plugin.getGameManager().getRunners());
+                Msg.send(ctxClick.player(), "§aTasks rerolled for current runners.");
+            }
+        }));
+        items.add(navigateItem(16, Material.PAPER, "§e§lCurrent Assignments", MenuKey.TASK_ASSIGNMENTS,
+                "§7Active runner tasks", assignments));
+        items.add(navigateItem(18, Material.BOOKSHELF, "§6§lTask Pool", MenuKey.TASK_POOL,
+                "§7Enable/disable individual tasks", 0));
+
+        return new MenuScreen("§6§lTask Master", 36, items);
+    }
+
+    private MenuScreen buildTaskSettings(MenuContext ctx) {
+        List<MenuItem> items = new ArrayList<>();
+        items.add(backButton(0, "§7§lBack", MenuKey.TASK_HOME, null, this::openTaskManagerMenu));
+
+        items.add(toggleConfigItem(10, Material.REDSTONE_TORCH, "§e§lPause on Disconnect",
+                "task_manager.pause_on_disconnect", true,
+                "§7Pause when active runner disconnects"));
+
+        items.add(toggleConfigItem(11, Material.BARRIER, "§e§lRemove On Timeout",
+                "task_manager.remove_on_timeout", true,
+                "§7Drop players who exceed rejoin grace"));
+
+        items.add(toggleConfigItem(12, Material.HOPPER, "§e§lAllow Late Joiners",
+                "task_manager.allow_late_joiners", false,
+                "§7Permit players to join mid-game"));
+
+        items.add(toggleConfigItem(13, Material.BOOK, "§e§lInclude Default Tasks",
+                "task_manager.include_default_tasks", true,
+                "§7Keep built-in objectives in the pool"));
+
+        items.add(adjustConfigItem(14, Material.CLOCK, "§6§lRejoin Grace (s)",
+                "task_manager.rejoin_grace_seconds", 180, 10, 30, 10, 3600,
+                "§7Seconds allowed to reconnect"));
+
+        items.add(adjustConfigItem(15, Material.CLOCK, "§6§lMax Game Length (min)",
+                "task_manager.max_game_duration", 0,
+                5, 15, 0, 360,
+                "§70 = unlimited duration"));
+
+        items.add(toggleConfigItem(16, Material.NAME_TAG, "§e§lEnd When One Left",
+                "task_manager.end_when_one_left", false,
+                "§7Automatically finish when one runner remains"));
+
+        return new MenuScreen("§6§lTask Settings", 36, items);
+    }
+
+    private MenuScreen buildTaskCustom(MenuContext ctx) {
+        TaskManagerMode mode = plugin.getTaskManagerMode();
+        List<MenuItem> items = new ArrayList<>();
+        items.add(backButton(0, "§7§lBack", MenuKey.TASK_HOME, null, this::openTaskManagerMenu));
+
+        items.add(simpleItem(2, () -> icon(Material.BOOK, "§7Default Pool",
+                List.of("§7Included: " + (plugin.getConfig().getBoolean("task_manager.include_default_tasks", true) ? "§aYes" : "§cNo"),
+                        "§7Toggle in Task Settings"))));
+
+        items.add(clickItem(8, () -> icon(Material.EMERALD_BLOCK, "§a§lAdd Custom Task", List.of("§7Enter ID via chat")), ctxClick -> {
+            plugin.getChatInputHandler().expectTaskId(ctxClick.player());
+            ctxClick.player().closeInventory();
+            Msg.send(ctxClick.player(), "§eEnter a unique task ID in chat.");
+        }));
+
+        if (mode != null) {
+            List<String> ids = mode.getCustomTaskIds();
+            int slot = 9;
+            for (String id : ids) {
+                TaskDefinition def = mode.getTask(id);
+                String description = def != null ? def.description() : "";
+                items.add(clickItem(slot, () -> icon(Material.PAPER, "§e" + id,
+                        List.of("§7" + description, "", "§cClick to remove")), ctxClick -> {
+                    if (mode.removeCustomTask(id)) {
+                        Msg.send(ctxClick.player(), "§cRemoved custom task §f" + id);
+                    }
+                    ctxClick.reopen();
+                }));
+                slot++;
+                if ((slot + 1) % 9 == 0) slot += 2;
+                if (slot >= 54) break;
+            }
+        }
+
+        return new MenuScreen("§6§lCustom Tasks", 54, items);
+    }
+
+    private MenuScreen buildTaskPool(MenuContext ctx) {
+        List<MenuItem> items = new ArrayList<>();
+        items.add(backButton(0, "§7§lBack", MenuKey.TASK_HOME, null, this::openTaskManagerMenu));
+
+        TaskManagerMode mode = plugin.getTaskManagerMode();
+        if (mode == null) {
+            items.add(simpleItem(22, () -> icon(Material.BARRIER, "§cTask Manager unavailable",
+                    List.of("§7Task mode not initialised."))));
+            return new MenuScreen("§6§lTask Pool", 54, items);
+        }
+
+        TaskDefinition[] defs = mode.getAllDefinitions().values().toArray(TaskDefinition[]::new);
+        java.util.Arrays.sort(defs, java.util.Comparator.comparing(TaskDefinition::id, String.CASE_INSENSITIVE_ORDER));
+
+        int perPage = 36;
+        int totalPages = Math.max(1, (int) Math.ceil(defs.length / (double) perPage));
+        int pageIndex = 0;
+        if (ctx.request().data() instanceof Integer p) {
+            pageIndex = Math.max(0, Math.min(p, totalPages - 1));
+        }
+        final int page = pageIndex;
+
+        items.add(cycleItem(2, Material.NETHERITE_SWORD, "§6§lDifficulty",
+                () -> mode.getDifficultyFilter().name(), current -> {
+                    TaskDifficulty cur = mode.getDifficultyFilter();
+                    TaskDifficulty next = switch (cur) {
+                        case EASY -> TaskDifficulty.MEDIUM;
+                        case MEDIUM -> TaskDifficulty.HARD;
+                        case HARD -> TaskDifficulty.EASY;
+                    };
+                    mode.setDifficultyFilter(next);
+                    return next.name();
+                }, List.of("§7Filter used when assigning", "§7Cycles EASY → MEDIUM → HARD")));
+
+        items.add(simpleItem(4, () -> icon(Material.PAPER, "§7Eligible Tasks",
+                List.of("§a" + mode.getCandidateCount() + " §7available for selection"))));
+
+        items.add(clickItem(6, () -> icon(Material.ENDER_CHEST, "§e§lReload tasks.yml",
+                        List.of("§7Re-read task definitions")), ctxClick -> {
+                    mode.reloadTasksFromFile();
+                    Msg.send(ctxClick.player(), "§aReloaded tasks.yml.");
+                    open(ctxClick.player(), MenuKey.TASK_POOL, page, true);
+                }));
+
+        int start = page * perPage;
+        int end = Math.min(defs.length, start + perPage);
+        for (int i = start; i < end; i++) {
+            TaskDefinition def = defs[i];
+            int displayIndex = i - start;
+            int row = displayIndex / 9;
+            int col = displayIndex % 9;
+            int slot = 9 + row * 9 + col;
+            String id = def.id();
+            TaskDefinition current = mode.getTask(id);
+            boolean enabled = current == null || current.enabled();
+            Material mat = enabled ? Material.WRITABLE_BOOK : Material.GRAY_DYE;
+            List<String> lore = new ArrayList<>();
+            lore.add("§7" + Optional.ofNullable(def.description()).orElse("No description"));
+            lore.add("§7Difficulty: §f" + (def.difficulty() != null ? def.difficulty().name() : "MEDIUM"));
+            if (def.categories() != null && !def.categories().isEmpty()) {
+                lore.add("§7Tags: §f" + String.join(", ", def.categories()));
+            }
+            lore.add("");
+            lore.add(enabled ? "§aEnabled" : "§cDisabled");
+            lore.add("§7Click to toggle");
+            items.add(clickItem(slot, () -> icon(mat, (enabled ? "§a" : "§c") + id, lore), ctxClick -> {
+                TaskDefinition cur = mode.getTask(id);
+                boolean next = cur == null || !cur.enabled();
+                mode.setTaskEnabled(id, next);
+                Msg.send(ctxClick.player(), "§eTask §f" + id + "§e is now " + (next ? "§aenabled" : "§cdisabled"));
+                open(ctxClick.player(), MenuKey.TASK_POOL, page, true);
+            }));
+        }
+
+        if (page > 0) {
+            items.add(clickItem(45, () -> icon(Material.ARROW, "§7§lPrevious Page",
+                    List.of("§7Page " + page + " of " + totalPages)), ctxClick -> open(ctxClick.player(), MenuKey.TASK_POOL, page - 1, false)));
+        }
+        if (page < totalPages - 1) {
+            items.add(clickItem(53, () -> icon(Material.ARROW, "§7§lNext Page",
+                    List.of("§7Page " + (page + 2) + " of " + totalPages)), ctxClick -> open(ctxClick.player(), MenuKey.TASK_POOL, page + 1, false)));
+        }
+
+        items.add(simpleItem(49, () -> icon(Material.NAME_TAG, "§7Page Info",
+                List.of("§7Page §f" + (page + 1) + "§7 of §f" + totalPages,
+                        "§7Tasks total: §f" + defs.length))));
+
+        return new MenuScreen("§6§lTask Pool", 54, items);
+    }
+
+    private MenuItem buildParticleTypeCycler(int slot) {
+        return cycleItem(slot, Material.FIREWORK_STAR, "§6§lParticle Type",
+                plugin.getConfigManager()::getParticleTrailType,
+                current -> {
+                    int idx = PARTICLE_TYPES.indexOf(current == null ? "" : current.toUpperCase(Locale.ROOT));
+                    int nextIndex = (idx + 1) % PARTICLE_TYPES.size();
+                    String type = PARTICLE_TYPES.get(nextIndex);
+                    plugin.getConfig().set("particle_trail.type", type);
+                    return type;
+                },
+                List.of("§7Cycle between allowed particle IDs"));
+    }
+
+    private MenuScreen buildTaskAssignments(MenuContext ctx) {
+        TaskManagerMode mode = plugin.getTaskManagerMode();
+        List<MenuItem> items = new ArrayList<>();
+        items.add(backButton(0, "§7§lBack", MenuKey.TASK_HOME, null, this::openTaskManagerMenu));
+
+        if (mode != null) {
+            int slot = 9;
+            for (Map.Entry<UUID, String> entry : mode.getAssignments().entrySet()) {
+                UUID uuid = entry.getKey();
+                String taskId = entry.getValue();
+                String name = Optional.ofNullable(Bukkit.getOfflinePlayer(uuid).getName()).orElse(uuid.toString().substring(0, 8));
+                TaskDefinition def = mode.getTask(taskId);
+                String desc = def != null ? def.description() : "Unknown task";
+                items.add(simpleItem(slot, () -> icon(Material.PAPER, "§e" + name,
+                        List.of("§7Task: §f" + taskId, "§7" + desc))));
+                slot++;
+                if ((slot + 1) % 9 == 0) slot += 2;
+                if (slot >= 54) break;
+            }
+        }
+
+        return new MenuScreen("§6§lTask Assignments", 54, items);
+    }
+
+    private MenuScreen buildVoiceChat(MenuContext ctx) {
+        List<MenuItem> items = new ArrayList<>();
+        items.add(backButton(0, "§7§lBack", MenuKey.SETTINGS_HOME, null, this::openSettingsMenu));
+        items.add(toggleConfigItem(11, Material.NOTE_BLOCK, "§e§lVoice Chat Integration",
+                "voice_chat.enabled", false,
+                "§7Integrate with Simple Voice Chat"));
+        items.add(toggleConfigItem(13, Material.LEVER, "§e§lMute Inactive Runners",
+                "voice_chat.mute_inactive_runners", true,
+                "§7Automatically mute inactive players"));
+        return new MenuScreen("§d§lVoice Chat", 27, items);
+    }
+
+    private MenuScreen buildBroadcast(MenuContext ctx) {
+        List<MenuItem> items = new ArrayList<>();
+        items.add(backButton(0, "§7§lBack", MenuKey.SETTINGS_HOME, null, this::openSettingsMenu));
+        items.add(toggleConfigItem(11, Material.BELL, "§e§lBroadcasts", "broadcasts.enabled", true,
+                "§7Enable general announcements"));
+        items.add(toggleConfigItem(13, Material.MAP, "§e§lGame Events", "broadcasts.game_events", true,
+                "§7Announce start/stop"));
+        items.add(toggleConfigItem(15, Material.PAPER, "§e§lTeam Changes", "broadcasts.team_changes", true,
+                "§7Announce team assignment changes"));
+        return new MenuScreen("§e§lBroadcast Settings", 27, items);
+    }
+
+    private MenuScreen buildUiSettings(MenuContext ctx) {
+        ConfigManager cfg = plugin.getConfigManager();
+        List<MenuItem> items = new ArrayList<>();
+        items.add(backButton(0, "§7§lBack", MenuKey.SETTINGS_HOME, null, this::openSettingsMenu));
+
+        items.add(adjustItem(11, Material.CLOCK, "§6§lActionbar Update",
+                cfg::getActionBarUpdateTicks,
+                value -> plugin.getConfig().set("ui.update_ticks.actionbar", value),
+                5, 20, 1, 200,
+                "§7Ticks between actionbar updates"));
+
+        items.add(adjustItem(13, Material.EXPERIENCE_BOTTLE, "§6§lTitle Update",
+                cfg::getTitleUpdateTicks,
+                value -> plugin.getConfig().set("ui.update_ticks.title", value),
+                1, 5, 1, 200,
+                "§7Ticks between title updates"));
+
+        items.add(cycleItem(20, Material.CLOCK, "§6§lRunner Timer", cfg::getRunnerTimerVisibility,
+                current -> {
+                    String next = nextVisibility(current);
+                    cfg.setRunnerTimerVisibility(next);
+                    return next;
+                }, timerLore("Active runner visibility")));
+        items.add(cycleItem(22, Material.CLOCK, "§6§lWaiting Timer", cfg::getWaitingTimerVisibility,
+                current -> {
+                    String next = nextVisibility(current);
+                    cfg.setWaitingTimerVisibility(next);
+                    return next;
+                }, timerLore("Waiting runner visibility")));
+        items.add(cycleItem(24, Material.CLOCK, "§6§lHunter Timer", cfg::getHunterTimerVisibility,
+                current -> {
+                    String next = nextVisibility(current);
+                    cfg.setHunterTimerVisibility(next);
+                    return next;
+                }, timerLore("Hunter visibility")));
+
+        items.add(toggleItem(29, Material.BLAZE_POWDER, "§e§lParticle Trail",
+                plugin.getConfigManager()::isParticleTrailEnabled,
+                value -> plugin.getConfig().set("particle_trail.enabled", value),
+                "§7Toggle runner particle trail"));
+
+        items.add(adjustItem(31, Material.REDSTONE, "§6§lSpawn Interval",
+                plugin.getConfigManager()::getParticleSpawnInterval,
+                value -> plugin.getConfig().set("particle_trail.spawn_interval", Math.max(1, value)),
+                1, 5, 1, 200,
+                "§7Ticks between trail spawns"));
+
+        items.add(buildParticleTypeCycler(33));
+
+        items.add(adjustItem(39, Material.RED_DYE, "§cRed Channel",
+                () -> plugin.getConfigManager().getParticleTrailColor()[0],
+                value -> updateParticleColorChannel(0, value),
+                5, 20, 0, 255,
+                "§7Adjust red intensity"));
+        items.add(adjustItem(40, Material.GREEN_DYE, "§aGreen Channel",
+                () -> plugin.getConfigManager().getParticleTrailColor()[1],
+                value -> updateParticleColorChannel(1, value),
+                5, 20, 0, 255,
+                "§7Adjust green intensity"));
+        items.add(adjustItem(41, Material.LAPIS_LAZULI, "§9Blue Channel",
+                () -> plugin.getConfigManager().getParticleTrailColor()[2],
+                value -> updateParticleColorChannel(2, value),
+                5, 20, 0, 255,
+                "§7Adjust blue intensity"));
+
+        return new MenuScreen("§b§lUI & Timers", 45, items);
+    }
+
+    private MenuScreen buildKitManager(MenuContext ctx) {
+        List<MenuItem> items = new ArrayList<>();
+        items.add(backButton(0, "§7§lBack", MenuKey.SETTINGS_HOME, null, this::openSettingsMenu));
+
+        items.add(toggleItem(11, Material.CHEST, "§e§lKits Enabled",
+                plugin.getConfigManager()::isKitsEnabled,
+                value -> plugin.getConfigManager().setKitsEnabled(value),
+                "§7Toggle kit distribution on start"));
+
+        items.add(clickItem(13, () -> icon(Material.DIAMOND_SWORD, "§a§lGive Runner Kit", List.of("§7Equip configured runner kit")), ctxClick -> plugin.getKitManager().applyRunnerKit(ctxClick.player())));
+
+        items.add(clickItem(15, () -> icon(Material.IRON_SWORD, "§c§lGive Hunter Kit", List.of("§7Equip configured hunter kit")), ctxClick -> plugin.getKitManager().applyHunterKit(ctxClick.player())));
+
+        items.add(simpleItem(31, () -> icon(Material.PAPER, "§7Editing Kits",
+                List.of("§7Edit contents in kits.yml", "§7or use /swap kits commands"))));
+
+        return new MenuScreen("§a§lKit Manager", 36, items);
+    }
+
+    // -----------------------------------------------------------------
+    // Helper item factories
+
+    private MenuItem simpleItem(int slot, Supplier<ItemStack> icon) {
+        return new MenuItem("static-" + slot, slot, ctx -> icon.get(), null);
+    }
+
+    private MenuItem clickItem(int slot, Supplier<ItemStack> icon, Consumer<MenuClickContext> action) {
+        return new MenuItem("click-" + slot + "-" + UUID.randomUUID(), slot, ctx -> icon.get(), action);
+    }
+
+    private MenuItem backButton(int slot, String label, MenuKey target, Object data, Consumer<Player> handler) {
+        return clickItem(slot, () -> icon(Material.ARROW, label, List.of("§7Go back")), ctx -> {
+            if (handler != null) handler.accept(ctx.player());
+            else openPrevious(ctx.player());
+        });
+    }
+
+    private MenuItem navigateItem(int slot, Material material, String name, MenuKey target, String description) {
+        return navigateItem(slot, material, name, target, description, null);
+    }
+
+    private MenuItem navigateItem(int slot, Material material, String name, MenuKey target, String description, Object data) {
+        return clickItem(slot, () -> icon(material, name, List.of("§7" + description)), ctx -> open(ctx.player(), target, data, false));
+    }
+
+    private MenuItem toggleItem(int slot, Material material, String label, BooleanSupplier getter, Consumer<Boolean> setter, String description) {
+        return clickItem(slot, () -> {
+            boolean enabled = getter.getAsBoolean();
+            String status = enabled ? "§aEnabled" : "§cDisabled";
+            return icon(material, label + ": " + status, description == null ? List.of("§7Click to toggle") : List.of("§7" + description, "§7Click to toggle"));
+        }, ctx -> {
+            boolean next = !getter.getAsBoolean();
+            setter.accept(next);
+            plugin.saveConfig();
+            Msg.send(ctx.player(), "§e" + label.replace("§", "") + ": " + (next ? "§aEnabled" : "§cDisabled"));
+            ctx.reopen();
+        });
+    }
+
+    private MenuItem toggleConfigItem(int slot, Material material, String label, String path, boolean def, String description) {
+        return toggleItem(slot, material, label,
+                () -> plugin.getConfig().getBoolean(path, def),
+                value -> {
+                    plugin.getConfig().set(path, value);
+                },
+                description);
+    }
+
+    private MenuItem adjustItem(int slot, Material material, String label, IntSupplier getter, Consumer<Integer> setter,
+                                int step, int shiftStep, int min, int max, String description) {
+        return clickItem(slot, () -> icon(material, label + " §f" + getter.getAsInt(),
+                List.of("§7" + description,
+                        "§7Left/right: ±" + step,
+                        "§7Shift: ±" + shiftStep)), ctx -> {
+            int value = getter.getAsInt();
+            int delta = ctx.shift() ? shiftStep : step;
+            if (ctx.click() == ClickType.LEFT) value += delta;
+            else if (ctx.click() == ClickType.RIGHT) value -= delta;
+            value = Math.max(min, Math.min(max, value));
+            setter.accept(value);
+            plugin.saveConfig();
+            Msg.send(ctx.player(), "§e" + label.replace("§", "") + ": §f" + value);
+            ctx.reopen();
+        });
+    }
+
+    private MenuItem adjustConfigItem(int slot, Material material, String label, String path, int def,
+                                      int step, int shiftStep, int min, int max, String description) {
+        return adjustItem(slot, material, label,
+                () -> plugin.getConfig().getInt(path, def),
+                value -> plugin.getConfig().set(path, value),
+                step, shiftStep, min, max, description);
+    }
+
+    private void updateParticleColorChannel(int channel, int value) {
+        int[] rgb = plugin.getConfigManager().getParticleTrailColor();
+        if (channel < 0 || channel >= rgb.length) {
+            return;
+        }
+        int clamped = Math.max(0, Math.min(255, value));
+        rgb[channel] = clamped;
+        plugin.getConfig().set("particle_trail.color", Arrays.asList(rgb[0], rgb[1], rgb[2]));
+    }
+
+    private MenuItem cycleItem(int slot, Material material, String label, Supplier<String> getter,
+                               Function<String, String> cycler, List<String> description) {
+        return clickItem(slot, () -> icon(material, label + ": §f" + getter.get(), description), ctx -> {
+            String next = cycler.apply(getter.get());
+            plugin.saveConfig();
+            Msg.send(ctx.player(), "§e" + label.replace("§", "") + ": §f" + next);
+            ctx.reopen();
+        });
+    }
+
+    private String nextVisibility(String current) {
+        if (current == null) return "always";
+        return switch (current.toLowerCase(Locale.ROOT)) {
+            case "always" -> "last_10";
+            case "last_10" -> "never";
+            default -> "always";
+        };
+    }
+
+    private List<String> timerLore(String title) {
+        return List.of("§7Visibility: always, last_10, never", "§7Currently adjusting: §f" + title);
+    }
+
+    private ItemStack icon(Material material, String name, List<String> lore) {
+        ItemStack item = new ItemStack(material);
+        ItemMeta meta = item.getItemMeta();
+        GuiCompat.setDisplayName(meta, name);
+        if (lore != null && !lore.isEmpty()) GuiCompat.setLore(meta, lore);
+        item.setItemMeta(meta);
+        return item;
+    }
+
+    // -----------------------------------------------------------------
+    // Supporting records and enums
+
+    private enum MenuKey {
+        MAIN,
+        MODE_SELECT,
+        MODE_SELECT_DIRECT,
+        TEAM_MANAGEMENT,
+        SETTINGS_HOME,
+        SETTINGS_SWAP,
+        SETTINGS_SAFETY,
+        SETTINGS_HUNTER,
+        POWERUPS_ROOT,
+        POWERUPS_EFFECTS,
+        POWERUPS_DURATION,
+        DANGEROUS_BLOCKS,
+        SETTINGS_WORLD_BORDER,
+        SETTINGS_BOUNTY,
+        SETTINGS_LAST_STAND,
+        SETTINGS_SUDDEN_DEATH,
+        SETTINGS_TASK,
+        TASK_HOME,
+        TASK_CUSTOM,
+        TASK_POOL,
+        TASK_ASSIGNMENTS,
+        STATS_ROOT,
+        STATS_ADVANCED,
+        SETTINGS_VOICE_CHAT,
+        SETTINGS_BROADCAST,
+        SETTINGS_UI,
+        KIT_MANAGER
+    }
+
+    public enum StatsParent {
+        MAIN,
+        SETTINGS
+    }
+
+    private interface MenuBuilder {
+        MenuScreen build(MenuContext context);
+    }
+
+    private record MenuRequest(MenuKey key, Object data) {}
+
+    private record MenuSession(MenuRequest request, MenuScreen screen, Inventory inventory) {}
+
+    private record MenuScreen(String title, int size, List<MenuItem> items) {
+        MenuItem button(String id) {
+            for (MenuItem item : items) {
+                if (item.id().equals(id)) return item;
+            }
+            return null;
+        }
+    }
+
+    private record MenuItem(String id, int slot, Function<MenuContext, ItemStack> icon, Consumer<MenuClickContext> action) {}
+
+    private static class MenuContext {
+        private final GuiManager manager;
+        private final Player player;
+        private final MenuRequest request;
+
+        MenuContext(GuiManager manager, Player player, MenuRequest request) {
+            this.manager = manager;
+            this.player = player;
+            this.request = request;
+        }
+
+        public GuiManager manager() { return manager; }
+        public Player player() { return player; }
+        public MenuRequest request() { return request; }
+    }
+
+    private static final class MenuClickContext extends MenuContext {
+        private final boolean shift;
+        private final ClickType click;
+
+        MenuClickContext(GuiManager manager, Player player, MenuRequest request, boolean shift, ClickType click) {
+            super(manager, player, request);
+            this.shift = shift;
+            this.click = click;
+        }
+
+        public boolean shift() { return shift; }
+        public ClickType click() { return click; }
+
+        public void reopen() { manager().reopen(player()); }
+    }
+
 }

@@ -89,11 +89,12 @@ public class TaskManagerMode {
         if (p == null || def == null) return;
         
         // Cross-platform title with fade timings in ticks
-        BukkitCompat.showTitle(p, "§6§lYOUR SECRET TASK", "§e" + def.description(), 10, 80, 16);
+        BukkitCompat.showTitle(p, "§6§lYOUR SECRET TASK", "§e" + def.description(), 10, 160, 20);
 
         // Show completion command information shortly after
         Bukkit.getScheduler().runTaskLater(plugin, () -> {
-            BukkitCompat.showTitle(p, "§a§lMANUAL COMPLETION", "§bUse: /swap complete confirm", 6, 50, 10);
+            BukkitCompat.showTitle(p, "§a§lMANUAL COMPLETION", "§bUse: /swap complete confirm", 10, 120, 20);
+            p.sendMessage("§bReminder: §eUse /swap complete confirm §bwhen you finish your task.");
         }, 60L); // Show after ~3 seconds
 
         // Chat messages with detailed instructions

@@ -5,7 +5,6 @@ import com.example.speedrunnerswap.config.ConfigManager;
 import com.example.speedrunnerswap.game.GameManager;
 import com.example.speedrunnerswap.gui.GuiManager;
 import com.example.speedrunnerswap.listeners.DragonDefeatListener;
-import com.example.speedrunnerswap.gui.GuiListener;
 import com.example.speedrunnerswap.listeners.EventListeners;
 import com.example.speedrunnerswap.tracking.TrackerManager;
 import com.example.speedrunnerswap.powerups.PowerUpManager;
@@ -102,15 +101,8 @@ public final class SpeedrunnerSwap extends JavaPlugin {
         getServer().getPluginManager().registerEvents(dragonManager, this);
         // Task Manager event listeners
         getServer().getPluginManager().registerEvents(new com.example.speedrunnerswap.task.TaskEventListener(this), this);
-        // Register GUI listener for menu interactions
-        getServer().getPluginManager().registerEvents(new GuiListener(this, guiManager), this);
-        // Register ControlSwap GUI listeners (for Sapnap mode)
-        try {
-            getServer().getPluginManager().registerEvents(new com.example.speedrunnerswap.gui.ControlGuiListener(this), this);
-            getServer().getPluginManager().registerEvents(new com.example.speedrunnerswap.gui.AboutGuiListener(this), this);
-        } catch (Throwable ignored) {
-            // If classes are absent for any reason, avoid startup failure
-        }
+        // Register GUI manager directly (handles all inventory interactions)
+        getServer().getPluginManager().registerEvents(guiManager, this);
         // Register chat input handler for custom tasks
         getServer().getPluginManager().registerEvents(chatInputHandler, this);
         

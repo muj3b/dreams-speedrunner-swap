@@ -38,5 +38,32 @@ public final class Msg {
             Bukkit.getLogger().info(LEGACY.serialize(component));
         }
     }
-}
 
+    public static void send(Player player, String legacyText) {
+        if (player == null) return;
+        send(player, LEGACY.deserialize(legacyText));
+    }
+
+    public static void send(CommandSender sender, String legacyText) {
+        if (sender == null) return;
+        send(sender, LEGACY.deserialize(legacyText));
+    }
+
+    public static void send(Player player, Component component) {
+        if (player == null) return;
+        try {
+            player.sendMessage(component);
+        } catch (Throwable ignored) {
+            player.sendMessage(LEGACY.serialize(component));
+        }
+    }
+
+    public static void send(CommandSender sender, Component component) {
+        if (sender == null) return;
+        try {
+            sender.sendMessage(component);
+        } catch (Throwable ignored) {
+            sender.sendMessage(LEGACY.serialize(component));
+        }
+    }
+}

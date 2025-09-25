@@ -1,6 +1,7 @@
 package com.example.speedrunnerswap.listeners;
 
 import com.example.speedrunnerswap.SpeedrunnerSwap;
+import org.bukkit.Bukkit;
 import org.bukkit.event.player.AsyncPlayerChatEvent;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
@@ -11,11 +12,16 @@ import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.inventory.InventoryAction;
 import org.bukkit.event.player.*;
 import org.bukkit.event.player.PlayerChangedWorldEvent;
+import org.bukkit.event.player.PlayerPortalEvent;
 import org.bukkit.event.entity.PlayerDeathEvent;
 import org.bukkit.event.entity.EntityDamageEvent;
 import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
+import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
+import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
+import java.util.Locale;
 
 public class EventListeners implements Listener {
     
@@ -138,14 +144,19 @@ public class EventListeners implements Listener {
     @EventHandler
     public void onPlayerJoin(PlayerJoinEvent event) {
         Player player = event.getPlayer();
-        
+
         if (plugin.getGameManager() != null && plugin.getGameManager().isGameRunning()) {
             // Handle task mode rejoin logic and resume if needed
             plugin.getGameManager().handlePlayerJoin(player);
-            
+
             // Initialize stats for late joiners if stats tracking is active
             if (plugin.getConfig().getBoolean("stats.enabled", true)) {
                 plugin.getStatsManager().initializePlayerStats(player);
+            }
+
+            // Ensure hunters rejoining mid-game receive a tracking compass immediately
+            if (plugin.getGameManager().isHunter(player)) {
+                Bukkit.getScheduler().runTask(plugin, () -> plugin.getTrackerManager().giveTrackingCompass(player));
             }
         }
     }
@@ -300,6 +311,26 @@ public class EventListeners implements Listener {
         }
     }
 
+    @EventHandler(priority = EventPriority.MONITOR)
+    public void onPlayerPortal(PlayerPortalEvent event) {
+        Player player = event.getPlayer();
+        if (!plugin.getGameManager().isGameRunning()) return;
+        if (!plugin.getGameManager().isRunner(player)) return;
+
+        var toWorld = event.getTo() != null ? event.getTo().getWorld() : null;
+        var fromWorld = event.getFrom() != null ? event.getFrom().getWorld() : null;
+        if (fromWorld == null) return;
+
+        org.bukkit.Location fromLoc = event.getFrom();
+        if (toWorld != null && toWorld.getEnvironment() == org.bukkit.World.Environment.THE_END) {
+            plugin.getTrackerManager().setLastRunnerEndPortalLocation(fromLoc);
+        }
+
+        if (fromWorld.getEnvironment() == org.bukkit.World.Environment.NORMAL) {
+            plugin.getTrackerManager().setLastRunnerOverworldLocation(fromLoc);
+        }
+    }
+
     @EventHandler(priority = EventPriority.HIGHEST)
     public void onInventoryClick(InventoryClickEvent event) {
         if (!(event.getWhoClicked() instanceof Player)) return;
@@ -309,7 +340,7 @@ public class EventListeners implements Listener {
     
         if (inventory == null || clickedItem == null || clickedItem.getType() == Material.AIR) return;
     
-        // If this is one of our plugin GUIs, let the dedicated GuiListener handle it
+        // If this is one of our plugin GUIs, let the GUI manager handle it instead
         String title = getPlainTitle(event.getView());
         if (isPluginGuiTitle(title)) {
             return; // Do not cancel or handle here
@@ -387,25 +418,35 @@ public class EventListeners implements Listener {
     
     private boolean isPluginGuiTitle(String title) {
         if (title == null || title.isEmpty()) return false;
-        return title.contains("SpeedrunnerSwap") ||
-               title.contains("Main Menu") ||
-               title.contains("Team Selector") ||
-               title.contains("Settings") ||
-               title.contains("Kits") ||
-               title.contains("Effects") ||
-               title.contains("Power-ups") ||
-               title.contains("Power-up Durations") ||
-               title.contains("World Border") ||
-               title.contains("Bounty") ||
-               title.contains("Last Stand") ||
-               title.contains("Compass") ||
-               title.contains("Sudden Death") ||
-               title.contains("Statistics") ||
-               title.contains("Dangerous Blocks") ||
-               title.contains("Edit ") && title.contains(" Kit");
+        String stripped;
+        try {
+            Component component = LegacyComponentSerializer.legacySection().deserialize(title);
+            stripped = PlainTextComponentSerializer.plainText().serialize(component);
+        } catch (Throwable ignored) {
+            stripped = title;
+        }
+        String normalized = stripped.toLowerCase(Locale.ROOT);
+
+        return normalized.contains("speedrunner swap") ||
+               normalized.contains("speedrunner swap -") ||
+               normalized.contains("team management") ||
+               normalized.contains("mode selector") ||
+               normalized.contains("task master") ||
+               normalized.contains("task settings") ||
+               normalized.contains("statistics") ||
+               normalized.contains("power-ups") ||
+               normalized.contains("dangerous blocks") ||
+               normalized.contains("world border") ||
+               normalized.contains("bounty") ||
+               normalized.contains("last stand") ||
+               normalized.contains("sudden death") ||
+               normalized.contains("kit manager") ||
+               normalized.contains("settings") ||
+               normalized.contains("voice chat") ||
+               normalized.contains("broadcast");
     }
 
-    // GUI clicks are exclusively handled by GuiListener to avoid duplication.
+    // GUI clicks are exclusively handled by GuiManager to avoid duplication.
 
     // Paper chat guard is registered reflectively in registerPaperChatGuard()
 
