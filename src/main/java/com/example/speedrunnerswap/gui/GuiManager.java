@@ -1921,9 +1921,30 @@ public final class GuiManager implements Listener {
 
     private MenuItem backButton(int slot, String label, MenuKey target, Object data, Consumer<Player> handler) {
         return clickItem(slot, () -> icon(Material.ARROW, label, List.of("§7Go back")), ctx -> {
-            if (handler != null) handler.accept(ctx.player());
-            else openPrevious(ctx.player());
+            popHistory(ctx.player());
+            if (handler != null) {
+                handler.accept(ctx.player());
+                return;
+            }
+            if (target != null) {
+                open(ctx.player(), target, data, false);
+                return;
+            }
+            Deque<MenuRequest> stack = history.get(ctx.player().getUniqueId());
+            if (stack == null || stack.isEmpty()) {
+                ctx.player().closeInventory();
+                return;
+            }
+            MenuRequest previous = stack.peek();
+            open(ctx.player(), previous.key(), previous.data(), false);
         });
+    }
+
+    private void popHistory(Player player) {
+        Deque<MenuRequest> stack = history.get(player.getUniqueId());
+        if (stack != null && !stack.isEmpty()) {
+            stack.pop();
+        }
     }
 
     private MenuItem navigateItem(int slot, Material material, String name, MenuKey target, String description) {

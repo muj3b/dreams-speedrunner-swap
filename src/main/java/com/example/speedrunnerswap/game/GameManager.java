@@ -781,6 +781,8 @@ public class GameManager {
             intervalSeconds = plugin.getConfigManager().getSwapInterval();
         }
         
+        intervalSeconds = Math.max(1, intervalSeconds);
+
         long intervalTicks = intervalSeconds * 20;
         nextSwapTime = System.currentTimeMillis() + (intervalSeconds * 1000);
         swapTask = Bukkit.getScheduler().runTaskLater(plugin, this::performSwap, intervalTicks);
@@ -1074,108 +1076,111 @@ public class GameManager {
         }
         swapInProgress = true;
 
-        // Save dragon health before swap
-        plugin.getDragonManager().onSwapStart();
+        try {
+            // Save dragon health before swap
+            plugin.getDragonManager().onSwapStart();
 
-        // Persist the current active runner's state before swapping
-        if (activeRunner != null && activeRunner.isOnline()) {
-            savePlayerState(activeRunner);
-        }
-
-        // Advance to next online runner
-        int attempts = 0;
-        do {
-            activeRunnerIndex = (activeRunnerIndex + 1) % runners.size();
-            attempts++;
-            if (attempts >= runners.size()) {
-                plugin.getLogger().warning("No online runners found during swap - pausing game");
-                pauseGame();
-                return;
+            // Persist the current active runner's state before swapping
+            if (activeRunner != null && activeRunner.isOnline()) {
+                savePlayerState(activeRunner);
             }
-        } while (!runners.get(activeRunnerIndex).isOnline());
 
-        Player nextRunner = runners.get(activeRunnerIndex);
-        Player previousRunner = activeRunner;
-        boolean sameRunner = previousRunner != null && previousRunner.equals(nextRunner);
-
-        activeRunner = nextRunner;
-        portalSwapRetries.remove(nextRunner.getUniqueId());
-        ensureRunnerQueueCoherence();
-
-        // Grace period for the new active runner
-        int gracePeriodTicks = plugin.getConfigManager().getGracePeriodTicks();
-        if (gracePeriodTicks > 0) {
-            nextRunner.setInvulnerable(true);
-            final Player finalNextRunner = nextRunner;
-            Bukkit.getScheduler().runTaskLater(plugin, () -> {
-                if (finalNextRunner.isOnline()) {
-                    finalNextRunner.setInvulnerable(false);
+            // Advance to next online runner
+            int attempts = 0;
+            do {
+                activeRunnerIndex = (activeRunnerIndex + 1) % runners.size();
+                attempts++;
+                if (attempts >= runners.size()) {
+                    plugin.getLogger().warning("No online runners found during swap - pausing game");
+                    pauseGame();
+                    return;
                 }
-            }, gracePeriodTicks);
-        }
+            } while (!runners.get(activeRunnerIndex).isOnline());
 
-        if (!sameRunner && previousRunner != null && previousRunner.isOnline()) {
-            // Capture full state (includes potion effects, XP, etc.) from the previous runner
-            com.example.speedrunnerswap.models.PlayerState prevState = PlayerStateUtil.capturePlayerState(previousRunner);
+            Player nextRunner = runners.get(activeRunnerIndex);
+            Player previousRunner = activeRunner;
+            boolean sameRunner = previousRunner != null && previousRunner.equals(nextRunner);
 
-            // Apply to the next runner
-            PlayerStateUtil.applyPlayerState(nextRunner, prevState);
-            try { nextRunner.updateInventory(); } catch (Throwable ignored) {}
+            activeRunner = nextRunner;
+            portalSwapRetries.remove(nextRunner.getUniqueId());
+            ensureRunnerQueueCoherence();
 
-            // Teleport adjustment for safe swap near the previous runner's location
-            if (plugin.getConfigManager().isSafeSwapEnabled()) {
-                Location swapLocation = previousRunner.getLocation();
-                Location safeLocation = SafeLocationFinder.findSafeLocation(
-                        swapLocation,
-                        plugin.getConfigManager().getSafeSwapHorizontalRadius(),
-                        plugin.getConfigManager().getSafeSwapVerticalDistance(),
-                        plugin.getConfigManager().getDangerousBlocks());
-                if (safeLocation != null) {
-                    nextRunner.teleport(safeLocation);
+            // Grace period for the new active runner
+            int gracePeriodTicks = plugin.getConfigManager().getGracePeriodTicks();
+            if (gracePeriodTicks > 0) {
+                nextRunner.setInvulnerable(true);
+                final Player finalNextRunner = nextRunner;
+                Bukkit.getScheduler().runTaskLater(plugin, () -> {
+                    if (finalNextRunner.isOnline()) {
+                        finalNextRunner.setInvulnerable(false);
+                    }
+                }, gracePeriodTicks);
+            }
+
+            if (!sameRunner && previousRunner != null && previousRunner.isOnline()) {
+                // Capture full state (includes potion effects, XP, etc.) from the previous runner
+                com.example.speedrunnerswap.models.PlayerState prevState = PlayerStateUtil.capturePlayerState(previousRunner);
+
+                // Apply to the next runner
+                PlayerStateUtil.applyPlayerState(nextRunner, prevState);
+                try { nextRunner.updateInventory(); } catch (Throwable ignored) {}
+
+                // Teleport adjustment for safe swap near the previous runner's location
+                if (plugin.getConfigManager().isSafeSwapEnabled()) {
+                    Location swapLocation = previousRunner.getLocation();
+                    Location safeLocation = SafeLocationFinder.findSafeLocation(
+                            swapLocation,
+                            plugin.getConfigManager().getSafeSwapHorizontalRadius(),
+                            plugin.getConfigManager().getSafeSwapVerticalDistance(),
+                            plugin.getConfigManager().getDangerousBlocks());
+                    if (safeLocation != null) {
+                        nextRunner.teleport(safeLocation);
+                    }
+                }
+
+                // Remove all active potion effects from the previous runner
+                for (PotionEffect effect : previousRunner.getActivePotionEffects()) {
+                    previousRunner.removePotionEffect(effect.getType());
+                }
+
+                // Clear previous runner's inventory to prevent duplication exploits
+                previousRunner.getInventory().clear();
+                previousRunner.getInventory().setArmorContents(new ItemStack[]{});
+                previousRunner.getInventory().setItemInOffHand(null);
+                previousRunner.updateInventory();
+            } else if (previousRunner == null || !previousRunner.isOnline()) {
+                // First-time activation (no previous runner). If kits enabled, give runner kit.
+                if (plugin.getConfigManager().isKitsEnabled()) {
+                    nextRunner.getInventory().clear();
+                    plugin.getKitManager().giveKit(nextRunner, "runner");
                 }
             }
 
-            // Remove all active potion effects from the previous runner
-            for (PotionEffect effect : previousRunner.getActivePotionEffects()) {
-                previousRunner.removePotionEffect(effect.getType());
+            applyInactiveEffects();
+            refreshActiveTrackerTargets();
+            scheduleNextSwap();
+
+            // Restore dragon health after swap
+            plugin.getDragonManager().onSwapComplete();
+
+            // Update hostile mob targeting
+            updateHostileMobTargeting(previousRunner, nextRunner);
+
+            // Suppress public chat broadcast on swap per request
+
+            if (plugin.getConfigManager().isPowerUpsEnabled()) {
+                applyRandomPowerUp(nextRunner);
             }
 
-            // Clear previous runner's inventory to prevent duplication exploits
-            previousRunner.getInventory().clear();
-            previousRunner.getInventory().setArmorContents(new ItemStack[]{});
-            previousRunner.getInventory().setItemInOffHand(null);
-            previousRunner.updateInventory();
-        } else if (previousRunner == null || !previousRunner.isOnline()) {
-            // First-time activation (no previous runner). If kits enabled, give runner kit.
-            if (plugin.getConfigManager().isKitsEnabled()) {
-                nextRunner.getInventory().clear();
-                plugin.getKitManager().giveKit(nextRunner, "runner");
+            if (plugin.getConfigManager().isCompassJammingEnabled()) {
+                long duration = plugin.getConfigManager().getCompassJamDuration();
+                if (duration > 0) {
+                    plugin.getTrackerManager().jamCompasses(duration);
+                }
             }
+        } finally {
+            swapInProgress = false;
         }
-
-        applyInactiveEffects();
-        refreshActiveTrackerTargets();
-        scheduleNextSwap();
-
-        // Restore dragon health after swap
-        plugin.getDragonManager().onSwapComplete();
-        
-        // Update hostile mob targeting
-        updateHostileMobTargeting(previousRunner, nextRunner);
-
-        // Suppress public chat broadcast on swap per request
-
-        if (plugin.getConfigManager().isPowerUpsEnabled()) {
-            applyRandomPowerUp(nextRunner);
-        }
-
-        if (plugin.getConfigManager().isCompassJammingEnabled()) {
-            long duration = plugin.getConfigManager().getCompassJamDuration();
-            if (duration > 0) {
-                plugin.getTrackerManager().jamCompasses(duration);
-            }
-        }
-        swapInProgress = false;
     }
 
     private void refreshActiveTrackerTargets() {
@@ -1395,7 +1400,9 @@ public class GameManager {
             try { ar.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS, 60, 10, false, false)); } catch (Throwable ignored) {}
         }
         // Broadcast pause
-        Msg.broadcast("§e§lGame paused by admin.");
+        if (plugin.getConfigManager().isBroadcastGameEvents()) {
+            Msg.broadcast("§e§lGame paused by admin.");
+        }
         return true;
     }
 
@@ -1413,7 +1420,9 @@ public class GameManager {
         startTitleUpdates();
         startCageEnforcement();
         // Broadcast resume
-        Msg.broadcast("§a§lGame resumed.");
+        if (plugin.getConfigManager().isBroadcastGameEvents()) {
+            Msg.broadcast("§a§lGame resumed.");
+        }
         return true;
     }
 

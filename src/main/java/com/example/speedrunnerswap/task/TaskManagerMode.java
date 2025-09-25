@@ -64,6 +64,10 @@ public class TaskManagerMode {
 
     public void assignAndAnnounceTasks(List<Player> players) {
         assignments.clear();
+        sheepKilledWithIronShovel.clear();
+        lastBedExploderPerWorld.clear();
+        resetProgressGates();
+
         // Build candidate pool with current filter and gates
         List<String> candidates = getCandidateTaskIds();
         if (candidates.isEmpty()) {
@@ -73,6 +77,12 @@ public class TaskManagerMode {
                     .map(TaskDefinition::id)
                     .toList();
         }
+
+        if (candidates.isEmpty()) {
+            handleEmptyTaskPool(players);
+            return;
+        }
+
         // Build a randomized selection without duplicates (wrap if more players than tasks)
         List<String> shuffled = new ArrayList<>(candidates);
         Collections.shuffle(shuffled, new Random());
@@ -85,6 +95,21 @@ public class TaskManagerMode {
             idx++;
         }
         saveAssignmentsToConfig();
+    }
+
+    private void handleEmptyTaskPool(List<Player> players) {
+        Msg.broadcast("§c[Task Manager] Cannot assign tasks — none are enabled. Round cancelled.");
+        plugin.getLogger().warning("Task Manager assignment aborted: no enabled tasks for current settings.");
+
+        if (plugin.getGameManager() != null && plugin.getGameManager().isGameRunning()) {
+            Bukkit.getScheduler().runTask(plugin, () -> plugin.getGameManager().stopGame());
+        }
+
+        for (Player p : players) {
+            if (p != null && p.isOnline()) {
+                p.sendMessage("§eEnable tasks in /swap gui → Task Manager before starting this mode.");
+            }
+        }
     }
 
     private void announceTask(Player p, TaskDefinition def) {
@@ -118,6 +143,7 @@ public class TaskManagerMode {
         if (p == null) return;
         String taskId = assignments.get(p.getUniqueId());
         if (taskId == null) return; // not assigned
+        sheepKilledWithIronShovel.remove(p.getUniqueId());
         // Announce winner and end the game with proper winner attribution
         Bukkit.getScheduler().runTask(plugin, () -> {
             for (Player pl : Bukkit.getOnlinePlayers()) {
@@ -211,6 +237,10 @@ public class TaskManagerMode {
         }
         // Post-process to infer categories for gating if not provided
         postProcessDefinitions();
+        sheepKilledWithIronShovel.clear();
+        lastBedExploderPerWorld.clear();
+        assignments.clear();
+        resetProgressGates();
     }
     
     /** Load custom tasks from config */
