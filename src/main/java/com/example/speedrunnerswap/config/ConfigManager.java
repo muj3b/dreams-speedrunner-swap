@@ -21,7 +21,7 @@ public class ConfigManager {
     private List<String> hunterNames = new ArrayList<>();
     private Set<Material> dangerousBlocks = new HashSet<>();
     private boolean powerUpsEnabled;
-    
+
     public ConfigManager(SpeedrunnerSwap plugin) {
         this.plugin = plugin;
         loadConfig();
@@ -29,6 +29,7 @@ public class ConfigManager {
 
     /**
      * Get whether safe swaps are enabled
+     * 
      * @return True if safe swaps are enabled
      */
     public boolean isSafeSwapEnabled() {
@@ -37,6 +38,7 @@ public class ConfigManager {
 
     /**
      * Set whether safe swaps are enabled
+     * 
      * @param enabled True to enable safe swaps
      */
     public void setSafeSwapEnabled(boolean enabled) {
@@ -46,6 +48,7 @@ public class ConfigManager {
 
     /**
      * Get the swap interval in seconds
+     * 
      * @return The interval in seconds
      */
     public int getSwapInterval() {
@@ -54,7 +57,9 @@ public class ConfigManager {
 
     /**
      * Set the swap interval in seconds
-     * @param interval The interval in seconds (clamped based on experimental toggle)
+     * 
+     * @param interval The interval in seconds (clamped based on experimental
+     *                 toggle)
      */
     public void setSwapInterval(int interval) {
         boolean beta = isBetaIntervalEnabled();
@@ -65,7 +70,6 @@ public class ConfigManager {
         saveConfig();
     }
 
-
     /**
      * Maximum allowed swap interval for UI enforcement (default 600s)
      */
@@ -75,6 +79,7 @@ public class ConfigManager {
 
     /**
      * Get whether randomized swaps are enabled
+     * 
      * @return True if swaps should be randomized
      */
     public boolean isSwapRandomized() {
@@ -83,6 +88,7 @@ public class ConfigManager {
 
     /**
      * Backward-compatibility alias for legacy callers
+     * 
      * @return True if swaps should be randomized
      * @deprecated Use {@link #isSwapRandomized()} instead.
      */
@@ -93,13 +99,14 @@ public class ConfigManager {
 
     /**
      * Set whether swaps should be randomized
+     * 
      * @param randomized True to enable randomized swaps
      */
     public void setSwapRandomized(boolean randomized) {
         config.set("swap.randomize", randomized);
         saveConfig();
     }
-    
+
     /**
      * Load or reload the configuration
      */
@@ -107,11 +114,11 @@ public class ConfigManager {
         plugin.saveDefaultConfig();
         plugin.reloadConfig();
         config = plugin.getConfig();
-        
+
         // Load team lists
         runnerNames = config.getStringList("teams.runners");
         hunterNames = config.getStringList("teams.hunters");
-        
+
         // Load dangerous blocks
         dangerousBlocks = new HashSet<>();
         for (String blockName : config.getStringList("safe_swap.dangerous_blocks")) {
@@ -127,7 +134,7 @@ public class ConfigManager {
         this.powerUpsEnabled = config.getBoolean("power_ups.enabled", false);
         config.set("power_ups.enabled", this.powerUpsEnabled); // Ensure config is in sync
     }
-    
+
     /**
      * Save the configuration
      */
@@ -135,12 +142,13 @@ public class ConfigManager {
         // Update team lists in config
         config.set("teams.runners", runnerNames);
         config.set("teams.hunters", hunterNames);
-        
+
         plugin.saveConfig();
     }
-    
+
     /**
      * Add a player to the runners list
+     * 
      * @param player The player to add
      */
     public void addRunner(Player player) {
@@ -151,9 +159,10 @@ public class ConfigManager {
             hunterNames.remove(name);
         }
     }
-    
+
     /**
      * Remove a player from the runners list
+     * 
      * @param player The player to remove
      */
     public void removeRunner(Player player) {
@@ -171,9 +180,10 @@ public class ConfigManager {
         config.set("power_ups.enabled", enabled);
         saveConfig();
     }
-    
+
     /**
      * Add a player to the hunters list
+     * 
      * @param player The player to add
      */
     public void addHunter(Player player) {
@@ -184,25 +194,28 @@ public class ConfigManager {
             runnerNames.remove(name);
         }
     }
-    
+
     /**
      * Remove a player from the hunters list
+     * 
      * @param player The player to remove
      */
     public void removeHunter(Player player) {
         hunterNames.remove(player.getName());
     }
-    
+
     /**
      * Get the list of runner names
+     * 
      * @return The list of runner names
      */
     public List<String> getRunnerNames() {
         return new ArrayList<>(runnerNames);
     }
-    
+
     /**
      * Get the list of hunter names
+     * 
      * @return The list of hunter names
      */
     public List<String> getHunterNames() {
@@ -211,10 +224,12 @@ public class ConfigManager {
 
     /**
      * Replace the entire runners name list in memory and persist
+     * 
      * @param names list of player names
      */
     public void setRunnerNames(java.util.List<String> names) {
-        if (names == null) names = java.util.Collections.emptyList();
+        if (names == null)
+            names = java.util.Collections.emptyList();
         this.runnerNames.clear();
         this.runnerNames.addAll(names);
         saveConfig();
@@ -222,80 +237,91 @@ public class ConfigManager {
 
     /**
      * Replace the entire hunters name list in memory and persist
+     * 
      * @param names list of player names
      */
     public void setHunterNames(java.util.List<String> names) {
-        if (names == null) names = java.util.Collections.emptyList();
+        if (names == null)
+            names = java.util.Collections.emptyList();
         this.hunterNames.clear();
         this.hunterNames.addAll(names);
         saveConfig();
     }
-    
+
     /**
      * Check if a player is a runner
+     * 
      * @param player The player to check
      * @return True if the player is a runner
      */
     public boolean isRunner(Player player) {
         return runnerNames.contains(player.getName());
     }
-    
+
     /**
      * Check if a player is a hunter
+     * 
      * @param player The player to check
      * @return True if the player is a hunter
      */
     public boolean isHunter(Player player) {
         return hunterNames.contains(player.getName());
     }
-    
+
     /**
      * Get whether swap randomization is enabled
+     * 
      * @return True if swap randomization is enabled
      */
     /**
      * Get the minimum swap interval in seconds
+     * 
      * @return The minimum swap interval
      */
     public int getMinSwapInterval() {
         return config.getInt("swap.min_interval", 30);
     }
-    
+
     /**
      * Get the maximum swap interval in seconds
+     * 
      * @return The maximum swap interval
      */
     public int getMaxSwapInterval() {
         // Deprecated alias; prefer getSwapIntervalMax()
         return getSwapIntervalMax();
     }
-    
+
     /**
      * Get the jitter standard deviation in seconds
+     * 
      * @return The jitter standard deviation
      */
     public double getJitterStdDev() {
         return config.getDouble("swap.jitter.stddev", 15);
     }
-    
+
     /**
      * Get whether to clamp jittered intervals within min/max limits
+     * 
      * @return True if jittered intervals should be clamped
      */
     public boolean isClampJitter() {
         return config.getBoolean("swap.jitter.clamp", true);
     }
-    
+
     /**
      * Get the grace period after swaps in ticks
+     * 
      * @return The grace period in ticks
      */
     public int getGracePeriodTicks() {
         return config.getInt("swap.grace_period_ticks", 40);
     }
-    
+
     /**
      * Get whether to pause the game when a runner disconnects
+     * 
      * @return True if the game should pause on disconnect
      */
     public boolean isPauseOnDisconnect() {
@@ -304,6 +330,7 @@ public class ConfigManager {
 
     /**
      * Get the spawn location for players after the game ends.
+     * 
      * @return The spawn location.
      */
     public org.bukkit.Location getSpawnLocation() {
@@ -314,7 +341,8 @@ public class ConfigManager {
         org.bukkit.World world = plugin.getServer().getWorld(worldName);
         if (world == null) {
             world = plugin.getServer().getWorlds().get(0); // Fallback to default world
-            plugin.getLogger().warning("Spawn world '" + worldName + "' not found. Using default world: " + world.getName());
+            plugin.getLogger()
+                    .warning("Spawn world '" + worldName + "' not found. Using default world: " + world.getName());
         }
         return new org.bukkit.Location(world, x, y, z);
     }
@@ -327,7 +355,6 @@ public class ConfigManager {
         config.set("spawn.force_global", force);
         plugin.saveConfig();
     }
-
 
     public void setGlobalSpawn(org.bukkit.Location location, boolean propagateRunners) {
         if (location == null || location.getWorld() == null) {
@@ -367,13 +394,10 @@ public class ConfigManager {
             Player.class.getMethod("setRespawnLocation", org.bukkit.Location.class, boolean.class)
                     .invoke(player, location, true);
         } catch (Throwable reflectiveFailure) {
-            plugin.getLogger().warning("Failed to set respawn location for " + player.getName() + ": " + reflectiveFailure.getMessage());
+            plugin.getLogger().warning(
+                    "Failed to set respawn location for " + player.getName() + ": " + reflectiveFailure.getMessage());
         }
     }
-
-
-
-
 
     public void setBroadcastsEnabled(boolean broadcastsEnabled) {
         config.set("broadcasts.enabled", broadcastsEnabled);
@@ -401,7 +425,8 @@ public class ConfigManager {
         World world = plugin.getServer().getWorld(worldName);
         if (world == null) {
             world = plugin.getServer().getWorlds().get(0);
-            plugin.getLogger().warning("Limbo world '" + worldName + "' not found. Using default world: " + world.getName());
+            plugin.getLogger()
+                    .warning("Limbo world '" + worldName + "' not found. Using default world: " + world.getName());
         }
         return new Location(world, x, y, z);
     }
@@ -438,10 +463,10 @@ public class ConfigManager {
 
     public int[] getParticleTrailColor() {
         List<Integer> rgb = config.getIntegerList("particle_trail.color");
-        return new int[]{
-            rgb.size() > 0 ? rgb.get(0) : 255,
-            rgb.size() > 1 ? rgb.get(1) : 0,
-            rgb.size() > 2 ? rgb.get(2) : 0
+        return new int[] {
+                rgb.size() > 0 ? rgb.get(0) : 255,
+                rgb.size() > 1 ? rgb.get(1) : 0,
+                rgb.size() > 2 ? rgb.get(2) : 0
         };
     }
 
@@ -457,42 +482,45 @@ public class ConfigManager {
         return config.getString("gui.settings.title", "§6SpeedrunnerSwap - Settings");
     }
 
-
-
     /**
      * Get the horizontal scan radius for safe swaps
+     * 
      * @return The horizontal scan radius
      */
     public int getSafeSwapHorizontalRadius() {
         return config.getInt("safe_swap.horizontal_radius", 5);
     }
-    
+
     /**
      * Get the vertical scan distance for safe swaps
+     * 
      * @return The vertical scan distance
      */
     public int getSafeSwapVerticalDistance() {
         return config.getInt("safe_swap.vertical_distance", 10);
     }
-    
+
     /**
      * Get the set of dangerous block materials
+     * 
      * @return The set of dangerous block materials
      */
     public Set<Material> getDangerousBlocks() {
         return dangerousBlocks;
     }
-    
+
     /**
      * Get whether to cancel movement for inactive runners
+     * 
      * @return True if movement should be canceled
      */
     public boolean isCancelMovement() {
         return config.getBoolean("cancel.movement", true);
     }
-    
+
     /**
      * Get whether to cancel interactions for inactive runners
+     * 
      * @return True if interactions should be canceled
      */
     public boolean isCancelInteractions() {
@@ -501,27 +529,29 @@ public class ConfigManager {
 
     /**
      * Get whether inactive runners are prevented from chatting
+     * 
      * @return True if inactive runner chat is restricted
      */
     public boolean isRestrictInactiveRunnerChat() {
-        return config.getBoolean("chat.restrict_inactive_runners", true);
+        return config.getBoolean("chat.restrict_inactive_runners", false);
     }
 
     /**
      * Set whether inactive runners can send chat messages
+     * 
      * @param restrict True to block inactive runner chat
      */
     public void setRestrictInactiveRunnerChat(boolean restrict) {
         config.set("chat.restrict_inactive_runners", restrict);
         saveConfig();
     }
-    
+
     public int getGuiMainMenuRows() {
         // Prefer nested path; fall back to legacy flat key
         return config.getInt("gui.main_menu.rows",
                 config.getInt("gui.main_menu_rows", 3));
     }
-    
+
     public int getGuiTeamSelectorRows() {
         // Prefer nested path; fall back to legacy flat key
         return config.getInt("gui.team_selector.rows",
@@ -558,9 +588,12 @@ public class ConfigManager {
     // Default mode persistence
     public com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode getDefaultMode() {
         String m = config.getString("game.default_mode", "dream");
-        if (m == null) m = "dream";
-        if ("sapnap".equalsIgnoreCase(m)) return com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode.SAPNAP;
-        if ("task".equalsIgnoreCase(m) || "taskmanager".equalsIgnoreCase(m)) return com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode.TASK;
+        if (m == null)
+            m = "dream";
+        if ("sapnap".equalsIgnoreCase(m))
+            return com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode.SAPNAP;
+        if ("task".equalsIgnoreCase(m) || "taskmanager".equalsIgnoreCase(m))
+            return com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode.TASK;
         return com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode.DREAM;
     }
 
@@ -580,6 +613,7 @@ public class ConfigManager {
 
     /**
      * Get whether the freeze mechanic is enabled
+     * 
      * @return True if enabled
      */
     public boolean isFreezeMechanicEnabled() {
@@ -588,6 +622,7 @@ public class ConfigManager {
 
     /**
      * Get the freeze duration in ticks
+     * 
      * @return The duration in ticks
      */
     public int getFreezeDurationTicks() {
@@ -596,6 +631,7 @@ public class ConfigManager {
 
     /**
      * Get the interval to check for freezing in ticks
+     * 
      * @return The check interval in ticks
      */
     public int getFreezeCheckIntervalTicks() {
@@ -604,6 +640,7 @@ public class ConfigManager {
 
     /**
      * Get the maximum distance for freezing
+     * 
      * @return The max distance
      */
     public double getFreezeMaxDistance() {
@@ -612,6 +649,7 @@ public class ConfigManager {
 
     /**
      * Get the timer visibility setting for active runners
+     * 
      * @return The visibility setting ("always", "last_10", or "never")
      */
     public String getRunnerTimerVisibility() {
@@ -620,6 +658,7 @@ public class ConfigManager {
 
     /**
      * Get the timer visibility setting for waiting runners
+     * 
      * @return The visibility setting ("always", "last_10", or "never")
      */
     public String getWaitingTimerVisibility() {
@@ -628,6 +667,7 @@ public class ConfigManager {
 
     /**
      * Get the timer visibility setting for hunters
+     * 
      * @return The visibility setting ("always", "last_10", or "never")
      */
     public String getHunterTimerVisibility() {
@@ -653,9 +693,11 @@ public class ConfigManager {
 
     // End portal hint per-world (used when target is in THE_END)
     public org.bukkit.Location getEndPortalHint(org.bukkit.World world) {
-        if (world == null) return null;
+        if (world == null)
+            return null;
         String base = "tracker.end_portal_hint." + world.getName();
-        if (!config.contains(base + ".x")) return null;
+        if (!config.contains(base + ".x"))
+            return null;
         double x = config.getDouble(base + ".x", world.getSpawnLocation().getX());
         double y = config.getDouble(base + ".y", world.getSpawnLocation().getY());
         double z = config.getDouble(base + ".z", world.getSpawnLocation().getZ());
@@ -663,7 +705,8 @@ public class ConfigManager {
     }
 
     public void setEndPortalHint(org.bukkit.World world, org.bukkit.Location loc) {
-        if (world == null || loc == null) return;
+        if (world == null || loc == null)
+            return;
         String base = "tracker.end_portal_hint." + world.getName();
         config.set(base + ".x", loc.getX());
         config.set(base + ".y", loc.getY());
@@ -672,7 +715,8 @@ public class ConfigManager {
     }
 
     public void clearEndPortalHint(org.bukkit.World world) {
-        if (world == null) return;
+        if (world == null)
+            return;
         String base = "tracker.end_portal_hint." + world.getName();
         config.set(base, null);
         plugin.saveConfig();
@@ -769,6 +813,7 @@ public class ConfigManager {
 
     /**
      * Set whether kits are enabled
+     * 
      * @param enabled true to enable kits
      */
     public void setKitsEnabled(boolean enabled) {
@@ -796,10 +841,9 @@ public class ConfigManager {
         return config.getBoolean("swap.hot_potato_mode.enabled", false);
     }
 
-
-
     /**
      * Set the timer visibility setting for active runners
+     * 
      * @param visibility The visibility setting ("always", "last_10", or "never")
      */
     public void setRunnerTimerVisibility(String visibility) {
@@ -809,6 +853,7 @@ public class ConfigManager {
 
     /**
      * Set the timer visibility setting for waiting runners
+     * 
      * @param visibility The visibility setting ("always", "last_10", or "never")
      */
     public void setWaitingTimerVisibility(String visibility) {
@@ -818,6 +863,7 @@ public class ConfigManager {
 
     /**
      * Set the timer visibility setting for hunters
+     * 
      * @param visibility The visibility setting ("always", "last_10", or "never")
      */
     public void setHunterTimerVisibility(String visibility) {
@@ -827,32 +873,33 @@ public class ConfigManager {
 
     /**
      * Get whether single player sleep is enabled
+     * 
      * @return True if only the active runner needs to sleep to skip night
      */
     public boolean isSinglePlayerSleepEnabled() {
         return config.getBoolean("single_player_sleep.enabled", false);
     }
-    
+
     // Experimental interval toggle
     public boolean isBetaIntervalEnabled() {
         return config.getBoolean("swap.beta_enabled", true);
     }
-    
+
     public void setBetaIntervalEnabled(boolean enabled) {
         config.set("swap.beta_enabled", enabled);
         saveConfig();
     }
-    
+
     // Apply default interval on mode switch
     public boolean getApplyDefaultOnModeSwitch() {
         return config.getBoolean("swap.apply_default_on_mode_switch", false);
     }
-    
+
     public void setApplyDefaultOnModeSwitch(boolean enabled) {
         config.set("swap.apply_default_on_mode_switch", enabled);
         saveConfig();
     }
-    
+
     // Per-mode default intervals
     public int getModeDefaultInterval(com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode mode) {
         String key = switch (mode) {
@@ -862,7 +909,7 @@ public class ConfigManager {
         };
         return config.getInt(key, 60);
     }
-    
+
     public void setModeDefaultInterval(com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode mode, int seconds) {
         String key = switch (mode) {
             case SAPNAP -> "swap.default_intervals.sapnap";
@@ -873,7 +920,7 @@ public class ConfigManager {
         config.set(key, seconds);
         saveConfig();
     }
-    
+
     public void applyModeDefaultInterval(com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode mode) {
         int seconds = getModeDefaultInterval(mode);
         setSwapInterval(seconds);
@@ -881,6 +928,7 @@ public class ConfigManager {
 
     /**
      * Set whether single player sleep is enabled
+     * 
      * @param enabled True to allow only active runner to skip night
      */
     public void setSinglePlayerSleepEnabled(boolean enabled) {

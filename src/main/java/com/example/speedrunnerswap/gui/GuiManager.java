@@ -888,7 +888,7 @@ public final class GuiManager implements Listener {
                 "§7Block inactive runner interactions"));
 
         items.add(toggleConfigItem(24, Material.PAPER, "§e§lRestrict Inactive Chat",
-                "chat.restrict_inactive_runners", true,
+                "chat.restrict_inactive_runners", false,
                 "§7Prevent waiting runners from chatting"));
 
         items.add(toggleItem(32, Material.WHITE_BED, "§e§lSingle Player Sleep",

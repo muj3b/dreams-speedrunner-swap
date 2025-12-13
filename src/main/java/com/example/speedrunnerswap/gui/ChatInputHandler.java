@@ -16,65 +16,71 @@ import java.util.UUID;
 public class ChatInputHandler implements Listener {
     private final SpeedrunnerSwap plugin;
     private final Map<UUID, InputState> activeInputs = new HashMap<>();
-    
+
     private static class InputState {
-        enum Type { TASK_ID, TASK_DESCRIPTION, TASK_DIFFICULTY, CONFIG_STRING, CONFIG_LIST_ADD }
+        enum Type {
+            TASK_ID, TASK_DESCRIPTION, TASK_DIFFICULTY, CONFIG_STRING, CONFIG_LIST_ADD
+        }
+
         final Type type;
         String taskId; // Store task ID when collecting description
         String taskDescription;
         String configPath; // Path for config edits
-        
+
         InputState(Type type) {
             this.type = type;
         }
     }
-    
+
     public ChatInputHandler(SpeedrunnerSwap plugin) {
         this.plugin = plugin;
-        // Try to register Paper's AsyncChatEvent handler via reflection (no compile-time dependency)
+        // Try to register Paper's AsyncChatEvent handler via reflection (no
+        // compile-time dependency)
         registerPaperAsyncChatHook();
     }
-    
+
     public void expectTaskId(Player player) {
         activeInputs.put(player.getUniqueId(), new InputState(InputState.Type.TASK_ID));
     }
-    
+
     public void expectTaskDescription(Player player, String taskId) {
         InputState state = new InputState(InputState.Type.TASK_DESCRIPTION);
         state.taskId = taskId;
         activeInputs.put(player.getUniqueId(), state);
     }
-    
+
     public void expectTaskDescription(Player player) {
         // For when we already have the task ID stored
         activeInputs.put(player.getUniqueId(), new InputState(InputState.Type.TASK_DESCRIPTION));
     }
-    
+
     public void expectConfigString(Player player, String path) {
         InputState st = new InputState(InputState.Type.CONFIG_STRING);
         st.configPath = path;
         activeInputs.put(player.getUniqueId(), st);
     }
-    
+
     public void expectConfigListAdd(Player player, String path) {
         InputState st = new InputState(InputState.Type.CONFIG_LIST_ADD);
         st.configPath = path;
         activeInputs.put(player.getUniqueId(), st);
     }
-    
+
     @SuppressWarnings("deprecation")
     @EventHandler
     public void onChat(AsyncPlayerChatEvent event) {
         Player player = event.getPlayer();
         UUID uuid = player.getUniqueId();
-        if (!activeInputs.containsKey(uuid)) return;
+        if (!activeInputs.containsKey(uuid))
+            return;
         event.setCancelled(true);
         String msg = event.getMessage();
         // Defer to main thread and share logic with Paper event
         plugin.getServer().getScheduler().runTask(plugin, () -> handleInput(player, msg));
     }
 
-    // Clear any pending chat prompts when a player disconnects to prevent stale state
+    // Clear any pending chat prompts when a player disconnects to prevent stale
+    // state
     @EventHandler
     public void onQuit(PlayerQuitEvent event) {
         activeInputs.remove(event.getPlayer().getUniqueId());
@@ -85,11 +91,15 @@ public class ChatInputHandler implements Listener {
         activeInputs.remove(event.getPlayer().getUniqueId());
     }
 
-    /** Shared input handling used by both legacy and Paper chat events (executed on main thread). */
+    /**
+     * Shared input handling used by both legacy and Paper chat events (executed on
+     * main thread).
+     */
     private void handleInput(Player player, String rawMessage) {
         UUID uuid = player.getUniqueId();
         InputState state = activeInputs.remove(uuid);
-        if (state == null) return;
+        if (state == null)
+            return;
         String msg = rawMessage == null ? "" : rawMessage.trim();
         switch (state.type) {
             case TASK_ID -> {
@@ -134,7 +144,8 @@ public class ChatInputHandler implements Listener {
                 next.taskId = id;
                 next.taskDescription = msg;
                 activeInputs.put(uuid, next);
-                player.sendMessage("§6Select a difficulty for §e" + id + "§6. Type §aEasy§6, §eMedium§6, or §cHard§6. Type §cCancel §6to abort.");
+                player.sendMessage("§6Select a difficulty for §e" + id
+                        + "§6. Type §aEasy§6, §eMedium§6, or §cHard§6. Type §cCancel §6to abort.");
             }
             case TASK_DIFFICULTY -> {
                 if ("cancel".equalsIgnoreCase(msg)) {
@@ -162,7 +173,8 @@ public class ChatInputHandler implements Listener {
                     return;
                 }
                 mode.addCustomTask(id, description, difficulty);
-                player.sendMessage("§aAdded custom task §e" + id + " §7(" + difficulty.name().toLowerCase(java.util.Locale.ROOT) + ")§a.");
+                player.sendMessage("§aAdded custom task §e" + id + " §7("
+                        + difficulty.name().toLowerCase(java.util.Locale.ROOT) + ")§a.");
                 plugin.getGuiManager().openTaskManagerMenu(player);
             }
             case CONFIG_STRING -> {
@@ -234,14 +246,17 @@ public class ChatInputHandler implements Listener {
         return value;
     }
 
-    /** Register Paper's AsyncChatEvent using reflection for cross-platform support. */
-    @SuppressWarnings({"unchecked"})
+    /**
+     * Register Paper's AsyncChatEvent using reflection for cross-platform support.
+     */
+    @SuppressWarnings({ "unchecked" })
     private void registerPaperAsyncChatHook() {
         try {
             final Class<?> asyncChatCls = Class.forName("io.papermc.paper.event.player.AsyncChatEvent");
             // Create an EventExecutor that extracts player and message via reflection
             org.bukkit.plugin.EventExecutor exec = (listener, event) -> {
-                if (!asyncChatCls.isInstance(event)) return;
+                if (!asyncChatCls.isInstance(event))
+                    return;
                 Object ev = event;
                 org.bukkit.entity.Player playerTmp;
                 String msgTmp;
@@ -256,10 +271,12 @@ public class ChatInputHandler implements Listener {
                     java.lang.reflect.Method messageM = asyncChatCls.getMethod("message");
                     Object component = messageM.invoke(ev);
                     // Reflectively serialize to plain text to avoid compile dependency
-                    Class<?> serCls = Class.forName("net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer");
+                    Class<?> serCls = Class
+                            .forName("net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer");
                     java.lang.reflect.Method plainText = serCls.getMethod("plainText");
                     Object serializer = plainText.invoke(null);
-                    java.lang.reflect.Method serialize = serializer.getClass().getMethod("serialize", Class.forName("net.kyori.adventure.text.Component"));
+                    java.lang.reflect.Method serialize = serializer.getClass().getMethod("serialize",
+                            Class.forName("net.kyori.adventure.text.Component"));
                     Object s = serialize.invoke(serializer, component);
                     msgTmp = s != null ? String.valueOf(s) : "";
                 } catch (Throwable t) {
@@ -267,23 +284,26 @@ public class ChatInputHandler implements Listener {
                 }
                 final org.bukkit.entity.Player player = playerTmp;
                 final String msg = msgTmp;
+                // Only process if this player has a pending chat input prompt
+                if (!activeInputs.containsKey(player.getUniqueId()))
+                    return;
                 // Cancel the Paper chat event
                 try {
                     java.lang.reflect.Method setCancelled = asyncChatCls.getMethod("setCancelled", boolean.class);
                     setCancelled.invoke(ev, true);
-                } catch (Throwable ignored) {}
+                } catch (Throwable ignored) {
+                }
                 // Delegate to main thread shared handler
                 plugin.getServer().getScheduler().runTask(plugin, () -> handleInput(player, msg));
             };
             // Register the event executor
             plugin.getServer().getPluginManager().registerEvent(
-                (Class<? extends org.bukkit.event.Event>) asyncChatCls,
-                this,
-                org.bukkit.event.EventPriority.NORMAL,
-                exec,
-                plugin,
-                true
-            );
+                    (Class<? extends org.bukkit.event.Event>) asyncChatCls,
+                    this,
+                    org.bukkit.event.EventPriority.NORMAL,
+                    exec,
+                    plugin,
+                    true);
             plugin.getLogger().info("Paper AsyncChatEvent hook enabled.");
         } catch (ClassNotFoundException e) {
             // Not running on Paper (or older versions) - nothing to do
@@ -291,9 +311,10 @@ public class ChatInputHandler implements Listener {
             plugin.getLogger().warning("Failed to enable Paper AsyncChatEvent hook: " + t.getMessage());
         }
     }
-    
-    // Removed unused handler methods after inlining logic in onChat() to reduce lints.
-    
+
+    // Removed unused handler methods after inlining logic in onChat() to reduce
+    // lints.
+
     public void clearInput(Player player) {
         activeInputs.remove(player.getUniqueId());
     }

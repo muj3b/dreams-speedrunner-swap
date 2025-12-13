@@ -89,8 +89,8 @@ cancel:
 
 # Chat controls for inactive runners
 chat:
-  # Block chat messages from inactive runners during swaps
-  restrict_inactive_runners: true
+  # Block chat messages from inactive runners during swaps (disabled by default)
+  restrict_inactive_runners: false
 
 # Tracker Configuration
 tracker:
