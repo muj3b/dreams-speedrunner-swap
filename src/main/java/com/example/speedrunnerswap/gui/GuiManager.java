@@ -49,8 +49,10 @@ import java.util.function.IntSupplier;
 import java.util.function.Supplier;
 
 /**
- * Rebuilt GUI system that exposes the entire plugin configuration and runtime controls.
- * Every screen is described using Menu definitions to keep navigation predictable.
+ * Rebuilt GUI system that exposes the entire plugin configuration and runtime
+ * controls.
+ * Every screen is described using Menu definitions to keep navigation
+ * predictable.
  */
 public final class GuiManager implements Listener {
 
@@ -58,7 +60,8 @@ public final class GuiManager implements Listener {
     private static final ItemStack FILLER_ACCENT;
     private static final ItemStack FILLER_BORDER;
     private static final NamespacedKey BUTTON_KEY;
-    private static final List<String> PARTICLE_TYPES = List.of("DUST", "END_ROD", "FLAME", "CRIT", "HEART", "CLOUD", "SMOKE");
+    private static final List<String> PARTICLE_TYPES = List.of("DUST", "END_ROD", "FLAME", "CRIT", "HEART", "CLOUD",
+            "SMOKE");
 
     static {
         FILLER_PRIMARY = pane(Material.LIGHT_BLUE_STAINED_GLASS_PANE);
@@ -96,7 +99,8 @@ public final class GuiManager implements Listener {
     }
 
     public void openDirectGamemodeSelector(Player player) {
-        if (player == null) return;
+        if (player == null)
+            return;
         resetNavigation(player);
         open(player, MenuKey.MODE_SELECT_DIRECT, null, false);
     }
@@ -138,7 +142,8 @@ public final class GuiManager implements Listener {
     // Menu engine
 
     private void open(Player player, MenuKey key, Object data, boolean replaceHistory) {
-        if (player == null) return;
+        if (player == null)
+            return;
         MenuBuilder builder = builders.get(key);
         if (builder == null) {
             player.closeInventory();
@@ -168,7 +173,8 @@ public final class GuiManager implements Listener {
 
     void reopen(Player player) {
         MenuSession session = sessions.get(player.getUniqueId());
-        if (session == null) return;
+        if (session == null)
+            return;
         open(player, session.request.key(), session.request.data(), true);
     }
 
@@ -210,7 +216,8 @@ public final class GuiManager implements Listener {
             inventory.setItem(i, filler);
         }
         for (MenuItem item : screen.items()) {
-            if (item.slot() < 0 || item.slot() >= inventory.getSize()) continue;
+            if (item.slot() < 0 || item.slot() >= inventory.getSize())
+                continue;
             ItemStack icon = item.icon().apply(context);
             ItemMeta meta = icon.getItemMeta();
             meta.getPersistentDataContainer().set(BUTTON_KEY, PersistentDataType.STRING, item.id());
@@ -221,32 +228,42 @@ public final class GuiManager implements Listener {
 
     @EventHandler
     public void onInventoryClick(InventoryClickEvent event) {
-        if (!(event.getWhoClicked() instanceof Player player)) return;
+        if (!(event.getWhoClicked() instanceof Player player))
+            return;
         MenuSession session = sessions.get(player.getUniqueId());
-        if (session == null) return;
-        if (!Objects.equals(event.getView().getTopInventory(), session.inventory())) return;
+        if (session == null)
+            return;
+        if (!Objects.equals(event.getView().getTopInventory(), session.inventory()))
+            return;
 
         event.setCancelled(true);
         ItemStack current = event.getCurrentItem();
-        if (current == null || current.getType() == Material.AIR) return;
+        if (current == null || current.getType() == Material.AIR)
+            return;
         ItemMeta meta = current.getItemMeta();
-        if (meta == null) return;
+        if (meta == null)
+            return;
         PersistentDataContainer container = meta.getPersistentDataContainer();
         String id = container.get(BUTTON_KEY, PersistentDataType.STRING);
-        if (id == null) return;
+        if (id == null)
+            return;
 
         MenuItem item = session.screen.button(id);
-        if (item == null || item.action() == null) return;
+        if (item == null || item.action() == null)
+            return;
 
-        MenuClickContext ctx = new MenuClickContext(this, player, session.request, event.isShiftClick(), event.getClick());
+        MenuClickContext ctx = new MenuClickContext(this, player, session.request, event.isShiftClick(),
+                event.getClick());
         item.action().accept(ctx);
     }
 
     @EventHandler
     public void onInventoryDrag(InventoryDragEvent event) {
-        if (!(event.getWhoClicked() instanceof Player player)) return;
+        if (!(event.getWhoClicked() instanceof Player player))
+            return;
         MenuSession session = sessions.get(player.getUniqueId());
-        if (session == null) return;
+        if (session == null)
+            return;
         if (Objects.equals(event.getView().getTopInventory(), session.inventory())) {
             event.setCancelled(true);
         }
@@ -254,7 +271,8 @@ public final class GuiManager implements Listener {
 
     @EventHandler
     public void onInventoryClose(InventoryCloseEvent event) {
-        if (!(event.getPlayer() instanceof Player player)) return;
+        if (!(event.getPlayer() instanceof Player player))
+            return;
         MenuSession session = sessions.get(player.getUniqueId());
         if (session != null && Objects.equals(session.inventory(), event.getInventory())) {
             sessions.remove(player.getUniqueId());
@@ -330,48 +348,56 @@ public final class GuiManager implements Listener {
         if (!running) {
             items.add(clickItem(10, () -> icon(Material.LIME_CONCRETE, "§a§lStart Game",
                     List.of("§7Swap interval: §f" + cfg.getSwapInterval() + "s")), ctxClick -> {
-                if (gm.startGame()) {
-                    Msg.send(ctxClick.player(), "§aGame started!");
-                } else {
-                    Msg.send(ctxClick.player(), "§cCannot start. Check team assignments.");
-                }
-                ctxClick.reopen();
-            }));
+                        if (gm.startGame()) {
+                            Msg.send(ctxClick.player(), "§aGame started!");
+                        } else {
+                            Msg.send(ctxClick.player(), "§cCannot start. Check team assignments.");
+                        }
+                        ctxClick.reopen();
+                    }));
         } else {
-            items.add(clickItem(10, () -> icon(Material.RED_CONCRETE, "§c§lStop Game", List.of("§7End the current game")), ctxClick -> {
-                gm.stopGame();
-                Msg.send(ctxClick.player(), "§cGame stopped.");
-                ctxClick.reopen();
-            }));
+            items.add(clickItem(10,
+                    () -> icon(Material.RED_CONCRETE, "§c§lStop Game", List.of("§7End the current game")), ctxClick -> {
+                        gm.stopGame();
+                        Msg.send(ctxClick.player(), "§cGame stopped.");
+                        ctxClick.reopen();
+                    }));
             if (paused) {
-                items.add(clickItem(12, () -> icon(Material.ORANGE_CONCRETE, "§a§lResume", List.of("§7Resume swaps")), ctxClick -> {
-                    gm.resumeGame();
-                    ctxClick.reopen();
-                }));
+                items.add(clickItem(12, () -> icon(Material.ORANGE_CONCRETE, "§a§lResume", List.of("§7Resume swaps")),
+                        ctxClick -> {
+                            gm.resumeGame();
+                            ctxClick.reopen();
+                        }));
             } else {
-                items.add(clickItem(12, () -> icon(Material.YELLOW_CONCRETE, "§e§lPause", List.of("§7Pause swaps")), ctxClick -> {
-                    gm.pauseGame();
-                    ctxClick.reopen();
-                }));
+                items.add(clickItem(12, () -> icon(Material.YELLOW_CONCRETE, "§e§lPause", List.of("§7Pause swaps")),
+                        ctxClick -> {
+                            gm.pauseGame();
+                            ctxClick.reopen();
+                        }));
             }
-            items.add(clickItem(14, () -> icon(Material.NETHER_STAR, "§e§lForce Swap", List.of("§7Trigger immediate swap")), ctxClick -> {
-                gm.triggerImmediateSwap();
-                Msg.send(ctxClick.player(), "§eSwap triggered.");
-            }));
+            items.add(clickItem(14,
+                    () -> icon(Material.NETHER_STAR, "§e§lForce Swap", List.of("§7Trigger immediate swap")),
+                    ctxClick -> {
+                        gm.triggerImmediateSwap();
+                        Msg.send(ctxClick.player(), "§eSwap triggered.");
+                    }));
         }
 
         items.add(clickItem(18, () -> icon(Material.NETHER_STAR, "§d§lAbout muj3b",
                 List.of(
                         "§7Click to show support info",
-                        "§7and share the donation link.")), ctxClick -> {
-            plugin.getGameManager().sendDonationMessage(ctxClick.player());
-            Msg.send(ctxClick.player(), "§dThanks for supporting muj3b!");
-        }));
+                        "§7and share the donation link.")),
+                ctxClick -> {
+                    plugin.getGameManager().sendDonationMessage(ctxClick.player());
+                    Msg.send(ctxClick.player(), "§dThanks for supporting muj3b!");
+                }));
 
-        items.add(clickItem(20, () -> icon(Material.PLAYER_HEAD, "§b§lTeam Management", List.of("§7Assign runners & hunters")),
+        items.add(clickItem(20,
+                () -> icon(Material.PLAYER_HEAD, "§b§lTeam Management", List.of("§7Assign runners & hunters")),
                 ctxClick -> open(ctxClick.player(), MenuKey.TEAM_MANAGEMENT, null, false)));
-        items.add(clickItem(21, () -> icon(Material.ENDER_EYE, "§d§lChoose Mode", List.of("§7Switch Dream/Sapnap/Task")),
-                ctxClick -> open(ctxClick.player(), MenuKey.MODE_SELECT, null, false)));
+        items.add(
+                clickItem(21, () -> icon(Material.ENDER_EYE, "§d§lChoose Mode", List.of("§7Switch Dream/Sapnap/Task")),
+                        ctxClick -> open(ctxClick.player(), MenuKey.MODE_SELECT, null, false)));
         items.add(clickItem(22, () -> icon(Material.COMPARATOR, "§6§lSettings", List.of("§7Configure every mechanic")),
                 ctxClick -> open(ctxClick.player(), MenuKey.SETTINGS_HOME, null, false)));
         items.add(clickItem(23, () -> icon(Material.BOOK, "§b§lStatistics", List.of("§7Adjust stat tracking")),
@@ -389,14 +415,15 @@ public final class GuiManager implements Listener {
                 ctxClick -> open(ctxClick.player(), MenuKey.SETTINGS_SUDDEN_DEATH, null, false)));
 
         if (mode == SpeedrunnerSwap.SwapMode.SAPNAP) {
-            items.add(clickItem(40, () -> icon(Material.CLOCK, "§b§lQueue Shuffle", List.of("§7Randomize runner order")),
-                    ctxClick -> {
-                        if (plugin.getGameManager().shuffleQueue()) {
-                            Msg.send(ctxClick.player(), "§aRunner queue shuffled.");
-                        } else {
-                            Msg.send(ctxClick.player(), "§cNot enough runners to shuffle.");
-                        }
-                    }));
+            items.add(
+                    clickItem(40, () -> icon(Material.CLOCK, "§b§lQueue Shuffle", List.of("§7Randomize runner order")),
+                            ctxClick -> {
+                                if (plugin.getGameManager().shuffleQueue()) {
+                                    Msg.send(ctxClick.player(), "§aRunner queue shuffled.");
+                                } else {
+                                    Msg.send(ctxClick.player(), "§cNot enough runners to shuffle.");
+                                }
+                            }));
         }
 
         return new MenuScreen(plugin.getConfigManager().getGuiMainMenuTitle(), 54, items);
@@ -408,7 +435,7 @@ public final class GuiManager implements Listener {
 
         if (direct) {
             items.add(simpleItem(4, () -> icon(Material.NETHER_STAR, "§e§lWelcome to Speedrunner Swap",
-                    List.of("§7Pick the challenge you want to run","§7and jump straight into setup."))));
+                    List.of("§7Pick the challenge you want to run", "§7and jump straight into setup."))));
             items.add(modeItem(10, SpeedrunnerSwap.SwapMode.DREAM, true, current));
             items.add(modeItem(13, SpeedrunnerSwap.SwapMode.SAPNAP, true, current));
             items.add(modeItem(16, SpeedrunnerSwap.SwapMode.TASK, true, current));
@@ -437,7 +464,8 @@ public final class GuiManager implements Listener {
         return new MenuScreen(title, size, items);
     }
 
-    private MenuItem modeItem(int slot, SpeedrunnerSwap.SwapMode mode, boolean direct, SpeedrunnerSwap.SwapMode current) {
+    private MenuItem modeItem(int slot, SpeedrunnerSwap.SwapMode mode, boolean direct,
+            SpeedrunnerSwap.SwapMode current) {
         boolean selected = mode == current;
         boolean isDefault = plugin.getConfigManager().getDefaultMode() == mode;
         Material mat = switch (mode) {
@@ -522,9 +550,9 @@ public final class GuiManager implements Listener {
         items.add(clickItem(2, () -> icon(Material.DIAMOND_BOOTS,
                 focus == Team.RUNNER ? "§a§lAssigning Runners" : "§b§lAssign Runners",
                 List.of("§7Click to set focus")), ctxClick -> {
-            teamFocus.put(ctxClick.player().getUniqueId(), Team.RUNNER);
-            ctxClick.reopen();
-        }));
+                    teamFocus.put(ctxClick.player().getUniqueId(), Team.RUNNER);
+                    ctxClick.reopen();
+                }));
 
         List<String> instructionLore = new ArrayList<>();
         instructionLore.add("§71. Select runner/hunter focus");
@@ -542,32 +570,35 @@ public final class GuiManager implements Listener {
                         : "§7§lHunters Disabled",
                 huntersAvailable
                         ? List.of("§7Click to set focus")
-                        : List.of("§7Dream mode only")), ctxClick -> {
-            if (!huntersAvailable) {
-                Msg.send(ctxClick.player(), "§eHunters are only available in Dream mode.");
-                return;
-            }
-            teamFocus.put(ctxClick.player().getUniqueId(), Team.HUNTER);
-            ctxClick.reopen();
-        }));
+                        : List.of("§7Dream mode only")),
+                ctxClick -> {
+                    if (!huntersAvailable) {
+                        Msg.send(ctxClick.player(), "§eHunters are only available in Dream mode.");
+                        return;
+                    }
+                    teamFocus.put(ctxClick.player().getUniqueId(), Team.HUNTER);
+                    ctxClick.reopen();
+                }));
 
-        items.add(clickItem(8, () -> icon(Material.BARRIER, "§c§lClear All", List.of("§7Remove all assignments")), ctxClick -> {
-            Set<Player> affected = new HashSet<>();
-            affected.addAll(gm.getRunners());
-            affected.addAll(gm.getHunters());
-            gm.clearAllTeams();
-            Msg.send(ctxClick.player(), "§cCleared all teams.");
-            for (Player p : affected) {
-                if (p != null && p.isOnline() && p != ctxClick.player()) {
-                    Msg.send(p, "§eYour team assignment was cleared by §f" + ctxClick.player().getName());
-                }
-            }
-            ctxClick.reopen();
-        }));
+        items.add(clickItem(8, () -> icon(Material.BARRIER, "§c§lClear All", List.of("§7Remove all assignments")),
+                ctxClick -> {
+                    Set<Player> affected = new HashSet<>();
+                    affected.addAll(gm.getRunners());
+                    affected.addAll(gm.getHunters());
+                    gm.clearAllTeams();
+                    Msg.send(ctxClick.player(), "§cCleared all teams.");
+                    for (Player p : affected) {
+                        if (p != null && p.isOnline() && p != ctxClick.player()) {
+                            Msg.send(p, "§eYour team assignment was cleared by §f" + ctxClick.player().getName());
+                        }
+                    }
+                    ctxClick.reopen();
+                }));
 
         int slot = 9;
         for (Player online : Bukkit.getOnlinePlayers()) {
-            if (slot >= 54) break;
+            if (slot >= 54)
+                break;
             Team assigned = gm.isRunner(online) ? Team.RUNNER : gm.isHunter(online) ? Team.HUNTER : Team.NONE;
             ItemStack head = new ItemStack(Material.PLAYER_HEAD);
             SkullMeta meta = (SkullMeta) head.getItemMeta();
@@ -591,7 +622,8 @@ public final class GuiManager implements Listener {
             head.setItemMeta(meta);
 
             items.add(clickItem(slot, () -> head, ctxClick -> {
-                Team targetTeam = ctxClick.shift() ? Team.NONE : teamFocus.getOrDefault(ctxClick.player().getUniqueId(), Team.RUNNER);
+                Team targetTeam = ctxClick.shift() ? Team.NONE
+                        : teamFocus.getOrDefault(ctxClick.player().getUniqueId(), Team.RUNNER);
                 if (!huntersAvailable && targetTeam == Team.HUNTER) {
                     teamFocus.put(ctxClick.player().getUniqueId(), Team.RUNNER);
                     Msg.send(ctxClick.player(), "§eAssign hunters only when Dream mode is active.");
@@ -607,17 +639,20 @@ public final class GuiManager implements Listener {
                     Msg.send(ctxClick.player(), "§eNo change for §f" + online.getName());
                 } else if (targetTeam == Team.NONE) {
                     Msg.send(ctxClick.player(), "§eRemoved §f" + online.getName() + "§e from teams.");
-                    if (online != ctxClick.player()) Msg.send(online, "§eYou were removed from all teams by §f" + ctxClick.player().getName());
+                    if (online != ctxClick.player())
+                        Msg.send(online, "§eYou were removed from all teams by §f" + ctxClick.player().getName());
                 } else {
                     String label = targetTeam == Team.RUNNER ? "§bSpeedrunners" : "§cHunters";
                     Msg.send(ctxClick.player(), "§aAdded §f" + online.getName() + "§a to " + label + "§a.");
-                    if (online != ctxClick.player()) Msg.send(online, "§eYou were assigned to " + label + " §eby §f" + ctxClick.player().getName());
+                    if (online != ctxClick.player())
+                        Msg.send(online, "§eYou were assigned to " + label + " §eby §f" + ctxClick.player().getName());
                 }
                 ctxClick.reopen();
             }));
 
             slot++;
-            if ((slot + 1) % 9 == 0) slot += 2;
+            if ((slot + 1) % 9 == 0)
+                slot += 2;
         }
 
         return new MenuScreen(plugin.getConfigManager().getGuiTeamSelectorTitle(), 54, items);
@@ -852,6 +887,10 @@ public final class GuiManager implements Listener {
                 value -> plugin.getConfig().set("cancel.interactions", value),
                 "§7Block inactive runner interactions"));
 
+        items.add(toggleConfigItem(24, Material.PAPER, "§e§lRestrict Inactive Chat",
+                "chat.restrict_inactive_runners", true,
+                "§7Prevent waiting runners from chatting"));
+
         items.add(toggleItem(32, Material.WHITE_BED, "§e§lSingle Player Sleep",
                 cfg::isSinglePlayerSleepEnabled,
                 value -> cfg.setSinglePlayerSleepEnabled(value),
@@ -866,7 +905,8 @@ public final class GuiManager implements Listener {
             String worldName = spawn.getWorld() != null ? spawn.getWorld().getName() : "unknown";
             return icon(Material.COMPASS, "§b§lSet Spawn",
                     List.of("§7World: §f" + worldName,
-                            String.format(Locale.ROOT, "§7Coords: §f%.1f / %.1f / %.1f", spawn.getX(), spawn.getY(), spawn.getZ()),
+                            String.format(Locale.ROOT, "§7Coords: §f%.1f / %.1f / %.1f", spawn.getX(), spawn.getY(),
+                                    spawn.getZ()),
                             "",
                             "§eClick to use your position"));
         }, ctxClick -> {
@@ -878,7 +918,8 @@ public final class GuiManager implements Listener {
         items.add(clickItem(35, () -> {
             org.bukkit.Location limbo = cfg.getLimboLocation();
             String world = limbo.getWorld() != null ? limbo.getWorld().getName() : "unknown";
-            String coords = String.format(Locale.ROOT, "§f%.1f §7/ §f%.1f §7/ §f%.1f", limbo.getX(), limbo.getY(), limbo.getZ());
+            String coords = String.format(Locale.ROOT, "§f%.1f §7/ §f%.1f §7/ §f%.1f", limbo.getX(), limbo.getY(),
+                    limbo.getZ());
             return icon(Material.ENDER_PEARL, "§b§lSet Limbo Location",
                     List.of("§7World: §f" + world, "§7Coords: " + coords, "", "§eClick to use your position"));
         }, ctxClick -> {
@@ -989,7 +1030,8 @@ public final class GuiManager implements Listener {
 
     private MenuScreen buildPowerUpEffects(MenuContext ctx) {
         boolean positive = "positive".equalsIgnoreCase(String.valueOf(ctx.request().data()));
-        List<String> list = positive ? plugin.getConfigManager().getGoodPowerUps() : plugin.getConfigManager().getBadPowerUps();
+        List<String> list = positive ? plugin.getConfigManager().getGoodPowerUps()
+                : plugin.getConfigManager().getBadPowerUps();
         Set<String> enabled = new HashSet<>();
         for (String id : list) {
             enabled.add(id.toUpperCase(Locale.ROOT));
@@ -1002,24 +1044,32 @@ public final class GuiManager implements Listener {
         @SuppressWarnings("deprecation")
         PotionEffectType[] effectTypes = PotionEffectType.values();
         for (PotionEffectType type : effectTypes) {
-            if (type == null || type.getKey() == null) continue;
+            if (type == null || type.getKey() == null)
+                continue;
             String id = type.getKey().getKey().toUpperCase(Locale.ROOT);
             String prefix = positive ? "§a" : "§c";
             Material material = positive ? Material.HONEY_BOTTLE : Material.SPIDER_EYE;
             items.add(toggleItem(slot, material, prefix + id,
                     () -> enabled.contains(id), value -> {
-                        List<String> editable = positive ? plugin.getConfig().getStringList("power_ups.good_effects") : plugin.getConfig().getStringList("power_ups.bad_effects");
-                        if (value && !editable.contains(id)) editable.add(id);
-                        if (!value) editable.remove(id);
-                        if (positive) plugin.getConfig().set("power_ups.good_effects", editable);
-                        else plugin.getConfig().set("power_ups.bad_effects", editable);
+                        List<String> editable = positive ? plugin.getConfig().getStringList("power_ups.good_effects")
+                                : plugin.getConfig().getStringList("power_ups.bad_effects");
+                        if (value && !editable.contains(id))
+                            editable.add(id);
+                        if (!value)
+                            editable.remove(id);
+                        if (positive)
+                            plugin.getConfig().set("power_ups.good_effects", editable);
+                        else
+                            plugin.getConfig().set("power_ups.bad_effects", editable);
                         plugin.saveConfig();
                         Msg.send(ctx.player(), "§e" + id + ": " + (value ? "§aEnabled" : "§cDisabled"));
                     }, "§7Click to toggle"));
 
             slot++;
-            if ((slot + 1) % 9 == 0) slot += 2;
-            if (slot >= 54) break;
+            if ((slot + 1) % 9 == 0)
+                slot += 2;
+            if (slot >= 54)
+                break;
         }
 
         return new MenuScreen(positive ? "§a§lPositive Effects" : "§c§lNegative Effects", 54, items);
@@ -1056,25 +1106,29 @@ public final class GuiManager implements Listener {
 
         int slot = 9;
         for (Material material : sorted) {
-            items.add(clickItem(slot, () -> icon(material, "§e" + material.name(), List.of("§cClick to remove")), ctxClick -> {
-                Set<Material> set = plugin.getConfigManager().getDangerousBlocks();
-                set.remove(material);
-                List<String> updated = new ArrayList<>();
-                for (Material m : set) updated.add(m.name());
-                plugin.getConfig().set("safe_swap.dangerous_blocks", updated);
-                plugin.saveConfig();
-                Msg.send(ctxClick.player(), "§eRemoved §f" + material.name());
-                ctxClick.reopen();
-            }));
+            items.add(clickItem(slot, () -> icon(material, "§e" + material.name(), List.of("§cClick to remove")),
+                    ctxClick -> {
+                        Set<Material> set = plugin.getConfigManager().getDangerousBlocks();
+                        set.remove(material);
+                        List<String> updated = new ArrayList<>();
+                        for (Material m : set)
+                            updated.add(m.name());
+                        plugin.getConfig().set("safe_swap.dangerous_blocks", updated);
+                        plugin.saveConfig();
+                        Msg.send(ctxClick.player(), "§eRemoved §f" + material.name());
+                        ctxClick.reopen();
+                    }));
             slot++;
-            if ((slot + 1) % 9 == 0) slot += 2;
+            if ((slot + 1) % 9 == 0)
+                slot += 2;
         }
 
-        items.add(clickItem(44, () -> icon(Material.EMERALD_BLOCK, "§a§lAdd Block", List.of("§7Type block ID in chat")), ctxClick -> {
-            plugin.getChatInputHandler().expectConfigListAdd(ctxClick.player(), "safe_swap.dangerous_blocks");
-            ctxClick.player().closeInventory();
-            Msg.send(ctxClick.player(), "§eType a block ID (or 'cancel').");
-        }));
+        items.add(clickItem(44, () -> icon(Material.EMERALD_BLOCK, "§a§lAdd Block", List.of("§7Type block ID in chat")),
+                ctxClick -> {
+                    plugin.getChatInputHandler().expectConfigListAdd(ctxClick.player(), "safe_swap.dangerous_blocks");
+                    ctxClick.player().closeInventory();
+                    Msg.send(ctxClick.player(), "§eType a block ID (or 'cancel').");
+                }));
 
         return new MenuScreen("§c§lDangerous Blocks", 54, items);
     }
@@ -1121,7 +1175,8 @@ public final class GuiManager implements Listener {
                 value -> {
                     plugin.getConfig().set("bounty.enabled", value);
                     plugin.saveConfig();
-                    if (!value) plugin.getBountyManager().clearBounty();
+                    if (!value)
+                        plugin.getBountyManager().clearBounty();
                 },
                 "§7Enable hunter bounty challenges"));
 
@@ -1149,14 +1204,16 @@ public final class GuiManager implements Listener {
                 30, 60, 10, 6000,
                 "§7Strength effect duration for killer"));
 
-        items.add(clickItem(30, () -> icon(Material.TARGET, "§a§lAssign New Bounty", List.of("§7Pick a new target")), ctxClick -> {
-            plugin.getBountyManager().assignNewBounty();
-            Msg.send(ctxClick.player(), "§aNew bounty assigned.");
-        }));
-        items.add(clickItem(32, () -> icon(Material.BARRIER, "§c§lClear Bounty", List.of("§7Remove current target")), ctxClick -> {
-            plugin.getBountyManager().clearBounty();
-            Msg.send(ctxClick.player(), "§cBounty cleared.");
-        }));
+        items.add(clickItem(30, () -> icon(Material.TARGET, "§a§lAssign New Bounty", List.of("§7Pick a new target")),
+                ctxClick -> {
+                    plugin.getBountyManager().assignNewBounty();
+                    Msg.send(ctxClick.player(), "§aNew bounty assigned.");
+                }));
+        items.add(clickItem(32, () -> icon(Material.BARRIER, "§c§lClear Bounty", List.of("§7Remove current target")),
+                ctxClick -> {
+                    plugin.getBountyManager().clearBounty();
+                    Msg.send(ctxClick.player(), "§cBounty cleared.");
+                }));
 
         return new MenuScreen("§6§lBounty System", 45, items);
     }
@@ -1207,13 +1264,15 @@ public final class GuiManager implements Listener {
                 "§7Seconds before sudden death begins"));
 
         items.add(adjustItem(14, Material.SHIELD, "§6§lResistance (s)",
-                () -> (int) Math.round(plugin.getConfig().getInt("sudden_death.effects.resistance_duration", 200) / 20.0),
+                () -> (int) Math
+                        .round(plugin.getConfig().getInt("sudden_death.effects.resistance_duration", 200) / 20.0),
                 value -> plugin.getConfig().set("sudden_death.effects.resistance_duration", Math.max(1, value) * 20),
                 5, 20, 1, 600,
                 "§7Duration of Resistance IV"));
 
         items.add(adjustItem(16, Material.GOLDEN_APPLE, "§6§lRegeneration (s)",
-                () -> (int) Math.round(plugin.getConfig().getInt("sudden_death.effects.regeneration_duration", 200) / 20.0),
+                () -> (int) Math
+                        .round(plugin.getConfig().getInt("sudden_death.effects.regeneration_duration", 200) / 20.0),
                 value -> plugin.getConfig().set("sudden_death.effects.regeneration_duration", Math.max(1, value) * 20),
                 5, 20, 1, 600,
                 "§7Duration of Regeneration III"));
@@ -1238,7 +1297,8 @@ public final class GuiManager implements Listener {
             plugin.getConfig().set("sudden_death.arena.x", loc.getX());
             plugin.getConfig().set("sudden_death.arena.y", loc.getY());
             plugin.getConfig().set("sudden_death.arena.z", loc.getZ());
-            plugin.getConfig().set("sudden_death.arena.world", loc.getWorld() != null ? loc.getWorld().getName() : "world_the_end");
+            plugin.getConfig().set("sudden_death.arena.world",
+                    loc.getWorld() != null ? loc.getWorld().getName() : "world_the_end");
             plugin.saveConfig();
             Msg.send(ctxClick.player(), "§aArena position updated.");
             ctxClick.reopen();
@@ -1248,10 +1308,11 @@ public final class GuiManager implements Listener {
             plugin.getSuddenDeathManager().scheduleSuddenDeath();
             Msg.send(ctxClick.player(), "§eSudden death scheduled.");
         }));
-        items.add(clickItem(32, () -> icon(Material.BARRIER, "§c§lCancel Schedule", Collections.emptyList()), ctxClick -> {
-            plugin.getSuddenDeathManager().cancelSchedule();
-            Msg.send(ctxClick.player(), "§cSchedule cancelled.");
-        }));
+        items.add(clickItem(32, () -> icon(Material.BARRIER, "§c§lCancel Schedule", Collections.emptyList()),
+                ctxClick -> {
+                    plugin.getSuddenDeathManager().cancelSchedule();
+                    Msg.send(ctxClick.player(), "§cSchedule cancelled.");
+                }));
         items.add(clickItem(34, () -> icon(Material.TNT, "§4§lActivate Now", Collections.emptyList()), ctxClick -> {
             plugin.getSuddenDeathManager().activateSuddenDeath();
             Msg.send(ctxClick.player(), "§4Sudden death activated!");
@@ -1265,8 +1326,10 @@ public final class GuiManager implements Listener {
         List<MenuItem> items = new ArrayList<>();
         items.add(backButton(0, "§7§lBack", parent == StatsParent.MAIN ? MenuKey.MAIN : MenuKey.SETTINGS_HOME, null,
                 player -> {
-                    if (parent == StatsParent.MAIN) open(player, MenuKey.MAIN, null, false);
-                    else openSettingsMenu(player);
+                    if (parent == StatsParent.MAIN)
+                        open(player, MenuKey.MAIN, null, false);
+                    else
+                        openSettingsMenu(player);
                 }));
 
         items.add(toggleItem(11, Material.LIME_DYE, "§e§lStatistics",
@@ -1274,8 +1337,10 @@ public final class GuiManager implements Listener {
                 value -> {
                     plugin.getConfig().set("stats.enabled", value);
                     plugin.saveConfig();
-                    if (!value) plugin.getStatsManager().stopTracking();
-                    else if (plugin.getGameManager().isGameRunning()) plugin.getStatsManager().startTracking();
+                    if (!value)
+                        plugin.getStatsManager().stopTracking();
+                    else if (plugin.getGameManager().isGameRunning())
+                        plugin.getStatsManager().startTracking();
                 },
                 "§7Toggle server-side tracking"));
 
@@ -1303,7 +1368,8 @@ public final class GuiManager implements Listener {
                 30, 60, 30, 3600,
                 "§7Seconds between stat announcements"));
 
-        items.add(clickItem(22, () -> icon(Material.PAPER, "§b§lBroadcast Snapshot", List.of("§7Send stats to chat")), ctxClick -> plugin.getStatsManager().displayStats()));
+        items.add(clickItem(22, () -> icon(Material.PAPER, "§b§lBroadcast Snapshot", List.of("§7Send stats to chat")),
+                ctxClick -> plugin.getStatsManager().displayStats()));
 
         items.add(navigateItem(24, Material.SPYGLASS, "§6§lAdvanced", MenuKey.STATS_ADVANCED, "§7Additional settings"));
 
@@ -1313,7 +1379,8 @@ public final class GuiManager implements Listener {
     private MenuScreen buildStatsAdvanced(MenuContext ctx) {
         ConfigManager cfg = plugin.getConfigManager();
         List<MenuItem> items = new ArrayList<>();
-        items.add(backButton(0, "§7§lBack", MenuKey.STATS_ROOT, null, player -> open(player, MenuKey.STATS_ROOT, null, false)));
+        items.add(backButton(0, "§7§lBack", MenuKey.STATS_ROOT, null,
+                player -> open(player, MenuKey.STATS_ROOT, null, false)));
 
         items.add(adjustItem(11, Material.CLOCK, "§6§lActionbar Update",
                 cfg::getActionBarUpdateTicks,
@@ -1472,15 +1539,15 @@ public final class GuiManager implements Listener {
         // Shuffle tasks ------------------------------------------------
         items.add(clickItem(23, () -> icon(Material.FEATHER, "§d§lShuffle Tasks",
                 List.of("§7Reassign secret tasks", "§7Use before the round begins")), ctxClick -> {
-            if (plugin.getGameManager().isGameRunning()) {
-                Msg.send(ctxClick.player(), "§cStop the game before shuffling tasks.");
-                return;
-            }
-            if (taskMode != null) {
-                taskMode.assignAndAnnounceTasks(plugin.getGameManager().getRunners());
-                Msg.send(ctxClick.player(), "§aTasks rerolled for current runners.");
-            }
-        }));
+                    if (plugin.getGameManager().isGameRunning()) {
+                        Msg.send(ctxClick.player(), "§cStop the game before shuffling tasks.");
+                        return;
+                    }
+                    if (taskMode != null) {
+                        taskMode.assignAndAnnounceTasks(plugin.getGameManager().getRunners());
+                        Msg.send(ctxClick.player(), "§aTasks rerolled for current runners.");
+                    }
+                }));
 
         // Task settings & advanced ------------------------------------
         items.add(navigateItem(25, Material.WRITABLE_BOOK, "§6§lTask Settings", MenuKey.SETTINGS_TASK,
@@ -1544,14 +1611,17 @@ public final class GuiManager implements Listener {
         items.add(backButton(0, "§7§lBack", MenuKey.TASK_HOME, null, this::openTaskManagerMenu));
 
         items.add(simpleItem(2, () -> icon(Material.BOOK, "§7Default Pool",
-                List.of("§7Included: " + (plugin.getConfig().getBoolean("task_manager.include_default_tasks", true) ? "§aYes" : "§cNo"),
+                List.of("§7Included: "
+                        + (plugin.getConfig().getBoolean("task_manager.include_default_tasks", true) ? "§aYes"
+                                : "§cNo"),
                         "§7Toggle in Task Settings"))));
 
-        items.add(clickItem(8, () -> icon(Material.EMERALD_BLOCK, "§a§lAdd Custom Task", List.of("§7Enter ID via chat")), ctxClick -> {
-            plugin.getChatInputHandler().expectTaskId(ctxClick.player());
-            ctxClick.player().closeInventory();
-            Msg.send(ctxClick.player(), "§eEnter a unique task ID in chat.");
-        }));
+        items.add(clickItem(8,
+                () -> icon(Material.EMERALD_BLOCK, "§a§lAdd Custom Task", List.of("§7Enter ID via chat")), ctxClick -> {
+                    plugin.getChatInputHandler().expectTaskId(ctxClick.player());
+                    ctxClick.player().closeInventory();
+                    Msg.send(ctxClick.player(), "§eEnter a unique task ID in chat.");
+                }));
 
         if (mode != null) {
             List<String> ids = mode.getCustomTaskIds();
@@ -1561,14 +1631,16 @@ public final class GuiManager implements Listener {
                 String description = def != null ? def.description() : "";
                 items.add(clickItem(slot, () -> icon(Material.PAPER, "§e" + id,
                         List.of("§7" + description, "", "§cClick to remove")), ctxClick -> {
-                    if (mode.removeCustomTask(id)) {
-                        Msg.send(ctxClick.player(), "§cRemoved custom task §f" + id);
-                    }
-                    ctxClick.reopen();
-                }));
+                            if (mode.removeCustomTask(id)) {
+                                Msg.send(ctxClick.player(), "§cRemoved custom task §f" + id);
+                            }
+                            ctxClick.reopen();
+                        }));
                 slot++;
-                if ((slot + 1) % 9 == 0) slot += 2;
-                if (slot >= 54) break;
+                if ((slot + 1) % 9 == 0)
+                    slot += 2;
+                if (slot >= 54)
+                    break;
             }
         }
 
@@ -1585,20 +1657,21 @@ public final class GuiManager implements Listener {
 
         items.add(clickItem(6, () -> icon(Material.BARRIER, "§c§lClear Runners",
                 List.of("§7Remove all runner assignments")), ctxClick -> {
-            Set<Player> affected = new HashSet<>(gm.getRunners());
-            for (Player player : affected) {
-                gm.assignPlayerToTeam(player, Team.NONE);
-                if (player != ctxClick.player()) {
-                    Msg.send(player, "§eYou were removed from runners by §f" + ctxClick.player().getName());
-                }
-            }
-            Msg.send(ctxClick.player(), "§cCleared all runners.");
-            ctxClick.reopen();
-        }));
+                    Set<Player> affected = new HashSet<>(gm.getRunners());
+                    for (Player player : affected) {
+                        gm.assignPlayerToTeam(player, Team.NONE);
+                        if (player != ctxClick.player()) {
+                            Msg.send(player, "§eYou were removed from runners by §f" + ctxClick.player().getName());
+                        }
+                    }
+                    Msg.send(ctxClick.player(), "§cCleared all runners.");
+                    ctxClick.reopen();
+                }));
 
         int slot = 9;
         for (Player online : Bukkit.getOnlinePlayers()) {
-            if (slot >= 54) break;
+            if (slot >= 54)
+                break;
             boolean isRunner = gm.isRunner(online);
             ItemStack head = new ItemStack(Material.PLAYER_HEAD);
             SkullMeta meta = (SkullMeta) head.getItemMeta();
@@ -1631,7 +1704,8 @@ public final class GuiManager implements Listener {
             }));
 
             slot++;
-            if ((slot + 1) % 9 == 0) slot += 2;
+            if ((slot + 1) % 9 == 0)
+                slot += 2;
         }
 
         return new MenuScreen("§b§lRunner Management", 54, items);
@@ -1675,7 +1749,7 @@ public final class GuiManager implements Listener {
                 List.of("§a" + mode.getCandidateCount() + " §7available for selection"))));
 
         items.add(clickItem(6, () -> icon(Material.ENDER_CHEST, "§e§lReload tasks.yml",
-                        List.of("§7Re-read task definitions")), ctxClick -> {
+                List.of("§7Re-read task definitions")), ctxClick -> {
                     mode.reloadTasksFromFile();
                     Msg.send(ctxClick.player(), "§aReloaded tasks.yml.");
                     open(ctxClick.player(), MenuKey.TASK_POOL, page, true);
@@ -1713,11 +1787,13 @@ public final class GuiManager implements Listener {
 
         if (page > 0) {
             items.add(clickItem(45, () -> icon(Material.ARROW, "§7§lPrevious Page",
-                    List.of("§7Page " + page + " of " + totalPages)), ctxClick -> open(ctxClick.player(), MenuKey.TASK_POOL, page - 1, false)));
+                    List.of("§7Page " + page + " of " + totalPages)),
+                    ctxClick -> open(ctxClick.player(), MenuKey.TASK_POOL, page - 1, false)));
         }
         if (page < totalPages - 1) {
             items.add(clickItem(53, () -> icon(Material.ARROW, "§7§lNext Page",
-                    List.of("§7Page " + (page + 2) + " of " + totalPages)), ctxClick -> open(ctxClick.player(), MenuKey.TASK_POOL, page + 1, false)));
+                    List.of("§7Page " + (page + 2) + " of " + totalPages)),
+                    ctxClick -> open(ctxClick.player(), MenuKey.TASK_POOL, page + 1, false)));
         }
 
         items.add(simpleItem(49, () -> icon(Material.NAME_TAG, "§7Page Info",
@@ -1751,11 +1827,12 @@ public final class GuiManager implements Listener {
                 "§7Pause on disconnect, defaults"));
 
         items.add(clickItem(31, () -> icon(Material.PAPER, "§e§lConfig Browser",
-                List.of("§7Type a config path in chat", "§7Format: path=value", "§7Example: swap.interval=75")), ctxClick -> {
-            ctxClick.player().closeInventory();
-            Msg.send(ctxClick.player(), "§eEnter a config path and value (path=value) or 'cancel'.");
-            plugin.getChatInputHandler().expectConfigString(ctxClick.player(), "__dynamic__");
-        }));
+                List.of("§7Type a config path in chat", "§7Format: path=value", "§7Example: swap.interval=75")),
+                ctxClick -> {
+                    ctxClick.player().closeInventory();
+                    Msg.send(ctxClick.player(), "§eEnter a config path and value (path=value) or 'cancel'.");
+                    plugin.getChatInputHandler().expectConfigString(ctxClick.player(), "__dynamic__");
+                }));
 
         return new MenuScreen("§b§lAdvanced Controls", 45, items);
     }
@@ -1783,14 +1860,17 @@ public final class GuiManager implements Listener {
             for (Map.Entry<UUID, String> entry : mode.getAssignments().entrySet()) {
                 UUID uuid = entry.getKey();
                 String taskId = entry.getValue();
-                String name = Optional.ofNullable(Bukkit.getOfflinePlayer(uuid).getName()).orElse(uuid.toString().substring(0, 8));
+                String name = Optional.ofNullable(Bukkit.getOfflinePlayer(uuid).getName())
+                        .orElse(uuid.toString().substring(0, 8));
                 TaskDefinition def = mode.getTask(taskId);
                 String desc = def != null ? def.description() : "Unknown task";
                 items.add(simpleItem(slot, () -> icon(Material.PAPER, "§e" + name,
                         List.of("§7Task: §f" + taskId, "§7" + desc))));
                 slot++;
-                if ((slot + 1) % 9 == 0) slot += 2;
-                if (slot >= 54) break;
+                if ((slot + 1) % 9 == 0)
+                    slot += 2;
+                if (slot >= 54)
+                    break;
             }
         }
 
@@ -1898,9 +1978,13 @@ public final class GuiManager implements Listener {
                 value -> plugin.getConfigManager().setKitsEnabled(value),
                 "§7Toggle kit distribution on start"));
 
-        items.add(clickItem(13, () -> icon(Material.DIAMOND_SWORD, "§a§lGive Runner Kit", List.of("§7Equip configured runner kit")), ctxClick -> plugin.getKitManager().applyRunnerKit(ctxClick.player())));
+        items.add(clickItem(13,
+                () -> icon(Material.DIAMOND_SWORD, "§a§lGive Runner Kit", List.of("§7Equip configured runner kit")),
+                ctxClick -> plugin.getKitManager().applyRunnerKit(ctxClick.player())));
 
-        items.add(clickItem(15, () -> icon(Material.IRON_SWORD, "§c§lGive Hunter Kit", List.of("§7Equip configured hunter kit")), ctxClick -> plugin.getKitManager().applyHunterKit(ctxClick.player())));
+        items.add(clickItem(15,
+                () -> icon(Material.IRON_SWORD, "§c§lGive Hunter Kit", List.of("§7Equip configured hunter kit")),
+                ctxClick -> plugin.getKitManager().applyHunterKit(ctxClick.player())));
 
         items.add(simpleItem(31, () -> icon(Material.PAPER, "§7Editing Kits",
                 List.of("§7Edit contents in kits.yml", "§7or use /swap kits commands"))));
@@ -1951,15 +2035,19 @@ public final class GuiManager implements Listener {
         return navigateItem(slot, material, name, target, description, null);
     }
 
-    private MenuItem navigateItem(int slot, Material material, String name, MenuKey target, String description, Object data) {
-        return clickItem(slot, () -> icon(material, name, List.of("§7" + description)), ctx -> open(ctx.player(), target, data, false));
+    private MenuItem navigateItem(int slot, Material material, String name, MenuKey target, String description,
+            Object data) {
+        return clickItem(slot, () -> icon(material, name, List.of("§7" + description)),
+                ctx -> open(ctx.player(), target, data, false));
     }
 
-    private MenuItem toggleItem(int slot, Material material, String label, BooleanSupplier getter, Consumer<Boolean> setter, String description) {
+    private MenuItem toggleItem(int slot, Material material, String label, BooleanSupplier getter,
+            Consumer<Boolean> setter, String description) {
         return clickItem(slot, () -> {
             boolean enabled = getter.getAsBoolean();
             String status = enabled ? "§aEnabled" : "§cDisabled";
-            return icon(material, label + ": " + status, description == null ? List.of("§7Click to toggle") : List.of("§7" + description, "§7Click to toggle"));
+            return icon(material, label + ": " + status, description == null ? List.of("§7Click to toggle")
+                    : List.of("§7" + description, "§7Click to toggle"));
         }, ctx -> {
             boolean next = !getter.getAsBoolean();
             setter.accept(next);
@@ -1969,7 +2057,8 @@ public final class GuiManager implements Listener {
         });
     }
 
-    private MenuItem toggleConfigItem(int slot, Material material, String label, String path, boolean def, String description) {
+    private MenuItem toggleConfigItem(int slot, Material material, String label, String path, boolean def,
+            String description) {
         return toggleItem(slot, material, label,
                 () -> plugin.getConfig().getBoolean(path, def),
                 value -> {
@@ -1979,25 +2068,28 @@ public final class GuiManager implements Listener {
     }
 
     private MenuItem adjustItem(int slot, Material material, String label, IntSupplier getter, Consumer<Integer> setter,
-                                int step, int shiftStep, int min, int max, String description) {
+            int step, int shiftStep, int min, int max, String description) {
         return clickItem(slot, () -> icon(material, label + " §f" + getter.getAsInt(),
                 List.of("§7" + description,
                         "§7Left/right: ±" + step,
-                        "§7Shift: ±" + shiftStep)), ctx -> {
-            int value = getter.getAsInt();
-            int delta = ctx.shift() ? shiftStep : step;
-            if (ctx.click() == ClickType.LEFT) value += delta;
-            else if (ctx.click() == ClickType.RIGHT) value -= delta;
-            value = Math.max(min, Math.min(max, value));
-            setter.accept(value);
-            plugin.saveConfig();
-            Msg.send(ctx.player(), "§e" + label.replace("§", "") + ": §f" + value);
-            ctx.reopen();
-        });
+                        "§7Shift: ±" + shiftStep)),
+                ctx -> {
+                    int value = getter.getAsInt();
+                    int delta = ctx.shift() ? shiftStep : step;
+                    if (ctx.click() == ClickType.LEFT)
+                        value += delta;
+                    else if (ctx.click() == ClickType.RIGHT)
+                        value -= delta;
+                    value = Math.max(min, Math.min(max, value));
+                    setter.accept(value);
+                    plugin.saveConfig();
+                    Msg.send(ctx.player(), "§e" + label.replace("§", "") + ": §f" + value);
+                    ctx.reopen();
+                });
     }
 
     private MenuItem adjustConfigItem(int slot, Material material, String label, String path, int def,
-                                      int step, int shiftStep, int min, int max, String description) {
+            int step, int shiftStep, int min, int max, String description) {
         return adjustItem(slot, material, label,
                 () -> plugin.getConfig().getInt(path, def),
                 value -> plugin.getConfig().set(path, value),
@@ -2015,7 +2107,7 @@ public final class GuiManager implements Listener {
     }
 
     private MenuItem cycleItem(int slot, Material material, String label, Supplier<String> getter,
-                               Function<String, String> cycler, List<String> description) {
+            Function<String, String> cycler, List<String> description) {
         return clickItem(slot, () -> icon(material, label + ": §f" + getter.get(), description), ctx -> {
             String next = cycler.apply(getter.get());
             plugin.saveConfig();
@@ -2025,7 +2117,8 @@ public final class GuiManager implements Listener {
     }
 
     private String nextVisibility(String current) {
-        if (current == null) return "always";
+        if (current == null)
+            return "always";
         return switch (current.toLowerCase(Locale.ROOT)) {
             case "always" -> "last_10";
             case "last_10" -> "never";
@@ -2041,7 +2134,8 @@ public final class GuiManager implements Listener {
         ItemStack item = new ItemStack(material);
         ItemMeta meta = item.getItemMeta();
         GuiCompat.setDisplayName(meta, name);
-        if (lore != null && !lore.isEmpty()) GuiCompat.setLore(meta, lore);
+        if (lore != null && !lore.isEmpty())
+            GuiCompat.setLore(meta, lore);
         item.setItemMeta(meta);
         return item;
     }
@@ -2090,20 +2184,25 @@ public final class GuiManager implements Listener {
         MenuScreen build(MenuContext context);
     }
 
-    private record MenuRequest(MenuKey key, Object data) {}
+    private record MenuRequest(MenuKey key, Object data) {
+    }
 
-    private record MenuSession(MenuRequest request, MenuScreen screen, Inventory inventory) {}
+    private record MenuSession(MenuRequest request, MenuScreen screen, Inventory inventory) {
+    }
 
     private record MenuScreen(String title, int size, List<MenuItem> items) {
         MenuItem button(String id) {
             for (MenuItem item : items) {
-                if (item.id().equals(id)) return item;
+                if (item.id().equals(id))
+                    return item;
             }
             return null;
         }
     }
 
-    private record MenuItem(String id, int slot, Function<MenuContext, ItemStack> icon, Consumer<MenuClickContext> action) {}
+    private record MenuItem(String id, int slot, Function<MenuContext, ItemStack> icon,
+            Consumer<MenuClickContext> action) {
+    }
 
     private static class MenuContext {
         private final GuiManager manager;
@@ -2116,9 +2215,17 @@ public final class GuiManager implements Listener {
             this.request = request;
         }
 
-        public GuiManager manager() { return manager; }
-        public Player player() { return player; }
-        public MenuRequest request() { return request; }
+        public GuiManager manager() {
+            return manager;
+        }
+
+        public Player player() {
+            return player;
+        }
+
+        public MenuRequest request() {
+            return request;
+        }
     }
 
     private static final class MenuClickContext extends MenuContext {
@@ -2131,10 +2238,17 @@ public final class GuiManager implements Listener {
             this.click = click;
         }
 
-        public boolean shift() { return shift; }
-        public ClickType click() { return click; }
+        public boolean shift() {
+            return shift;
+        }
 
-        public void reopen() { manager().reopen(player()); }
+        public ClickType click() {
+            return click;
+        }
+
+        public void reopen() {
+            manager().reopen(player());
+        }
     }
 
 }

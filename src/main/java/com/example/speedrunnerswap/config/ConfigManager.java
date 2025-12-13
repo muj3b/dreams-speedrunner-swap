@@ -498,6 +498,23 @@ public class ConfigManager {
     public boolean isCancelInteractions() {
         return config.getBoolean("cancel.interactions", true);
     }
+
+    /**
+     * Get whether inactive runners are prevented from chatting
+     * @return True if inactive runner chat is restricted
+     */
+    public boolean isRestrictInactiveRunnerChat() {
+        return config.getBoolean("chat.restrict_inactive_runners", true);
+    }
+
+    /**
+     * Set whether inactive runners can send chat messages
+     * @param restrict True to block inactive runner chat
+     */
+    public void setRestrictInactiveRunnerChat(boolean restrict) {
+        config.set("chat.restrict_inactive_runners", restrict);
+        saveConfig();
+    }
     
     public int getGuiMainMenuRows() {
         // Prefer nested path; fall back to legacy flat key

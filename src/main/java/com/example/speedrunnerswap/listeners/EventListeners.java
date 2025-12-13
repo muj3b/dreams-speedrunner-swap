@@ -107,6 +107,9 @@ public class EventListeners implements Listener {
                     java.lang.reflect.Method getPlayer = asyncChatCls.getMethod("getPlayer");
                     player = (org.bukkit.entity.Player) getPlayer.invoke(ev);
                 } catch (Throwable t) { return; }
+                if (!plugin.getConfigManager().isRestrictInactiveRunnerChat()) {
+                    return;
+                }
 
                 boolean shouldBlock = false;
                 try {
@@ -486,6 +489,7 @@ public class EventListeners implements Listener {
     @EventHandler(priority = EventPriority.HIGHEST)
     public void onPlayerChatLegacy(AsyncPlayerChatEvent event) {
         Player player = event.getPlayer();
+        if (!plugin.getConfigManager().isRestrictInactiveRunnerChat()) return;
         if (!plugin.getGameManager().isGameRunning()) return;
         if (!plugin.getGameManager().isRunner(player)) return;
         if (plugin.getGameManager().getActiveRunner() == player) return;

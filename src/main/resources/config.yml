@@ -87,6 +87,11 @@ cancel:
   # Cancel interactions for inactive runners
   interactions: true
 
+# Chat controls for inactive runners
+chat:
+  # Block chat messages from inactive runners during swaps
+  restrict_inactive_runners: true
+
 # Tracker Configuration
 tracker:
   # Whether to enable the compass tracker
