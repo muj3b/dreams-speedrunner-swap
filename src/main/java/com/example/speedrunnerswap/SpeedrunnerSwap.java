@@ -2,11 +2,13 @@ package com.example.speedrunnerswap;
 
 import com.example.speedrunnerswap.commands.SwapCommand;
 import com.example.speedrunnerswap.config.ConfigManager;
+import com.example.speedrunnerswap.game.CageManager;
 import com.example.speedrunnerswap.game.GameManager;
 import com.example.speedrunnerswap.gui.GuiManager;
 import com.example.speedrunnerswap.listeners.DragonDefeatListener;
 import com.example.speedrunnerswap.listeners.EventListeners;
 import com.example.speedrunnerswap.tracking.TrackerManager;
+import com.example.speedrunnerswap.utils.MessageManager;
 import com.example.speedrunnerswap.powerups.PowerUpManager;
 import com.example.speedrunnerswap.game.KitManager;
 import com.example.speedrunnerswap.game.StatsManager;
@@ -27,8 +29,10 @@ public final class SpeedrunnerSwap extends JavaPlugin {
     public static final String DONATION_URL = "https://donate.stripe.com/8x29AT0H58K03judnR0Ba01";
     private ConfigManager configManager;
     private GameManager gameManager;
+    private CageManager cageManager;
     private GuiManager guiManager;
     private TrackerManager trackerManager;
+    private MessageManager messageManager;
     private PowerUpManager powerUpManager;
     private KitManager kitManager;
     private StatsManager statsManager;
@@ -52,8 +56,10 @@ public final class SpeedrunnerSwap extends JavaPlugin {
         
         // Initialize managers
         this.configManager = new ConfigManager(this);
+        this.cageManager = new CageManager(this);
         this.gameManager = new GameManager(this);
         this.guiManager = new GuiManager(this);
+        this.messageManager = new MessageManager(this);
         this.trackerManager = new TrackerManager(this);
         this.powerUpManager = new PowerUpManager(this);
         this.kitManager = new KitManager(this);
@@ -149,7 +155,15 @@ public final class SpeedrunnerSwap extends JavaPlugin {
     public GameManager getGameManager() {
         return gameManager;
     }
-    
+
+    public CageManager getCageManager() {
+        return cageManager;
+    }
+
+    public MessageManager getMessageManager() {
+        return messageManager;
+    }
+
     /**
      * Get the GUI manager
      * @return The GUI manager

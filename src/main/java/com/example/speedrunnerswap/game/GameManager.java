@@ -37,15 +37,10 @@ public class GameManager {
     private BukkitTask actionBarTask;
     private BukkitTask titleTask;
     private BukkitTask freezeCheckTask;
-    private BukkitTask cageTask;
     private BukkitTask runnerTimeoutTask;
     private long nextSwapTime;
     private final Map<UUID, PlayerState> playerStates;
     private final Map<UUID, Long> runnerDisconnectAt = new HashMap<>();
-    // Shared cage management per-world (one cage in each world)
-    private final java.util.Map<org.bukkit.World, java.util.List<org.bukkit.block.BlockState>> sharedCageBlocks = new java.util.HashMap<>();
-    private final java.util.Map<org.bukkit.World, org.bukkit.Location> sharedCageCenters = new java.util.HashMap<>();
-    private final java.util.Set<java.util.UUID> cagedPlayers = new java.util.HashSet<>();
     private final java.util.Map<java.util.UUID, Integer> portalSwapRetries = new java.util.HashMap<>();
     private boolean swapInProgress = false;
     private Location sharedRunnerSpawn;
@@ -68,6 +63,9 @@ public class GameManager {
     private static final long TASK_INTRO_DELAY_TICKS = 8L * 20L;
     private static final int RESPAWN_SEARCH_RADIUS = 6;
     private static final int RESPAWN_VERTICAL_RANGE = 8;
+    private static final String VISIBILITY_ALWAYS = "always";
+    private static final String VISIBILITY_LAST_10 = "last_10";
+    private static final String VISIBILITY_NEVER = "never";
     
     public GameManager(SpeedrunnerSwap plugin) {
         this.plugin = plugin;
@@ -91,22 +89,7 @@ public class GameManager {
             boolean hasRunner = !runners.isEmpty();
             boolean hasHunter = !hunters.isEmpty();
 
-            String failureMessage = switch (mode) {
-                case DREAM -> hasRunner
-                        ? "§cGame cannot start: Assign at least one hunter for Dream mode."
-                        : "§cGame cannot start: Assign at least one speedrunner.";
-                case SAPNAP -> hasRunner
-                        ? (hasHunter
-                            ? "§cGame cannot start: Sapnap mode does not allow hunters. Clear them and keep only speedrunners."
-                            : "§cGame cannot start: Assign at least one speedrunner.")
-                        : "§cGame cannot start: Assign at least one speedrunner.";
-                case TASK -> hasRunner
-                        ? (hasHunter
-                            ? "§cGame cannot start: Task Master mode uses only speedrunners. Remove any hunters before starting."
-                            : "§cGame cannot start: Assign at least one speedrunner.")
-                        : "§cGame cannot start: Assign at least one speedrunner.";
-            };
-
+            String failureMessage = plugin.getMessageManager().getGameStartFailureMessage(mode, hasRunner, hasHunter);
             Msg.broadcast(failureMessage);
             return false;
         }
@@ -121,184 +104,174 @@ public class GameManager {
             @Override
             public void run() {
                 if (count > 0) {
-                    String title = switch (countdownMode) {
-                        case DREAM -> "§b§lDream Swap starting in " + count;
-                        case SAPNAP -> "§d§lSapnap speedrunner swap in " + count;
-                        case TASK -> "§6§lTaskmaster starting in " + count;
-                    };
-                    String subtitle = "§7Made by muj3b";
+                    String title = plugin.getMessageManager().getStartCountdownTitle(countdownMode, count);
+                    String subtitle = plugin.getMessageManager().getStartCountdownSubtitle();
                     for (Player player : Bukkit.getOnlinePlayers()) {
                         BukkitCompat.showTitle(player, title, subtitle, 10, 70, 10);
                     }
                     count--;
                 } else {
-                    String goTitle = switch (countdownMode) {
-                        case DREAM -> "§b§lDream Swap GO!";
-                        case SAPNAP -> "§d§lSapnap swap GO!";
-                        case TASK -> "§6§lTaskmaster GO!";
-                    };
+                    String goTitle = plugin.getMessageManager().getStartTitle(countdownMode);
+                    String subtitle = plugin.getMessageManager().getStartCountdownSubtitle();
                     for (Player player : Bukkit.getOnlinePlayers()) {
-                        BukkitCompat.showTitle(player, goTitle, "§7Made by muj3b", 10, 60, 10);
+                        BukkitCompat.showTitle(player, goTitle, subtitle, 10, 60, 10);
                     }
                     this.cancel();
-                    gameRunning = true;
-                    gamePaused = false;
-                    activeRunnerIndex = 0;
-                    activeRunner = runners.get(activeRunnerIndex);
-                    saveAllPlayerStates();
-                    portalSwapRetries.clear();
-                    swapInProgress = false;
-                
-                if (plugin.getConfigManager().isKitsEnabled()) {
-                    for (Player player : runners) {
-                        plugin.getKitManager().giveKit(player, "runner");
-                    }
-                    for (Player hunter : hunters) {
-                        plugin.getKitManager().giveKit(hunter, "hunter");
-                    }
+                    initializeGame();
+                    giveStartingKits();
+                    scheduleGameTasks();
+                    handlePostStart();
+                    startTracking();
+                    startStatsTracking();
                 }
-                
-                scheduleNextSwap();
-                if (plugin.getCurrentMode() == com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode.DREAM) {
-                    scheduleNextHunterSwap();
-                }
+            }
+        }.runTaskTimer(plugin, 0L, 20L);
 
-                Runnable postStart = () -> {
-                    if (!gameRunning) return;
-                    applyInactiveEffects();
-                    startActionBarUpdates();
-                    startTitleUpdates();
-                    startCageEnforcement();
-                    if (plugin.getConfigManager().isFreezeMechanicEnabled()) {
-                        startFreezeChecking();
-                    }
-                };
+        return true;
+    }
 
-                if (plugin.getCurrentMode() == com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode.TASK) {
-                    try { plugin.getTaskManagerMode().assignAndAnnounceTasks(runners); } catch (Throwable t) {
-                        plugin.getLogger().warning("Task assignment failed: " + t.getMessage());
-                    }
-                    startRunnerTimeoutWatcher();
-                    Bukkit.getScheduler().runTaskLater(plugin, postStart, TASK_INTRO_DELAY_TICKS);
-                } else {
-                    postStart.run();
-                }
+    private void initializeGame() {
+        gameRunning = true;
+        gamePaused = false;
+        activeRunnerIndex = 0;
+        activeRunner = runners.get(activeRunnerIndex);
+        saveAllPlayerStates();
+        portalSwapRetries.clear();
+        swapInProgress = false;
+    }
 
-                if (plugin.getCurrentMode() != com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode.SAPNAP && plugin.getConfigManager().isTrackerEnabled()) {
-                    plugin.getTrackerManager().startTracking();
-                    for (Player hunter : hunters) {
-                        if (hunter.isOnline()) {
-                            plugin.getTrackerManager().giveTrackingCompass(hunter);
-                        }
-                    }
-                }
+    private void giveStartingKits() {
+        if (plugin.getConfigManager().isKitsEnabled()) {
+            for (Player player : runners) {
+                plugin.getKitManager().giveKit(player, "runner");
+            }
+            for (Player hunter : hunters) {
+                plugin.getKitManager().giveKit(hunter, "hunter");
+            }
+        }
+    }
 
-                // Optionally start stats tracking
-                if (plugin.getConfig().getBoolean("stats.enabled", true)) {
-                    plugin.getStatsManager().startTracking();
+    private void scheduleGameTasks() {
+        scheduleNextSwap();
+        if (plugin.getCurrentMode() == SpeedrunnerSwap.SwapMode.DREAM) {
+            scheduleNextHunterSwap();
+        }
+    }
+
+    private void handlePostStart() {
+        Runnable postStart = () -> {
+            if (!gameRunning) return;
+            applyInactiveEffects();
+            startActionBarUpdates();
+            startTitleUpdates();
+            plugin.getCageManager().startCageEnforcement();
+            if (plugin.getConfigManager().isFreezeMechanicEnabled()) {
+                startFreezeChecking();
+            }
+        };
+
+        if (plugin.getCurrentMode() == SpeedrunnerSwap.SwapMode.TASK) {
+            try {
+                plugin.getTaskManagerMode().assignAndAnnounceTasks(runners);
+            } catch (Throwable t) {
+                plugin.getLogger().warning("Task assignment failed: " + t.getMessage());
+            }
+            startRunnerTimeoutWatcher();
+            Bukkit.getScheduler().runTaskLater(plugin, postStart, TASK_INTRO_DELAY_TICKS);
+        } else {
+            postStart.run();
+        }
+    }
+
+    private void startTracking() {
+        if (plugin.getCurrentMode() != SpeedrunnerSwap.SwapMode.SAPNAP && plugin.getConfigManager().isTrackerEnabled()) {
+            plugin.getTrackerManager().startTracking();
+            for (Player hunter : hunters) {
+                if (hunter.isOnline()) {
+                    plugin.getTrackerManager().giveTrackingCompass(hunter);
                 }
             }
         }
-    }.runTaskTimer(plugin, 0L, 20L);
+    }
 
-    return true;
-}    public void endGame(Team winner) {
+    private void startStatsTracking() {
+        if (plugin.getConfig().getBoolean("stats.enabled", true)) {
+            plugin.getStatsManager().startTracking();
+        }
+    }    public void endGame(Team winner) {
         if (!gameRunning) {
             return;
         }
 
-        String titleStr;
-        String runnerSubtitle = "";
-        String hunterSubtitle = "";
+        showEndGameTitles(winner);
+        cancelGameTasks();
+        cleanupGame(winner);
+    }
 
-        if (winner == Team.RUNNER) {
-            titleStr = "§a§lRUNNERS WIN!";
-            runnerSubtitle = "§eBro y'all are locked in, good stuff";
-            hunterSubtitle = "§eBro y'all are locked in, good stuff";
-        } else if (winner == Team.HUNTER) {
-            titleStr = "§c§lHUNTERS WIN!";
-            runnerSubtitle = "§eYou ain't the main character, unc";
-            hunterSubtitle = "§eBro those speedrunners are trash";
-        } else {
-            titleStr = "§c§lGAME OVER";
-            runnerSubtitle = "§eNo winner declared.";
-            hunterSubtitle = "§eNo winner declared.";
-        }
-
+    private void showEndGameTitles(Team winner) {
+        String titleStr = plugin.getMessageManager().getEndTitle(winner);
         for (Player player : Bukkit.getOnlinePlayers()) {
-            String sub = isRunner(player) ? runnerSubtitle : hunterSubtitle;
+            String sub = plugin.getMessageManager().getEndSubtitle(winner, isRunner(player));
             BukkitCompat.showTitle(player, titleStr, sub, 10, 100, 10);
         }
+    }
 
+    private void cancelGameTasks() {
         if (swapTask != null) swapTask.cancel();
         if (hunterSwapTask != null) hunterSwapTask.cancel();
         if (actionBarTask != null) actionBarTask.cancel();
         if (titleTask != null) titleTask.cancel();
         if (freezeCheckTask != null) freezeCheckTask.cancel();
-        if (cageTask != null) { cageTask.cancel(); cageTask = null; }
-        if (runnerTimeoutTask != null) { runnerTimeoutTask.cancel(); runnerTimeoutTask = null; }
+        plugin.getCageManager().stopCageTask();
+        if (runnerTimeoutTask != null) {
+            runnerTimeoutTask.cancel();
+            runnerTimeoutTask = null;
+        }
         plugin.getTrackerManager().stopTracking();
         portalSwapRetries.clear();
         swapInProgress = false;
-        try { plugin.getStatsManager().stopTracking(); } catch (Exception ignored) {}
+        try {
+            plugin.getStatsManager().stopTracking();
+        } catch (Exception e) {
+            plugin.getLogger().warning("Error stopping stats tracker: " + e.getMessage());
+        }
+    }
 
+    private void cleanupGame(Team winner) {
         new BukkitRunnable() {
             @Override
             public void run() {
-                // Optionally preserve final runner progress for all runners (configurable)
                 if (plugin.getConfig().getBoolean("swap.preserve_runner_progress_on_end", false)) {
-                    try {
-                        if (activeRunner != null && activeRunner.isOnline() && !runners.isEmpty()) {
-                            com.example.speedrunnerswap.models.PlayerState finalState = PlayerStateUtil.capturePlayerState(activeRunner);
-                            for (Player r : runners) {
-                                playerStates.put(r.getUniqueId(), finalState);
-                            }
-                        }
-                    } catch (Exception ex) {
-                        plugin.getLogger().warning("Failed to capture/apply final runner state: " + ex.getMessage());
-                    }
+                    preserveFinalRunnerProgress();
                 }
 
-                cleanupAllCages();
+                plugin.getCageManager().cleanupAllCages();
                 restoreAllPlayerStates();
-                
+
                 gameRunning = false;
                 gamePaused = false;
                 activeRunner = null;
-                
+
                 if (plugin.getConfigManager().isBroadcastGameEvents()) {
-                    String winnerMessage = (winner != null) ? winner.name() + " team won!" : "Game ended!";
-                    Msg.broadcast("§a[SpeedrunnerSwap] Game ended! " + winnerMessage);
+                    Msg.broadcast(plugin.getMessageManager().getGameEndMessage(winner));
                 }
 
-                broadcastDonationMessage();
+                plugin.getMessageManager().sendDonationMessage(null);
             }
         }.runTaskLater(plugin, 200L);
     }
 
-    public void sendDonationMessage(Player recipient) {
-        if (recipient != null) {
-            deliverDonationMessage(recipient, SpeedrunnerSwap.DONATION_URL);
-            return;
+    private void preserveFinalRunnerProgress() {
+        try {
+            if (activeRunner != null && activeRunner.isOnline() && !runners.isEmpty()) {
+                PlayerState finalState = PlayerStateUtil.capturePlayerState(activeRunner);
+                for (Player r : runners) {
+                    playerStates.put(r.getUniqueId(), finalState);
+                }
+            }
+        } catch (Exception ex) {
+            plugin.getLogger().warning("Failed to capture/apply final runner state: " + ex.getMessage());
         }
-
-        for (Player player : Bukkit.getOnlinePlayers()) {
-            deliverDonationMessage(player, SpeedrunnerSwap.DONATION_URL);
-        }
-    }
-
-    private void deliverDonationMessage(Player player, String donateUrl) {
-        if (player == null) return;
-        player.sendMessage("");
-        player.sendMessage("§6§l=== Support the Creator ===");
-        player.sendMessage("§eEnjoyed the game? Help keep updates coming!");
-        player.sendMessage("§d❤ Donate to support development");
-        player.sendMessage("§b" + donateUrl);
-        player.sendMessage("");
-    }
-
-    private void broadcastDonationMessage() {
-        sendDonationMessage(null);
     }
     /** Stop the game without declaring a winner */
     public void stopGame() {
@@ -441,7 +414,7 @@ public class GameManager {
             if (plugin.getConfigManager().isPauseOnDisconnect()) {
                 pauseGame();
                 if (plugin.getConfigManager().isBroadcastGameEvents()) {
-                    Msg.broadcast("§e[SpeedrunnerSwap] Game paused: waiting for players to return.");
+                    Msg.broadcast(plugin.getMessageManager().getGamePausedOnDisconnectMessage());
                 }
             } else {
                 // Keep running but log a warning for admins
@@ -482,7 +455,7 @@ public class GameManager {
                 ? plugin.getConfig().getBoolean("task_manager.pause_on_disconnect", plugin.getConfigManager().isPauseOnDisconnect())
                 : plugin.getConfigManager().isPauseOnDisconnect();
 
-        if (player.equals(activeRunner)) {
+        if (activeRunner != null && player.equals(activeRunner)) {
             if (pauseOnDc) {
                 pauseGame();
             } else {
@@ -745,7 +718,8 @@ public class GameManager {
                 }
             }
             player.updateInventory();
-        } catch (Throwable ignored) {
+        } catch (Exception e) {
+            plugin.getLogger().warning("Error reclaiming items from open container for " + player.getName() + ": " + e.getMessage());
         }
     }
     
@@ -842,8 +816,8 @@ public class GameManager {
         for (Player player : Bukkit.getOnlinePlayers()) {
             boolean isRunner = runners.contains(player);
             boolean isHunter = hunters.contains(player);
-            boolean isActive = player.equals(activeRunner);
-            boolean isCaged = cagedPlayers.contains(player.getUniqueId());
+            boolean isActive = activeRunner != null && player.equals(activeRunner);
+            boolean isCaged = plugin.getCageManager().isCaged(player);
 
             String vis;
             if (isRunner) {
@@ -852,24 +826,17 @@ public class GameManager {
             } else if (isHunter) {
                 vis = plugin.getConfigManager().getHunterTimerVisibility();
             } else {
-                vis = "never";
+                vis = VISIBILITY_NEVER;
             }
 
-            boolean show;
-            switch (String.valueOf(vis).toLowerCase()) {
-                case "always" -> show = true;
-                case "last_10" -> show = timeLeft <= 10;
-                default -> show = false;
-            }
-
-            if (show) {
+            if (shouldShowTimer(vis, timeLeft)) {
                 // For caged players, show queue position instead of timer
                 if (isCaged && !isActive) {
                     int queuePosition = getQueuePosition(player);
-                    String msg = String.format("§6Queued (%d) - You're up next", queuePosition);
+                    String msg = plugin.getMessageManager().getQueuedMessage(queuePosition);
                     com.example.speedrunnerswap.utils.ActionBarUtil.sendActionBar(player, msg);
                 } else {
-                    String msg = String.format("§eSwap in: §c%ds", Math.max(0, timeLeft));
+                    String msg = plugin.getMessageManager().getSwapInMessage(timeLeft);
                     com.example.speedrunnerswap.utils.ActionBarUtil.sendActionBar(player, msg);
                 }
             } else {
@@ -926,8 +893,11 @@ public class GameManager {
             return;
         }
         try {
-            location.getWorld().getChunkAt(location);
-        } catch (Throwable ignored) {
+            if (!location.getWorld().isChunkLoaded(location.getChunk())) {
+                location.getChunk().load();
+            }
+        } catch (Exception e) {
+            plugin.getLogger().warning("Failed to load chunk at " + location + ": " + e.getMessage());
         }
     }
 
@@ -974,9 +944,9 @@ public class GameManager {
         String freezeMode = plugin.getConfigManager().getFreezeMode();
 
         for (Player runner : runners) {
-            if (runner.equals(activeRunner)) {
+            if (activeRunner != null && runner.equals(activeRunner)) {
                 // Remove player from shared cage set
-                cagedPlayers.remove(runner.getUniqueId());
+                plugin.getCageManager().removeCagedPlayer(runner.getUniqueId());
                 PotionEffectType eff;
                 if ((eff = BukkitCompat.resolvePotionEffect("blindness")) != null) runner.removePotionEffect(eff);
                 if ((eff = BukkitCompat.resolvePotionEffect("darkness")) != null) runner.removePotionEffect(eff);
@@ -1017,16 +987,19 @@ public class GameManager {
                     if (blindness2 != null) runner.addPotionEffect(new PotionEffect(blindness2, Integer.MAX_VALUE, 1, false, false));
                 } else if (freezeMode.equalsIgnoreCase("CAGE")) {
                     // Teleport to shared bedrock cage and blind + invis
-                    createOrEnsureSharedCage(runner.getWorld());
-                    teleportToSharedCage(runner);
+                    plugin.getCageManager().teleportToSharedCage(runner);
                     PotionEffectType blindness = BukkitCompat.resolvePotionEffect("blindness");
                     if (blindness != null) runner.addPotionEffect(new PotionEffect(blindness, Integer.MAX_VALUE, 1, false, false));
                     PotionEffectType invis = BukkitCompat.resolvePotionEffect("invisibility");
                     if (invis != null) runner.addPotionEffect(new PotionEffect(invis, Integer.MAX_VALUE, 1, false, false));
                     runner.setGameMode(GameMode.ADVENTURE);
                     // Allow flight while caged to prevent server kicking for "flying"
-                    try { runner.setAllowFlight(true); } catch (Exception ignored) {}
-                    try { runner.setFlying(false); } catch (Exception ignored) {}
+                    try {
+                        runner.setAllowFlight(true);
+                        runner.setFlying(false);
+                    } catch (Exception e) {
+                        plugin.getLogger().warning("Failed to set flight for caged player " + runner.getName() + ": " + e.getMessage());
+                    }
                 }
 
                 // Ensure inactive runners have no visible/usable inventory
@@ -1090,7 +1063,7 @@ public class GameManager {
             applyInactiveEffects();
             // If CAGE mode is not selected anymore, ensure cages are removed
             if (!"CAGE".equalsIgnoreCase(plugin.getConfigManager().getFreezeMode())) {
-                cleanupAllCages();
+                plugin.getCageManager().cleanupAllCages();
             }
         }
     }
@@ -1281,7 +1254,7 @@ public class GameManager {
         long delay = plugin.getConfig().getLong("tracker.portal_retry_delay_ticks", 20L);
         long normalizedDelay = Math.max(5L, delay);
         if (plugin.getConfigManager().isBroadcastGameEvents()) {
-            Msg.broadcast("§e[SpeedrunnerSwap] Swap deferred: runner is mid-portal. Retrying in " + (normalizedDelay / 20.0) + "s (attempt " + (attempts + 1) + "/" + maxAttempts + ").");
+            Msg.broadcast(plugin.getMessageManager().getSwapDeferredMessage(normalizedDelay / 20.0, attempts + 1, maxAttempts));
         } else {
             plugin.getLogger().info("Deferred runner swap while player is in portal. Retry " + (attempts + 1) + "/" + maxAttempts + " in " + normalizedDelay + " ticks.");
         }
@@ -1354,7 +1327,7 @@ public class GameManager {
         plugin.getTrackerManager().updateAllHunterCompasses();
 
         if (plugin.getConfigManager().isBroadcastsEnabled()) {
-            Msg.broadcast("§c[SpeedrunnerSwap] Hunters have been swapped!");
+            Msg.broadcast(plugin.getMessageManager().getHuntersSwappedMessage());
         }
     }
     
@@ -1410,12 +1383,8 @@ public class GameManager {
         
         String effectName = effectType.getKey().getKey().replace("_", " ").toLowerCase();
         String effectLevel = amplifier == 0 ? "I" : "II";
-        
-        player.sendMessage(String.format("§%sYou received a %s power-up: %s %s!",
-                isGoodEffect ? "a" : "c",
-                isGoodEffect ? "good" : "bad",
-                effectName,
-                effectLevel));
+
+        player.sendMessage(plugin.getMessageManager().getPowerupReceivedMessage(isGoodEffect, effectName, effectLevel));
     }
 
     private PotionEffectType resolveEffect(String id) {
@@ -1449,7 +1418,7 @@ public class GameManager {
         }
         // Broadcast pause
         if (plugin.getConfigManager().isBroadcastGameEvents()) {
-            Msg.broadcast("§e§lGame paused by admin.");
+            Msg.broadcast(plugin.getMessageManager().getGamePausedMessage());
         }
         return true;
     }
@@ -1466,10 +1435,10 @@ public class GameManager {
         scheduleNextHunterSwap();
         startActionBarUpdates();
         startTitleUpdates();
-        startCageEnforcement();
+        plugin.getCageManager().startCageEnforcement();
         // Broadcast resume
         if (plugin.getConfigManager().isBroadcastGameEvents()) {
-            Msg.broadcast("§a§lGame resumed.");
+            Msg.broadcast(plugin.getMessageManager().getGameResumedMessage());
         }
         return true;
     }
@@ -1481,7 +1450,7 @@ public class GameManager {
 
     /** Shuffle the runner queue while keeping the current active runner first */
     public boolean shuffleQueue() {
-        if (runners == null || runners.size() < 2) return false;
+        if (runners == null || runners.size() < 2 || activeRunner == null) return false;
         Player current = activeRunner;
         java.util.List<Player> rest = new java.util.ArrayList<>();
         for (Player p : runners) {
@@ -1677,129 +1646,38 @@ public class GameManager {
         boolean isSprint = current != null && current.isSprinting();
 
         String waitingVis = plugin.getConfigManager().getWaitingTimerVisibility();
-        boolean waitingAlways = "always".equalsIgnoreCase(waitingVis);
-        boolean waitingLast10 = "last_10".equalsIgnoreCase(waitingVis);
 
         for (Player p : Bukkit.getOnlinePlayers()) {
             if (!runners.contains(p)) continue; // Only runners get titles
 
-            boolean isActive = p.equals(current);
-            boolean isCaged = cagedPlayers.contains(p.getUniqueId());
+            boolean isActive = activeRunner != null && p.equals(activeRunner);
+            boolean isCaged = plugin.getCageManager().isCaged(p);
             
             // For caged players, show large aesthetic title
             if (isCaged && !isActive) {
-                String t = String.format("§6§lSwap in: %ds", Math.max(0, timeLeft));
-                String sub = String.format("§eSneaking: %s  §7|  §eRunning: %s", isSneak ? "Yes" : "No", isSprint ? "Yes" : "No");
+                String t = plugin.getMessageManager().getTitleSwapInMessage(timeLeft);
+                String sub = plugin.getMessageManager().getTitleStatusSubtitle(isSneak, isSprint);
                 BukkitCompat.showTitle(p, t, sub, 0, 20, 0);
                 continue;
             }
             
             // For non-caged waiting runners, show smaller title
-            boolean shouldShow = !isActive && !isCaged && (waitingAlways || (waitingLast10 && timeLeft <= 10));
-            if (!shouldShow) continue;
-
-            String t = String.format("§6§lSwap in: %ds", Math.max(0, timeLeft));
-            String sub = String.format("§eSneaking: %s  §7|  §eRunning: %s", isSneak ? "Yes" : "No", isSprint ? "Yes" : "No");
-            BukkitCompat.showTitle(p, t, sub, 0, 12, 0);
-        }
-    }
-
-    private void createOrEnsureSharedCage(World world) {
-        if (world == null) world = Bukkit.getWorlds().get(0);
-        Location base = plugin.getConfigManager().getLimboLocation();
-        int y = world.getMaxHeight() - 10;
-        int cx = (int) Math.round(base.getX());
-        int cz = (int) Math.round(base.getZ());
-        Location center = new Location(world, cx + 0.5, y, cz + 0.5);
-        Location existing = sharedCageCenters.get(world);
-        if (existing != null && Math.abs(existing.getX() - center.getX()) < 0.1 && Math.abs(existing.getY() - center.getY()) < 0.1 && Math.abs(existing.getZ() - center.getZ()) < 0.1) {
-            return;
-        }
-        // Cleanup old cage in this world
-        java.util.List<org.bukkit.block.BlockState> old = sharedCageBlocks.remove(world);
-        if (old != null) {
-            for (org.bukkit.block.BlockState s : old) { try { s.update(true, false); } catch (Exception ignored) {} }
-        }
-        try { center.getChunk().load(true); } catch (Throwable ignored) {}
-        java.util.List<org.bukkit.block.BlockState> changed = new java.util.ArrayList<>();
-        for (int dx = -2; dx <= 2; dx++) {
-            for (int dy = -1; dy <= 2; dy++) {
-                for (int dz = -2; dz <= 2; dz++) {
-                    org.bukkit.block.Block block = world.getBlockAt(cx + dx, y + dy, cz + dz);
-                    boolean isShell = (dx == -2 || dx == 2 || dz == -2 || dz == 2 || dy == -1 || dy == 2);
-                    changed.add(block.getState());
-                    block.setType(isShell ? Material.BEDROCK : Material.AIR, false);
-                }
+            if (!isActive && !isCaged && shouldShowTimer(waitingVis, timeLeft)) {
+                String t = plugin.getMessageManager().getTitleSwapInMessage(timeLeft);
+                String sub = plugin.getMessageManager().getTitleStatusSubtitle(isSneak, isSprint);
+                BukkitCompat.showTitle(p, t, sub, 0, 12, 0);
             }
         }
-        for (int dx = -3; dx <= 3; dx++) {
-            for (int dz = -3; dz <= 3; dz++) {
-                org.bukkit.block.Block floor = world.getBlockAt(cx + dx, y - 1, cz + dz);
-                changed.add(floor.getState());
-                floor.setType(Material.BEDROCK, false);
-            }
+    }
+
+    private boolean shouldShowTimer(String visibility, int timeLeft) {
+        if (visibility == null) {
+            return false;
         }
-        sharedCageBlocks.put(world, changed);
-        sharedCageCenters.put(world, center.clone());
-    }
-
-    private void teleportToSharedCage(Player p) {
-        if (p == null || !p.isOnline()) return;
-        createOrEnsureSharedCage(p.getWorld());
-        org.bukkit.Location center = sharedCageCenters.get(p.getWorld());
-        if (center != null) {
-            // Teleport player to the center of the cage floor
-            p.teleport(center);
-            cagedPlayers.add(p.getUniqueId());
-            try { p.setAllowFlight(true); } catch (Exception ignored) {}
-            try { p.setFlying(false); } catch (Exception ignored) {}
-        }
-    }
-
-    private void cleanupAllCages() {
-        for (java.util.Map.Entry<org.bukkit.World, java.util.List<org.bukkit.block.BlockState>> e : sharedCageBlocks.entrySet()) {
-            java.util.List<org.bukkit.block.BlockState> list = e.getValue();
-            if (list != null) for (org.bukkit.block.BlockState s : list) { try { s.update(true, false); } catch (Exception ignored) {} }
-        }
-        sharedCageBlocks.clear();
-        sharedCageCenters.clear();
-        cagedPlayers.clear();
-    }
-
-    private void startCageEnforcement() {
-        if (cageTask != null) { cageTask.cancel(); cageTask = null; }
-        cageTask = Bukkit.getScheduler().runTaskTimer(plugin, () -> {
-            if (!gameRunning || gamePaused) return;
-            if (!"CAGE".equalsIgnoreCase(plugin.getConfigManager().getFreezeMode())) return;
-            // Ensure a cage exists in each runner's current world and enforce
-            for (Player r : runners) {
-                if (r.equals(activeRunner)) continue;
-                if (!r.isOnline()) continue;
-                createOrEnsureSharedCage(r.getWorld());
-                teleportToSharedCage(r);
-                org.bukkit.Location center = sharedCageCenters.get(r.getWorld());
-                if (center == null) continue;
-                org.bukkit.Location loc = r.getLocation();
-                double dx = Math.abs(loc.getX() - center.getX());
-                double dy = loc.getY() - center.getY();
-                double dz = Math.abs(loc.getZ() - center.getZ());
-                boolean outside = dx > 1.2 || dz > 1.2 || dy < -0.2 || dy > 0.8;
-                if (outside) {
-                    r.teleport(center);
-                    r.setVelocity(new org.bukkit.util.Vector(0, 0, 0));
-                    r.setFallDistance(0f);
-                    r.setNoDamageTicks(Math.max(10, r.getNoDamageTicks()));
-                } else {
-                    try { r.setAllowFlight(true); } catch (Exception ignored) {}
-                    try { r.setFlying(false); } catch (Exception ignored) {}
-                }
-            }
-        }, 0L, 5L); // enforce every 0.25s
-    }
-
-    public boolean areBothPlayersInSharedCage(Player a, Player b) {
-        if (a == null || b == null) return false;
-        if (!cagedPlayers.contains(a.getUniqueId()) || !cagedPlayers.contains(b.getUniqueId())) return false;
-        return a.getWorld().equals(b.getWorld()) && sharedCageCenters.containsKey(a.getWorld());
+        return switch (visibility.toLowerCase()) {
+            case VISIBILITY_ALWAYS -> true;
+            case VISIBILITY_LAST_10 -> timeLeft <= 10;
+            default -> false;
+        };
     }
 }
