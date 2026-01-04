@@ -330,13 +330,11 @@ public class ConfigManager {
 
     /**
      * Get the spawn location for players after the game ends.
+     * If not configured, uses the world's natural spawn point.
      * 
      * @return The spawn location.
      */
     public org.bukkit.Location getSpawnLocation() {
-        double x = config.getDouble("spawn.x", 0);
-        double y = config.getDouble("spawn.y", 0);
-        double z = config.getDouble("spawn.z", 0);
         String worldName = config.getString("spawn.world", "world");
         org.bukkit.World world = plugin.getServer().getWorld(worldName);
         if (world == null) {
@@ -344,6 +342,13 @@ public class ConfigManager {
             plugin.getLogger()
                     .warning("Spawn world '" + worldName + "' not found. Using default world: " + world.getName());
         }
+
+        // Use world spawn as default if not configured (fixes teleport to 0,64,0 issue)
+        org.bukkit.Location worldSpawn = world.getSpawnLocation();
+        double x = config.getDouble("spawn.x", worldSpawn.getX());
+        double y = config.getDouble("spawn.y", worldSpawn.getY());
+        double z = config.getDouble("spawn.z", worldSpawn.getZ());
+
         return new org.bukkit.Location(world, x, y, z);
     }
 
@@ -418,9 +423,6 @@ public class ConfigManager {
     }
 
     public Location getLimboLocation() {
-        double x = config.getDouble("limbo.x", 0.5);
-        double y = config.getDouble("limbo.y", 200.0);
-        double z = config.getDouble("limbo.z", 0.5);
         String worldName = config.getString("limbo.world", "world");
         World world = plugin.getServer().getWorld(worldName);
         if (world == null) {
@@ -428,6 +430,13 @@ public class ConfigManager {
             plugin.getLogger()
                     .warning("Limbo world '" + worldName + "' not found. Using default world: " + world.getName());
         }
+
+        // Use world spawn X/Z as default if not configured (fixes CAGE at 0,0 issue)
+        Location worldSpawn = world.getSpawnLocation();
+        double x = config.getDouble("limbo.x", worldSpawn.getX() + 0.5);
+        double y = config.getDouble("limbo.y", 200.0); // Keep Y high for limbo
+        double z = config.getDouble("limbo.z", worldSpawn.getZ() + 0.5);
+
         return new Location(world, x, y, z);
     }
 
