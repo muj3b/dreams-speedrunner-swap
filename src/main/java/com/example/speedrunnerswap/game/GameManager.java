@@ -1706,8 +1706,14 @@ public class GameManager {
             }
         }
 
-        Location worldSpawn = player.getWorld() != null ? player.getWorld().getSpawnLocation() : null;
-        Location safeWorldSpawn = prepareSafeSpawn(worldSpawn, player.getWorld());
+        // Always use the Overworld spawn as fallback (not the player's current world)
+        // This prevents respawning in the Nether when dying there with no bed set
+        World overworld = Bukkit.getWorlds().isEmpty() ? null : Bukkit.getWorlds().get(0);
+        if (overworld == null) {
+            overworld = player.getWorld(); // Absolute fallback
+        }
+        Location worldSpawn = overworld.getSpawnLocation();
+        Location safeWorldSpawn = prepareSafeSpawn(worldSpawn, overworld);
         if (safeWorldSpawn != null) {
             return safeWorldSpawn;
         }

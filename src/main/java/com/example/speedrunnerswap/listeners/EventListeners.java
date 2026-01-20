@@ -25,11 +25,11 @@ import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 import java.util.Locale;
 
 public class EventListeners implements Listener {
-    
+
     private final SpeedrunnerSwap plugin;
     // Simple debounce for hot potato swap triggers
     private volatile long lastHotPotatoTriggerMs = 0L;
-    
+
     public EventListeners(SpeedrunnerSwap plugin) {
         this.plugin = plugin;
         // Register Paper chat guard without compile-time dependency
@@ -39,58 +39,74 @@ public class EventListeners implements Listener {
     // Cleanup tracker caches after other listeners have run
     @org.bukkit.event.EventHandler(priority = org.bukkit.event.EventPriority.MONITOR)
     public void onQuitMonitor(org.bukkit.event.player.PlayerQuitEvent event) {
-        try { plugin.getTrackerManager().cleanupPlayer(event.getPlayer().getUniqueId()); } catch (Throwable ignored) {}
+        try {
+            plugin.getTrackerManager().cleanupPlayer(event.getPlayer().getUniqueId());
+        } catch (Throwable ignored) {
+        }
     }
 
     @org.bukkit.event.EventHandler(priority = org.bukkit.event.EventPriority.MONITOR)
     public void onKickMonitor(org.bukkit.event.player.PlayerKickEvent event) {
-        try { plugin.getTrackerManager().cleanupPlayer(event.getPlayer().getUniqueId()); } catch (Throwable ignored) {}
+        try {
+            plugin.getTrackerManager().cleanupPlayer(event.getPlayer().getUniqueId());
+        } catch (Throwable ignored) {
+        }
     }
 
-    // Cross-version safe title extractor (reflection; no compile-time kyori dependency)
+    // Cross-version safe title extractor (reflection; no compile-time kyori
+    // dependency)
     private String getPlainTitle(org.bukkit.inventory.InventoryView view) {
-        if (view == null) return "";
+        if (view == null)
+            return "";
         // Try Paper's title() via reflection first
         try {
             java.lang.reflect.Method m = view.getClass().getMethod("title");
             Object comp = m.invoke(view);
             if (comp != null) {
                 try {
-                    Class<?> serCls = Class.forName("net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer");
+                    Class<?> serCls = Class
+                            .forName("net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer");
                     java.lang.reflect.Method plainText = serCls.getMethod("plainText");
                     Object serializer = plainText.invoke(null);
                     Class<?> componentCls = Class.forName("net.kyori.adventure.text.Component");
                     java.lang.reflect.Method serialize = serializer.getClass().getMethod("serialize", componentCls);
                     Object s = serialize.invoke(serializer, comp);
-                    if (s != null) return String.valueOf(s);
+                    if (s != null)
+                        return String.valueOf(s);
                 } catch (Throwable ignored) {
                     try {
                         java.lang.reflect.Method content = comp.getClass().getMethod("content");
                         Object s = content.invoke(comp);
-                        if (s != null) return String.valueOf(s);
+                        if (s != null)
+                            return String.valueOf(s);
                     } catch (Throwable alsoIgnored) {
                         return String.valueOf(comp);
                     }
                 }
             }
-        } catch (Throwable ignored) {}
+        } catch (Throwable ignored) {
+        }
 
         // Fallbacks in 1.21 API
         try {
             java.lang.reflect.Method getTitle = view.getClass().getMethod("getTitle");
             Object s = getTitle.invoke(view);
-            if (s != null) return String.valueOf(s);
-        } catch (Throwable ignored) {}
+            if (s != null)
+                return String.valueOf(s);
+        } catch (Throwable ignored) {
+        }
 
         try {
             java.lang.reflect.Method getOrig = view.getClass().getMethod("getOriginalTitle");
             Object s = getOrig.invoke(view);
-            if (s != null) return String.valueOf(s);
-        } catch (Throwable ignored) {}
+            if (s != null)
+                return String.valueOf(s);
+        } catch (Throwable ignored) {
+        }
 
         return "";
     }
-    
+
     /**
      * Register a Paper AsyncChatEvent hook reflectively so we can cancel
      * inactive runner chat without a compile-time Paper dependency.
@@ -100,13 +116,16 @@ public class EventListeners implements Listener {
         try {
             final Class<?> asyncChatCls = Class.forName("io.papermc.paper.event.player.AsyncChatEvent");
             org.bukkit.plugin.EventExecutor exec = (listener, event) -> {
-                if (!asyncChatCls.isInstance(event)) return;
+                if (!asyncChatCls.isInstance(event))
+                    return;
                 Object ev = event;
                 org.bukkit.entity.Player player;
                 try {
                     java.lang.reflect.Method getPlayer = asyncChatCls.getMethod("getPlayer");
                     player = (org.bukkit.entity.Player) getPlayer.invoke(ev);
-                } catch (Throwable t) { return; }
+                } catch (Throwable t) {
+                    return;
+                }
                 if (!plugin.getConfigManager().isRestrictInactiveRunnerChat()) {
                     return;
                 }
@@ -114,37 +133,41 @@ public class EventListeners implements Listener {
                 boolean shouldBlock = false;
                 try {
                     if (plugin.getGameManager().isGameRunning() &&
-                        plugin.getGameManager().isRunner(player) &&
-                        plugin.getGameManager().getActiveRunner() != player) {
+                            plugin.getGameManager().isRunner(player) &&
+                            plugin.getGameManager().getActiveRunner() != player) {
                         shouldBlock = true;
                     }
-                } catch (Throwable ignored) {}
+                } catch (Throwable ignored) {
+                }
 
                 if (shouldBlock) {
                     try {
                         java.lang.reflect.Method setCancelled = asyncChatCls.getMethod("setCancelled", boolean.class);
                         setCancelled.invoke(ev, true);
-                    } catch (Throwable ignored) {}
+                    } catch (Throwable ignored) {
+                    }
                     plugin.getServer().getScheduler().runTask(plugin, () -> {
-                        try { player.sendMessage("§c[SpeedrunnerSwap] You cannot chat while inactive."); } catch (Throwable ignored) {}
+                        try {
+                            player.sendMessage("§c[SpeedrunnerSwap] You cannot chat while inactive.");
+                        } catch (Throwable ignored) {
+                        }
                     });
                 }
             };
             plugin.getServer().getPluginManager().registerEvent(
-                (Class<? extends org.bukkit.event.Event>) asyncChatCls,
-                this,
-                org.bukkit.event.EventPriority.HIGHEST,
-                exec,
-                plugin,
-                true
-            );
+                    (Class<? extends org.bukkit.event.Event>) asyncChatCls,
+                    this,
+                    org.bukkit.event.EventPriority.HIGHEST,
+                    exec,
+                    plugin,
+                    true);
         } catch (ClassNotFoundException e) {
             // Not Paper; nothing to do.
         } catch (Throwable t) {
             plugin.getLogger().warning("Failed to hook Paper chat guard: " + t.getMessage());
         }
     }
-    
+
     @EventHandler
     public void onPlayerJoin(PlayerJoinEvent event) {
         Player player = event.getPlayer();
@@ -167,16 +190,22 @@ public class EventListeners implements Listener {
 
     @org.bukkit.event.EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
     public void onRunnerDamaged(org.bukkit.event.entity.EntityDamageEvent event) {
-        if (!plugin.getGameManager().isGameRunning()) return;
-        if (!plugin.getConfigManager().isHotPotatoModeEnabled()) return;
+        if (!plugin.getGameManager().isGameRunning())
+            return;
+        if (!plugin.getConfigManager().isHotPotatoModeEnabled())
+            return;
 
-        if (!(event.getEntity() instanceof Player player)) return;
-        if (!plugin.getGameManager().isRunner(player)) return;
-        if (!player.equals(plugin.getGameManager().getActiveRunner())) return;
+        if (!(event.getEntity() instanceof Player player))
+            return;
+        if (!plugin.getGameManager().isRunner(player))
+            return;
+        if (!player.equals(plugin.getGameManager().getActiveRunner()))
+            return;
 
         // Debounce to avoid cascading swaps from multi-hit damage events
         long now = System.currentTimeMillis();
-        if (now - lastHotPotatoTriggerMs < 1000) return; // 1s cooldown
+        if (now - lastHotPotatoTriggerMs < 1000)
+            return; // 1s cooldown
         lastHotPotatoTriggerMs = now;
 
         // Trigger an immediate swap on next tick
@@ -192,13 +221,15 @@ public class EventListeners implements Listener {
             // Try Spigot API first: setDeathMessage(String)
             try {
                 java.lang.reflect.Method m = event.getClass().getMethod("setDeathMessage", String.class);
-                m.invoke(event, new Object[]{null});
+                m.invoke(event, new Object[] { null });
             } catch (Throwable t) {
                 // Paper API: deathMessage(Component) — set to null to clear if present
                 try {
-                    java.lang.reflect.Method m2 = event.getClass().getMethod("deathMessage", Class.forName("net.kyori.adventure.text.Component"));
-                    m2.invoke(event, new Object[]{null});
-                } catch (Throwable ignored) {}
+                    java.lang.reflect.Method m2 = event.getClass().getMethod("deathMessage",
+                            Class.forName("net.kyori.adventure.text.Component"));
+                    m2.invoke(event, new Object[] { null });
+                } catch (Throwable ignored) {
+                }
             }
         }
 
@@ -222,7 +253,8 @@ public class EventListeners implements Listener {
                 // Optional: lightweight feedback
                 try {
                     player.sendMessage("§eYou died, but the game continues in this mode.");
-                } catch (Throwable ignored) {}
+                } catch (Throwable ignored) {
+                }
             }
         }
     }
@@ -233,8 +265,8 @@ public class EventListeners implements Listener {
         ItemStack droppedItem = event.getItemDrop().getItemStack();
 
         if (plugin.getGameManager().isGameRunning() &&
-            plugin.getGameManager().isHunter(player) &&
-            droppedItem.getType() == Material.COMPASS) {
+                plugin.getGameManager().isHunter(player) &&
+                droppedItem.getType() == Material.COMPASS) {
             event.setCancelled(true);
             player.sendMessage("§cYou cannot drop your tracking compass!");
         }
@@ -242,11 +274,14 @@ public class EventListeners implements Listener {
 
     @EventHandler(priority = EventPriority.HIGHEST)
     public void onInventoryDrag(org.bukkit.event.inventory.InventoryDragEvent event) {
-        if (!(event.getWhoClicked() instanceof Player player)) return;
-        if (!plugin.getGameManager().isGameRunning() || !plugin.getGameManager().isHunter(player)) return;
+        if (!(event.getWhoClicked() instanceof Player player))
+            return;
+        if (!plugin.getGameManager().isGameRunning() || !plugin.getGameManager().isHunter(player))
+            return;
 
         ItemStack dragged = event.getOldCursor();
-        if (dragged == null || dragged.getType() != Material.COMPASS) return;
+        if (dragged == null || dragged.getType() != Material.COMPASS)
+            return;
 
         // Allow dragging the compass within the player's own inventory only.
         // If any affected slot is in the top (container) inventory, cancel.
@@ -311,15 +346,20 @@ public class EventListeners implements Listener {
         if (spawn == null) {
             spawn = event.getRespawnLocation();
         }
-        if (spawn != null && spawn.getWorld() != null) {
+        // Only propagate Overworld spawn points - ignore Nether/End spawns
+        // This prevents broken bed respawns from being shared incorrectly
+        if (spawn != null && spawn.getWorld() != null
+                && spawn.getWorld().getEnvironment() == org.bukkit.World.Environment.NORMAL) {
             plugin.getGameManager().setSharedRunnerSpawn(spawn);
         }
     }
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onAnyDamage(EntityDamageEvent event) {
-        if (!(event.getEntity() instanceof Player victim)) return;
-        if (!plugin.getGameManager().isGameRunning()) return;
+        if (!(event.getEntity() instanceof Player victim))
+            return;
+        if (!plugin.getGameManager().isGameRunning())
+            return;
         // Cancel any damage to inactive runners in cages
         if (plugin.getGameManager().isRunner(victim) && plugin.getGameManager().getActiveRunner() != victim) {
             if ("CAGE".equalsIgnoreCase(plugin.getConfigManager().getFreezeMode())) {
@@ -331,7 +371,8 @@ public class EventListeners implements Listener {
     @EventHandler
     public void onPlayerChangedWorld(PlayerChangedWorldEvent event) {
         Player player = event.getPlayer();
-        if (!plugin.getGameManager().isGameRunning()) return;
+        if (!plugin.getGameManager().isGameRunning())
+            return;
 
         // If a hunter changes world, (re)give/update their compass
         if (plugin.getGameManager().isHunter(player)) {
@@ -348,12 +389,15 @@ public class EventListeners implements Listener {
     @EventHandler(priority = EventPriority.MONITOR)
     public void onPlayerPortal(PlayerPortalEvent event) {
         Player player = event.getPlayer();
-        if (!plugin.getGameManager().isGameRunning()) return;
-        if (!plugin.getGameManager().isRunner(player)) return;
+        if (!plugin.getGameManager().isGameRunning())
+            return;
+        if (!plugin.getGameManager().isRunner(player))
+            return;
 
         var toWorld = event.getTo() != null ? event.getTo().getWorld() : null;
         var fromWorld = event.getFrom() != null ? event.getFrom().getWorld() : null;
-        if (fromWorld == null) return;
+        if (fromWorld == null)
+            return;
 
         org.bukkit.Location fromLoc = event.getFrom();
         if (toWorld != null && toWorld.getEnvironment() == org.bukkit.World.Environment.THE_END) {
@@ -367,19 +411,21 @@ public class EventListeners implements Listener {
 
     @EventHandler(priority = EventPriority.HIGHEST)
     public void onInventoryClick(InventoryClickEvent event) {
-        if (!(event.getWhoClicked() instanceof Player)) return;
+        if (!(event.getWhoClicked() instanceof Player))
+            return;
         Player player = (Player) event.getWhoClicked();
         Inventory inventory = event.getClickedInventory();
         ItemStack clickedItem = event.getCurrentItem();
-    
-        if (inventory == null || clickedItem == null || clickedItem.getType() == Material.AIR) return;
-    
+
+        if (inventory == null || clickedItem == null || clickedItem.getType() == Material.AIR)
+            return;
+
         // If this is one of our plugin GUIs, let the GUI manager handle it instead
         String title = getPlainTitle(event.getView());
         if (isPluginGuiTitle(title)) {
             return; // Do not cancel or handle here
         }
-    
+
         // Hunters: allow moving compass within their own inventory, but block
         // placing it into any container/top inventory or quick-moving into it.
         if (plugin.getGameManager().isGameRunning() && plugin.getGameManager().isHunter(player)) {
@@ -393,7 +439,8 @@ public class EventListeners implements Listener {
                 return;
             }
 
-            // If the clicked item is a compass, only allow moves inside the player inventory.
+            // If the clicked item is a compass, only allow moves inside the player
+            // inventory.
             if (clickedItem.getType() == Material.COMPASS) {
                 // Disallow shift-click (would move to top/container)
                 if (event.isShiftClick()) {
@@ -449,9 +496,10 @@ public class EventListeners implements Listener {
             }
         }
     }
-    
+
     private boolean isPluginGuiTitle(String title) {
-        if (title == null || title.isEmpty()) return false;
+        if (title == null || title.isEmpty())
+            return false;
         String stripped;
         try {
             Component component = LegacyComponentSerializer.legacySection().deserialize(title);
@@ -462,22 +510,22 @@ public class EventListeners implements Listener {
         String normalized = stripped.toLowerCase(Locale.ROOT);
 
         return normalized.contains("speedrunner swap") ||
-               normalized.contains("speedrunner swap -") ||
-               normalized.contains("team management") ||
-               normalized.contains("mode selector") ||
-               normalized.contains("task master") ||
-               normalized.contains("task settings") ||
-               normalized.contains("statistics") ||
-               normalized.contains("power-ups") ||
-               normalized.contains("dangerous blocks") ||
-               normalized.contains("world border") ||
-               normalized.contains("bounty") ||
-               normalized.contains("last stand") ||
-               normalized.contains("sudden death") ||
-               normalized.contains("kit manager") ||
-               normalized.contains("settings") ||
-               normalized.contains("voice chat") ||
-               normalized.contains("broadcast");
+                normalized.contains("speedrunner swap -") ||
+                normalized.contains("team management") ||
+                normalized.contains("mode selector") ||
+                normalized.contains("task master") ||
+                normalized.contains("task settings") ||
+                normalized.contains("statistics") ||
+                normalized.contains("power-ups") ||
+                normalized.contains("dangerous blocks") ||
+                normalized.contains("world border") ||
+                normalized.contains("bounty") ||
+                normalized.contains("last stand") ||
+                normalized.contains("sudden death") ||
+                normalized.contains("kit manager") ||
+                normalized.contains("settings") ||
+                normalized.contains("voice chat") ||
+                normalized.contains("broadcast");
     }
 
     // GUI clicks are exclusively handled by GuiManager to avoid duplication.
@@ -489,10 +537,14 @@ public class EventListeners implements Listener {
     @EventHandler(priority = EventPriority.HIGHEST)
     public void onPlayerChatLegacy(AsyncPlayerChatEvent event) {
         Player player = event.getPlayer();
-        if (!plugin.getConfigManager().isRestrictInactiveRunnerChat()) return;
-        if (!plugin.getGameManager().isGameRunning()) return;
-        if (!plugin.getGameManager().isRunner(player)) return;
-        if (plugin.getGameManager().getActiveRunner() == player) return;
+        if (!plugin.getConfigManager().isRestrictInactiveRunnerChat())
+            return;
+        if (!plugin.getGameManager().isGameRunning())
+            return;
+        if (!plugin.getGameManager().isRunner(player))
+            return;
+        if (plugin.getGameManager().getActiveRunner() == player)
+            return;
         player.sendMessage("§c[SpeedrunnerSwap] You cannot chat while inactive.");
         event.setCancelled(true);
     }
@@ -500,19 +552,20 @@ public class EventListeners implements Listener {
     @EventHandler
     public void onPlayerMove(PlayerMoveEvent event) {
         Player player = event.getPlayer();
-        
+
         // If the player is an inactive runner, prevent movement
-        if (plugin.getGameManager().isGameRunning() && 
-            plugin.getGameManager().isRunner(player) && 
-            plugin.getGameManager().getActiveRunner() != player) {
-            
+        if (plugin.getGameManager().isGameRunning() &&
+                plugin.getGameManager().isRunner(player) &&
+                plugin.getGameManager().getActiveRunner() != player) {
+
             // Check if getTo() is not null to prevent NullPointerException
             if (event.getTo() != null) {
-                // Only cancel if the player is actually trying to move (not just looking around)
-                if (event.getFrom().getX() != event.getTo().getX() || 
-                    event.getFrom().getY() != event.getTo().getY() || 
-                    event.getFrom().getZ() != event.getTo().getZ()) {
-                    
+                // Only cancel if the player is actually trying to move (not just looking
+                // around)
+                if (event.getFrom().getX() != event.getTo().getX() ||
+                        event.getFrom().getY() != event.getTo().getY() ||
+                        event.getFrom().getZ() != event.getTo().getZ()) {
+
                     event.setCancelled(true);
                 }
             }
@@ -530,7 +583,7 @@ public class EventListeners implements Listener {
     @EventHandler(priority = EventPriority.HIGHEST)
     public void onPlayerBedEnter(org.bukkit.event.player.PlayerBedEnterEvent event) {
         Player player = event.getPlayer();
-        
+
         // If game is running and sleep mechanic is enabled, control who can sleep
         if (plugin.getGameManager().isGameRunning() && plugin.getConfigManager().isSinglePlayerSleepEnabled()) {
             // If this is a runner but not the active one, cancel the bed enter
@@ -545,7 +598,8 @@ public class EventListeners implements Listener {
                 return;
             }
 
-            // If we reach here, it's the active runner entering bed - schedule night skip check
+            // If we reach here, it's the active runner entering bed - schedule night skip
+            // check
             if (plugin.getGameManager().isRunner(player) && player.equals(plugin.getGameManager().getActiveRunner())) {
                 plugin.getServer().getScheduler().runTaskLater(plugin, () -> {
                     if (plugin.getConfigManager().isForceGlobalSpawn() && plugin.getGameManager().isRunner(player)) {
@@ -573,14 +627,19 @@ public class EventListeners implements Listener {
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onEntityDamageByEntity(EntityDamageByEntityEvent event) {
-        if (!plugin.getGameManager().isGameRunning()) return;
-        if (!"CAGE".equalsIgnoreCase(plugin.getConfigManager().getFreezeMode())) return;
+        if (!plugin.getGameManager().isGameRunning())
+            return;
+        if (!"CAGE".equalsIgnoreCase(plugin.getConfigManager().getFreezeMode()))
+            return;
 
         if (event.getEntity() instanceof Player victim) {
             org.bukkit.entity.Entity damagerEntity = event.getDamager();
             Player attacker = null;
-            if (damagerEntity instanceof Player p) attacker = p;
-            else if (damagerEntity instanceof org.bukkit.entity.Projectile proj && proj.getShooter() instanceof Player p2) attacker = p2;
+            if (damagerEntity instanceof Player p)
+                attacker = p;
+            else if (damagerEntity instanceof org.bukkit.entity.Projectile proj
+                    && proj.getShooter() instanceof Player p2)
+                attacker = p2;
 
             if (attacker != null) {
                 // Cancel PvP only when both players are occupants of the shared cage
@@ -588,7 +647,8 @@ public class EventListeners implements Listener {
                     if (plugin.getGameManager().areBothPlayersInSharedCage(attacker, victim)) {
                         event.setCancelled(true);
                     }
-                } catch (Throwable ignored) {}
+                } catch (Throwable ignored) {
+                }
             }
         }
     }
