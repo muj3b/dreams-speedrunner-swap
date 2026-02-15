@@ -197,7 +197,15 @@ public class ChatInputHandler implements Listener {
                     player.sendMessage("§aUpdated §e" + rawPath + "§a to §f" + rawValue + "§a.");
                     return;
                 }
-                plugin.getConfig().set(state.configPath, msg);
+                if ("cancel".equalsIgnoreCase(msg)) {
+                    player.sendMessage("§cConfig edit cancelled.");
+                    return;
+                }
+                String value = msg;
+                if ("clear".equalsIgnoreCase(msg)) {
+                    value = "";
+                }
+                plugin.getConfig().set(state.configPath, value);
                 plugin.saveConfig();
                 player.sendMessage("§aUpdated §e" + state.configPath + "§a.");
             }

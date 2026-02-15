@@ -130,12 +130,43 @@ broadcasts:
   # Whether to broadcast team changes
   team_changes: true
 
+# End game messaging (titles/subtitles/broadcast)
+# Credits/support lines are intentionally not configurable.
+messages:
+  end_game:
+    runner:
+      title: "§a§lRUNNERS WIN!"
+      subtitle_runner: "§eBro y'all are locked in, good stuff"
+      subtitle_hunter: "§eBro y'all are locked in, good stuff"
+    hunter:
+      title: "§c§lHUNTERS WIN!"
+      subtitle_runner: "§eYou ain't the main character, unc"
+      subtitle_hunter: "§eBro those speedrunners are trash"
+    none:
+      title: "§c§lGAME OVER"
+      subtitle_runner: "§eNo winner declared."
+      subtitle_hunter: "§eNo winner declared."
+    # Placeholders:
+    # %winner% -> RUNNER team won! / HUNTER team won! / Game ended!
+    # %winner_team% -> RUNNER / HUNTER / NONE
+    broadcast: "§a[SpeedrunnerSwap] Game ended! %winner%"
+
 # Freeze Mechanic Configuration
 freeze_mechanic:
   enabled: false
   duration_ticks: 100  # 5 seconds
   check_interval_ticks: 20
   max_distance: 50
+  cage:
+    # If true, End players are caged in a non-End world (limbo/fallback world).
+    # Default false keeps cages in The End while still forcing them far from dragon activity.
+    avoid_cage_in_end: false
+    # In The End, if limbo X/Z is too close to 0,0, move cages out to this coordinate.
+    # This avoids interference with dragon landing/perch logic near the exit portal.
+    end_min_distance_from_origin: 256
+    end_safe_coordinate: 500
+    # If a dragon is nearby, push the cage to at least this horizontal distance.
+    end_min_distance_from_dragon: 500
 
 # Timer Visibility Configuration
 timer_visibility:

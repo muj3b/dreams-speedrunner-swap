@@ -491,6 +491,55 @@ public class ConfigManager {
         return config.getString("gui.settings.title", "§6SpeedrunnerSwap - Settings");
     }
 
+    private String getLegacyMessage(String path, String defaultValue) {
+        String raw = config.getString(path, defaultValue);
+        if (raw == null) {
+            return "";
+        }
+        // Accept both '&' and section-sign styles from config/chat edits.
+        return raw.replace('&', '§');
+    }
+
+    public String getEndGameRunnerWinTitle() {
+        return getLegacyMessage("messages.end_game.runner.title", "§a§lRUNNERS WIN!");
+    }
+
+    public String getEndGameRunnerWinRunnerSubtitle() {
+        return getLegacyMessage("messages.end_game.runner.subtitle_runner", "§eBro y'all are locked in, good stuff");
+    }
+
+    public String getEndGameRunnerWinHunterSubtitle() {
+        return getLegacyMessage("messages.end_game.runner.subtitle_hunter", "§eBro y'all are locked in, good stuff");
+    }
+
+    public String getEndGameHunterWinTitle() {
+        return getLegacyMessage("messages.end_game.hunter.title", "§c§lHUNTERS WIN!");
+    }
+
+    public String getEndGameHunterWinRunnerSubtitle() {
+        return getLegacyMessage("messages.end_game.hunter.subtitle_runner", "§eYou ain't the main character, unc");
+    }
+
+    public String getEndGameHunterWinHunterSubtitle() {
+        return getLegacyMessage("messages.end_game.hunter.subtitle_hunter", "§eBro those speedrunners are trash");
+    }
+
+    public String getEndGameNoWinnerTitle() {
+        return getLegacyMessage("messages.end_game.none.title", "§c§lGAME OVER");
+    }
+
+    public String getEndGameNoWinnerRunnerSubtitle() {
+        return getLegacyMessage("messages.end_game.none.subtitle_runner", "§eNo winner declared.");
+    }
+
+    public String getEndGameNoWinnerHunterSubtitle() {
+        return getLegacyMessage("messages.end_game.none.subtitle_hunter", "§eNo winner declared.");
+    }
+
+    public String getEndGameBroadcastMessage() {
+        return getLegacyMessage("messages.end_game.broadcast", "§a[SpeedrunnerSwap] Game ended! %winner%");
+    }
+
     /**
      * Get the horizontal scan radius for safe swaps
      * 
@@ -887,6 +936,22 @@ public class ConfigManager {
      */
     public boolean isSinglePlayerSleepEnabled() {
         return config.getBoolean("single_player_sleep.enabled", false);
+    }
+
+    public int getEndCageMinDistanceFromOrigin() {
+        return Math.max(0, config.getInt("freeze_mechanic.cage.end_min_distance_from_origin", 256));
+    }
+
+    public int getEndCageSafeCoordinate() {
+        return Math.max(64, Math.abs(config.getInt("freeze_mechanic.cage.end_safe_coordinate", 500)));
+    }
+
+    public int getEndCageMinDistanceFromDragon() {
+        return Math.max(0, config.getInt("freeze_mechanic.cage.end_min_distance_from_dragon", 500));
+    }
+
+    public boolean isAvoidCageInEndEnabled() {
+        return config.getBoolean("freeze_mechanic.cage.avoid_cage_in_end", false);
     }
 
     // Experimental interval toggle

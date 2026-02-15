@@ -9,6 +9,7 @@ import com.example.speedrunnerswap.task.TaskManagerMode;
 import com.example.speedrunnerswap.task.TaskDifficulty;
 import com.example.speedrunnerswap.utils.GuiCompat;
 import com.example.speedrunnerswap.utils.Msg;
+import com.example.speedrunnerswap.utils.TextUtil;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
@@ -310,6 +311,7 @@ public final class GuiManager implements Listener {
         builders.put(MenuKey.TASK_ADVANCED, this::buildTaskAdvanced);
         builders.put(MenuKey.SETTINGS_VOICE_CHAT, this::buildVoiceChat);
         builders.put(MenuKey.SETTINGS_BROADCAST, this::buildBroadcast);
+        builders.put(MenuKey.SETTINGS_END_MESSAGES, this::buildEndGameMessages);
         builders.put(MenuKey.SETTINGS_UI, this::buildUiSettings);
         builders.put(MenuKey.KIT_MANAGER, this::buildKitManager);
     }
@@ -383,13 +385,13 @@ public final class GuiManager implements Listener {
                     }));
         }
 
-        items.add(clickItem(18, () -> icon(Material.NETHER_STAR, "§d§lAbout muj3b",
+        items.add(clickItem(18, () -> icon(Material.NETHER_STAR, "§d§lAbout muj4b",
                 List.of(
                         "§7Click to show support info",
                         "§7and share the donation link.")),
                 ctxClick -> {
                     plugin.getGameManager().sendDonationMessage(ctxClick.player());
-                    Msg.send(ctxClick.player(), "§dThanks for supporting muj3b!");
+                    Msg.send(ctxClick.player(), "§dThanks for supporting muj4b!");
                 }));
 
         items.add(clickItem(20,
@@ -689,6 +691,8 @@ public final class GuiManager implements Listener {
                 "§7Announcement settings"));
         items.add(navigateItem(24, Material.COMPARATOR, "§b§lUI & Timers", MenuKey.SETTINGS_UI,
                 "§7Actionbars, titles, visibility"));
+        items.add(navigateItem(25, Material.WRITABLE_BOOK, "§6§lEnd Game Messages", MenuKey.SETTINGS_END_MESSAGES,
+                "§7Winner titles and subtitles"));
 
         items.add(navigateItem(28, Material.CHEST, "§a§lKits", MenuKey.KIT_MANAGER,
                 "§7Toggle kits and quick actions"));
@@ -1901,6 +1905,44 @@ public final class GuiManager implements Listener {
         return new MenuScreen("§e§lBroadcast Settings", 27, items);
     }
 
+    private MenuScreen buildEndGameMessages(MenuContext ctx) {
+        List<MenuItem> items = new ArrayList<>();
+        items.add(backButton(0, "§7§lBack", MenuKey.SETTINGS_HOME, null, this::openSettingsMenu));
+
+        items.add(simpleItem(4, () -> icon(Material.NAME_TAG, "§6§lEditable End Game Text",
+                List.of("§7Customize winner titles/subtitles and broadcasts",
+                        "§cCreator credits/support text is intentionally locked"))));
+
+        items.add(editTextConfigItem(10, Material.LIME_BANNER, "§aRunner Win Title",
+                "messages.end_game.runner.title", "§a§lRUNNERS WIN!"));
+        items.add(editTextConfigItem(11, Material.LIME_DYE, "§aRunner Win (Runner Subtitle)",
+                "messages.end_game.runner.subtitle_runner", "§eBro y'all are locked in, good stuff"));
+        items.add(editTextConfigItem(12, Material.YELLOW_DYE, "§eRunner Win (Hunter Subtitle)",
+                "messages.end_game.runner.subtitle_hunter", "§eBro y'all are locked in, good stuff"));
+
+        items.add(editTextConfigItem(19, Material.RED_BANNER, "§cHunter Win Title",
+                "messages.end_game.hunter.title", "§c§lHUNTERS WIN!"));
+        items.add(editTextConfigItem(20, Material.RED_DYE, "§cHunter Win (Runner Subtitle)",
+                "messages.end_game.hunter.subtitle_runner", "§eYou ain't the main character, unc"));
+        items.add(editTextConfigItem(21, Material.ORANGE_DYE, "§6Hunter Win (Hunter Subtitle)",
+                "messages.end_game.hunter.subtitle_hunter", "§eBro those speedrunners are trash"));
+
+        items.add(editTextConfigItem(28, Material.BARRIER, "§7No Winner Title",
+                "messages.end_game.none.title", "§c§lGAME OVER"));
+        items.add(editTextConfigItem(29, Material.GRAY_DYE, "§7No Winner (Runner Subtitle)",
+                "messages.end_game.none.subtitle_runner", "§eNo winner declared."));
+        items.add(editTextConfigItem(30, Material.LIGHT_GRAY_DYE, "§7No Winner (Hunter Subtitle)",
+                "messages.end_game.none.subtitle_hunter", "§eNo winner declared."));
+
+        items.add(editTextConfigItem(32, Material.PAPER, "§eEnd Broadcast Message",
+                "messages.end_game.broadcast", "§a[SpeedrunnerSwap] Game ended! %winner%"));
+        items.add(simpleItem(41, () -> icon(Material.BOOK, "§7Broadcast Placeholders",
+                List.of("§f%winner% §7→ \"RUNNER team won!\" / \"HUNTER team won!\" / \"Game ended!\"",
+                        "§f%winner_team% §7→ RUNNER / HUNTER / NONE"))));
+
+        return new MenuScreen("§6§lEnd Game Messages", 45, items);
+    }
+
     private MenuScreen buildUiSettings(MenuContext ctx) {
         ConfigManager cfg = plugin.getConfigManager();
         List<MenuItem> items = new ArrayList<>();
@@ -2096,6 +2138,36 @@ public final class GuiManager implements Listener {
                 step, shiftStep, min, max, description);
     }
 
+    private MenuItem editTextConfigItem(int slot, Material material, String label, String path, String fallback) {
+        return clickItem(slot, () -> {
+            String current = plugin.getConfig().getString(path, fallback);
+            List<String> lore = new ArrayList<>();
+            lore.add("§7Current: §f" + previewText(current));
+            lore.add("");
+            lore.add("§7Click to edit in chat");
+            lore.add("§7Use §f& §7(or section-sign codes) for colors");
+            lore.add("§7Type §fclear §7for blank text");
+            return icon(material, label, lore);
+        }, ctx -> {
+            ctx.player().closeInventory();
+            Msg.send(ctx.player(), "§eEditing §f" + path + "§e.");
+            Msg.send(ctx.player(), "§7Type your new text in chat.");
+            Msg.send(ctx.player(), "§7Type §fcancel §7to abort, or §fclear §7for blank.");
+            plugin.getChatInputHandler().expectConfigString(ctx.player(), path);
+        });
+    }
+
+    private String previewText(String raw) {
+        if (raw == null || raw.isBlank()) {
+            return "<blank>";
+        }
+        String clean = TextUtil.stripColors(raw.replace('&', '§'));
+        if (clean == null || clean.isBlank()) {
+            return "<colored text>";
+        }
+        return clean.length() > 42 ? clean.substring(0, 42) + "..." : clean;
+    }
+
     private void updateParticleColorChannel(int channel, int value) {
         int[] rgb = plugin.getConfigManager().getParticleTrailColor();
         if (channel < 0 || channel >= rgb.length) {
@@ -2171,6 +2243,7 @@ public final class GuiManager implements Listener {
         STATS_ADVANCED,
         SETTINGS_VOICE_CHAT,
         SETTINGS_BROADCAST,
+        SETTINGS_END_MESSAGES,
         SETTINGS_UI,
         KIT_MANAGER
     }

@@ -2,7 +2,7 @@ name: SpeedrunnerSwap
 version: '${project.version}'
 main: com.example.speedrunnerswap.SpeedrunnerSwap
 api-version: '1.21'
-authors: [muj3b]
+authors: [muj4b]
 description: |
   Dream-style "Speedrunner Swap" challenge where speedrunners share the same state and swap control on a timer.
   Features include:

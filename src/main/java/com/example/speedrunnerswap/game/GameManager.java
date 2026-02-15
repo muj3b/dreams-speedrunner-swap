@@ -8,6 +8,7 @@ import com.example.speedrunnerswap.utils.SafeLocationFinder;
 import org.bukkit.Location;
 import org.bukkit.*;
 import org.bukkit.entity.Entity;
+import org.bukkit.entity.EnderDragon;
 import org.bukkit.entity.Player;
 import org.bukkit.event.inventory.InventoryType;
 import org.bukkit.inventory.InventoryView;
@@ -125,7 +126,7 @@ public class GameManager {
                         case SAPNAP -> "§d§lSapnap speedrunner swap in " + count;
                         case TASK -> "§6§lTaskmaster starting in " + count;
                     };
-                    String subtitle = "§7Made by muj3b";
+                    String subtitle = "§7Made by muj4b";
                     for (Player player : Bukkit.getOnlinePlayers()) {
                         BukkitCompat.showTitle(player, title, subtitle, 10, 70, 10);
                     }
@@ -137,7 +138,7 @@ public class GameManager {
                         case TASK -> "§6§lTaskmaster GO!";
                     };
                     for (Player player : Bukkit.getOnlinePlayers()) {
-                        BukkitCompat.showTitle(player, goTitle, "§7Made by muj3b", 10, 60, 10);
+                        BukkitCompat.showTitle(player, goTitle, "§7Made by muj4b", 10, 60, 10);
                     }
                     this.cancel();
                     gameRunning = true;
@@ -215,19 +216,20 @@ public class GameManager {
         String titleStr;
         String runnerSubtitle = "";
         String hunterSubtitle = "";
+        com.example.speedrunnerswap.config.ConfigManager cfg = plugin.getConfigManager();
 
         if (winner == Team.RUNNER) {
-            titleStr = "§a§lRUNNERS WIN!";
-            runnerSubtitle = "§eBro y'all are locked in, good stuff";
-            hunterSubtitle = "§eBro y'all are locked in, good stuff";
+            titleStr = cfg.getEndGameRunnerWinTitle();
+            runnerSubtitle = cfg.getEndGameRunnerWinRunnerSubtitle();
+            hunterSubtitle = cfg.getEndGameRunnerWinHunterSubtitle();
         } else if (winner == Team.HUNTER) {
-            titleStr = "§c§lHUNTERS WIN!";
-            runnerSubtitle = "§eYou ain't the main character, unc";
-            hunterSubtitle = "§eBro those speedrunners are trash";
+            titleStr = cfg.getEndGameHunterWinTitle();
+            runnerSubtitle = cfg.getEndGameHunterWinRunnerSubtitle();
+            hunterSubtitle = cfg.getEndGameHunterWinHunterSubtitle();
         } else {
-            titleStr = "§c§lGAME OVER";
-            runnerSubtitle = "§eNo winner declared.";
-            hunterSubtitle = "§eNo winner declared.";
+            titleStr = cfg.getEndGameNoWinnerTitle();
+            runnerSubtitle = cfg.getEndGameNoWinnerRunnerSubtitle();
+            hunterSubtitle = cfg.getEndGameNoWinnerHunterSubtitle();
         }
 
         for (Player player : Bukkit.getOnlinePlayers()) {
@@ -295,13 +297,28 @@ public class GameManager {
                 activeRunner = null;
 
                 if (plugin.getConfigManager().isBroadcastGameEvents()) {
-                    String winnerMessage = (winner != null) ? winner.name() + " team won!" : "Game ended!";
-                    Msg.broadcast("§a[SpeedrunnerSwap] Game ended! " + winnerMessage);
+                    Msg.broadcast(formatEndGameBroadcast(winner));
                 }
 
                 broadcastDonationMessage();
             }
         }.runTaskLater(plugin, 200L);
+    }
+
+    private String formatEndGameBroadcast(Team winner) {
+        String winnerLabel = "NONE";
+        String winnerMessage = "Game ended!";
+        if (winner == Team.RUNNER) {
+            winnerLabel = "RUNNER";
+            winnerMessage = "RUNNER team won!";
+        } else if (winner == Team.HUNTER) {
+            winnerLabel = "HUNTER";
+            winnerMessage = "HUNTER team won!";
+        }
+        String template = plugin.getConfigManager().getEndGameBroadcastMessage();
+        return template
+                .replace("%winner%", winnerMessage)
+                .replace("%winner_team%", winnerLabel);
     }
 
     public void sendDonationMessage(Player recipient) {
@@ -1869,13 +1886,18 @@ public class GameManager {
     }
 
     private void createOrEnsureSharedCage(World world) {
-        if (world == null)
-            world = Bukkit.getWorlds().get(0);
-        Location base = plugin.getConfigManager().getLimboLocation();
-        int y = world.getMaxHeight() - 10;
-        int cx = (int) Math.round(base.getX());
-        int cz = (int) Math.round(base.getZ());
-        Location center = new Location(world, cx + 0.5, y, cz + 0.5);
+        World requestedWorld = world;
+        world = resolveCageWorld(world);
+        if (world == null) {
+            return;
+        }
+        if (requestedWorld != null && !requestedWorld.equals(world)) {
+            clearSharedCageForWorld(requestedWorld);
+        }
+        Location center = resolveSharedCageCenter(world);
+        int cx = center.getBlockX();
+        int y = center.getBlockY();
+        int cz = center.getBlockZ();
         Location existing = sharedCageCenters.get(world);
         if (existing != null && Math.abs(existing.getX() - center.getX()) < 0.1
                 && Math.abs(existing.getY() - center.getY()) < 0.1 && Math.abs(existing.getZ() - center.getZ()) < 0.1) {
@@ -1917,11 +1939,120 @@ public class GameManager {
         sharedCageCenters.put(world, center.clone());
     }
 
+    private void clearSharedCageForWorld(World world) {
+        if (world == null) {
+            return;
+        }
+        java.util.List<org.bukkit.block.BlockState> old = sharedCageBlocks.remove(world);
+        if (old != null) {
+            for (org.bukkit.block.BlockState s : old) {
+                try {
+                    s.update(true, false);
+                } catch (Exception ignored) {
+                }
+            }
+        }
+        sharedCageCenters.remove(world);
+    }
+
+    private World resolveCageWorld(World currentWorld) {
+        if (currentWorld == null) {
+            if (!Bukkit.getWorlds().isEmpty()) {
+                return Bukkit.getWorlds().get(0);
+            }
+            return null;
+        }
+        if (currentWorld.getEnvironment() != World.Environment.THE_END) {
+            return currentWorld;
+        }
+        if (!plugin.getConfigManager().isAvoidCageInEndEnabled()) {
+            return currentWorld;
+        }
+        Location limbo = plugin.getConfigManager().getLimboLocation();
+        if (limbo != null && limbo.getWorld() != null
+                && limbo.getWorld().getEnvironment() != World.Environment.THE_END) {
+            return limbo.getWorld();
+        }
+        for (World candidate : Bukkit.getWorlds()) {
+            if (candidate != null && candidate.getEnvironment() != World.Environment.THE_END) {
+                return candidate;
+            }
+        }
+        if (!Bukkit.getWorlds().isEmpty()) {
+            return Bukkit.getWorlds().get(0);
+        }
+        return currentWorld;
+    }
+
+    private Location resolveSharedCageCenter(World world) {
+        Location base = plugin.getConfigManager().getLimboLocation();
+        int cx = (int) Math.round(base.getX());
+        int cz = (int) Math.round(base.getZ());
+        int y = Math.max(world.getMinHeight() + 5, world.getMaxHeight() - 10);
+
+        if (world.getEnvironment() == World.Environment.THE_END) {
+            int minDistance = plugin.getConfigManager().getEndCageMinDistanceFromOrigin();
+            long distanceSquared = (long) cx * cx + (long) cz * cz;
+            long minDistanceSquared = (long) minDistance * minDistance;
+            if (distanceSquared < minDistanceSquared) {
+                int safeCoord = plugin.getConfigManager().getEndCageSafeCoordinate();
+                cx = cx < 0 ? -safeCoord : safeCoord;
+                cz = cz < 0 ? -safeCoord : safeCoord;
+            }
+        }
+
+        Location center = new Location(world, cx + 0.5, y, cz + 0.5);
+        return pushEndCageAwayFromDragon(center);
+    }
+
+    private Location pushEndCageAwayFromDragon(Location center) {
+        if (center == null || center.getWorld() == null) {
+            return center;
+        }
+        World world = center.getWorld();
+        if (world.getEnvironment() != World.Environment.THE_END) {
+            return center;
+        }
+
+        double minDistance = plugin.getConfigManager().getEndCageMinDistanceFromDragon();
+        if (minDistance <= 0) {
+            return center;
+        }
+        double minDistanceSq = minDistance * minDistance;
+        double x = center.getX();
+        double z = center.getZ();
+
+        for (EnderDragon dragon : world.getEntitiesByClass(EnderDragon.class)) {
+            if (dragon == null || dragon.isDead()) {
+                continue;
+            }
+            Location dragonLoc = dragon.getLocation();
+            double dx = x - dragonLoc.getX();
+            double dz = z - dragonLoc.getZ();
+            double horizontalSq = dx * dx + dz * dz;
+            if (horizontalSq >= minDistanceSq) {
+                continue;
+            }
+            double length = Math.sqrt(horizontalSq);
+            if (length < 0.001D) {
+                dx = x >= 0 ? 1.0D : -1.0D;
+                dz = z >= 0 ? 1.0D : -1.0D;
+                length = Math.sqrt(2.0D);
+            }
+            double scale = minDistance / length;
+            x = dragonLoc.getX() + dx * scale;
+            z = dragonLoc.getZ() + dz * scale;
+        }
+
+        return new Location(world, Math.round(x) + 0.5, center.getY(), Math.round(z) + 0.5);
+    }
+
     private void teleportToSharedCage(Player p) {
         if (p == null || !p.isOnline())
             return;
-        createOrEnsureSharedCage(p.getWorld());
-        org.bukkit.Location center = sharedCageCenters.get(p.getWorld());
+        World cageWorld = resolveCageWorld(p.getWorld());
+        createOrEnsureSharedCage(cageWorld);
+        org.bukkit.Location center = sharedCageCenters.get(cageWorld);
         if (center != null) {
             // Teleport player to the center of the cage floor
             p.teleport(center);
@@ -1970,9 +2101,10 @@ public class GameManager {
                     continue;
                 if (!r.isOnline())
                     continue;
-                createOrEnsureSharedCage(r.getWorld());
+                World cageWorld = resolveCageWorld(r.getWorld());
+                createOrEnsureSharedCage(cageWorld);
                 teleportToSharedCage(r);
-                org.bukkit.Location center = sharedCageCenters.get(r.getWorld());
+                org.bukkit.Location center = sharedCageCenters.get(cageWorld);
                 if (center == null)
                     continue;
                 org.bukkit.Location loc = r.getLocation();

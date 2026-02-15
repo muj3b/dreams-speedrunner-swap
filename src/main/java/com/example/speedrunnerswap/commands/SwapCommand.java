@@ -197,7 +197,7 @@ public class SwapCommand implements CommandExecutor, TabCompleter {
     private boolean handleCreator(CommandSender sender) {
         // No special permission; anyone can view credits/support
         sender.sendMessage("§6§lSpeedrunner Swap");
-        sender.sendMessage("§eCreated by §f m u j 3 b");
+        sender.sendMessage("§eCreated by §f m u j 4 b");
         sender.sendMessage("§d❤ Donate to support development");
         sender.sendMessage("§b" + SpeedrunnerSwap.DONATION_URL);
         return true;
