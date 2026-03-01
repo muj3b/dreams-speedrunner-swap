@@ -1,5 +1,12 @@
 # Changelog
 
+## 4.0.8
+- Fixed reconnect reliability in live games (1.21+):
+  - Team membership checks are now UUID-safe, preventing stale player-reference issues after disconnect/rejoin.
+  - Rejoined players are re-synchronized into runner/hunter lists from config assignments.
+  - Auto-resume now only triggers when the game was paused due to disconnects and required teams are online.
+  - Queue coherence now rebinds the active runner to the current online player instance.
+
 ## 3.2.0
 - Settings GUI
   - Added Experimental Intervals toggle (allow <30s and >max with red beta warnings)

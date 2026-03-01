@@ -49,6 +49,7 @@ public class GameManager {
     private final java.util.Set<java.util.UUID> cagedPlayers = new java.util.HashSet<>();
     private final java.util.Map<java.util.UUID, Integer> portalSwapRetries = new java.util.HashMap<>();
     private boolean swapInProgress = false;
+    private boolean pausedByDisconnect = false;
     private Location sharedRunnerSpawn;
     private boolean spawnSyncInFlight;
 
@@ -148,6 +149,7 @@ public class GameManager {
                     saveAllPlayerStates();
                     portalSwapRetries.clear();
                     swapInProgress = false;
+                    pausedByDisconnect = false;
 
                     if (plugin.getConfigManager().isKitsEnabled()) {
                         for (Player player : runners) {
@@ -258,6 +260,7 @@ public class GameManager {
         plugin.getTrackerManager().stopTracking();
         portalSwapRetries.clear();
         swapInProgress = false;
+        pausedByDisconnect = false;
         try {
             plugin.getStatsManager().stopTracking();
         } catch (Exception ignored) {
@@ -359,7 +362,7 @@ public class GameManager {
      * @return true if the player is a hunter
      */
     public boolean isHunter(Player player) {
-        return hunters.contains(player);
+        return player != null && containsPlayerByUuid(hunters, player.getUniqueId());
     }
 
     /**
@@ -369,7 +372,7 @@ public class GameManager {
      * @return true if the player is a runner
      */
     public boolean isRunner(Player player) {
-        return runners.contains(player);
+        return player != null && containsPlayerByUuid(runners, player.getUniqueId());
     }
 
     /**
@@ -495,7 +498,9 @@ public class GameManager {
         boolean teamEmpty = runners.isEmpty() || (huntersRequired && hunters.isEmpty());
         if (gameRunning && teamEmpty) {
             if (plugin.getConfigManager().isPauseOnDisconnect()) {
-                pauseGame();
+                if (pauseGame()) {
+                    pausedByDisconnect = true;
+                }
                 if (plugin.getConfigManager().isBroadcastGameEvents()) {
                     Msg.broadcast("§e[SpeedrunnerSwap] Game paused: waiting for players to return.");
                 }
@@ -545,7 +550,9 @@ public class GameManager {
 
         if (player.equals(activeRunner)) {
             if (pauseOnDc) {
-                pauseGame();
+                if (pauseGame()) {
+                    pausedByDisconnect = true;
+                }
             } else {
                 performSwap();
             }
@@ -560,6 +567,9 @@ public class GameManager {
     public void handlePlayerJoin(Player player) {
         if (!gameRunning)
             return;
+        synchronizeRejoinedPlayer(player);
+        runnerDisconnectAt.remove(player.getUniqueId());
+        clearRuntimeDisconnectTime(player.getUniqueId());
         if (plugin.getCurrentMode() == com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode.TASK) {
             // If they had an assignment, ensure they're in runners
             var tmm = plugin.getTaskManagerMode();
@@ -585,22 +595,9 @@ public class GameManager {
                 }
             }
 
-            // Clear disconnect record
-            runnerDisconnectAt.remove(player.getUniqueId());
-            clearRuntimeDisconnectTime(player.getUniqueId());
-
-            // If paused and we have at least one online runner, resume automatically
-            if (isGamePaused()) {
-                boolean anyOnline = false;
-                for (Player r : runners)
-                    if (r.isOnline()) {
-                        anyOnline = true;
-                        break;
-                    }
-                if (anyOnline) {
-                    resumeGame();
-                }
-            }
+        }
+        if (isGamePaused() && pausedByDisconnect && canResumeAfterDisconnectPause()) {
+            resumeGame();
         }
         portalSwapRetries.remove(player.getUniqueId());
         ensureRunnerQueueCoherence();
@@ -660,13 +657,7 @@ public class GameManager {
 
                 // If paused due to disconnect and we still have online runners, resume
                 if (gamePaused && pauseOnDc) {
-                    boolean anyOnline = false;
-                    for (Player r : runners)
-                        if (r.isOnline()) {
-                            anyOnline = true;
-                            break;
-                        }
-                    if (anyOnline)
+                    if (pausedByDisconnect && canResumeAfterDisconnectPause())
                         resumeGame();
                 }
             }
@@ -735,7 +726,7 @@ public class GameManager {
             if ((eff = BukkitCompat.resolvePotionEffect("jump_boost")) != null)
                 player.removePotionEffect(eff);
 
-            if (player.getGameMode() == GameMode.SPECTATOR && runners.contains(player)) {
+            if (player.getGameMode() == GameMode.SPECTATOR && isRunner(player)) {
                 player.setGameMode(GameMode.SURVIVAL);
             }
             // Ensure everyone can see everyone again after cleanup
@@ -935,8 +926,8 @@ public class GameManager {
 
         int timeLeft = getTimeUntilNextSwap();
         for (Player player : Bukkit.getOnlinePlayers()) {
-            boolean isRunner = runners.contains(player);
-            boolean isHunter = hunters.contains(player);
+            boolean isRunner = isRunner(player);
+            boolean isHunter = isHunter(player);
             boolean isActive = player.equals(activeRunner);
             boolean isCaged = cagedPlayers.contains(player.getUniqueId());
 
@@ -974,7 +965,7 @@ public class GameManager {
     }
 
     private int getQueuePosition(Player player) {
-        if (!runners.contains(player))
+        if (!isRunner(player))
             return 0;
 
         int position = 1;
@@ -1460,8 +1451,9 @@ public class GameManager {
         }
 
         if (activeRunner != null && activeRunner.isOnline()) {
-            int idx = runners.indexOf(activeRunner);
+            int idx = indexOfPlayerByUuid(runners, activeRunner.getUniqueId());
             if (idx >= 0) {
+                activeRunner = runners.get(idx);
                 activeRunnerIndex = idx;
             } else {
                 runners.add(0, activeRunner);
@@ -1587,6 +1579,7 @@ public class GameManager {
             return false;
         }
         gamePaused = true;
+        pausedByDisconnect = false;
         if (swapTask != null) {
             swapTask.cancel();
         }
@@ -1622,6 +1615,7 @@ public class GameManager {
             return false;
         }
         gamePaused = false;
+        pausedByDisconnect = false;
         scheduleNextSwap();
         scheduleNextHunterSwap();
         startActionBarUpdates();
@@ -1835,9 +1829,9 @@ public class GameManager {
                 PlayerState state = getPlayerState(online);
                 if (state == null)
                     continue;
-                if (runners.contains(online)) {
+                if (isRunner(online)) {
                     state.setSelectedTeam(Team.RUNNER);
-                } else if (hunters.contains(online)) {
+                } else if (isHunter(online)) {
                     state.setSelectedTeam(Team.HUNTER);
                 } else {
                     state.setSelectedTeam(Team.NONE);
@@ -1858,7 +1852,7 @@ public class GameManager {
         boolean waitingLast10 = "last_10".equalsIgnoreCase(waitingVis);
 
         for (Player p : Bukkit.getOnlinePlayers()) {
-            if (!runners.contains(p))
+            if (!isRunner(p))
                 continue; // Only runners get titles
 
             boolean isActive = p.equals(current);
@@ -2137,5 +2131,80 @@ public class GameManager {
         if (!cagedPlayers.contains(a.getUniqueId()) || !cagedPlayers.contains(b.getUniqueId()))
             return false;
         return a.getWorld().equals(b.getWorld()) && sharedCageCenters.containsKey(a.getWorld());
+    }
+
+    private void synchronizeRejoinedPlayer(Player player) {
+        if (player == null) {
+            return;
+        }
+
+        UUID uuid = player.getUniqueId();
+        replaceTeamReferenceByUuid(runners, uuid, player);
+        replaceTeamReferenceByUuid(hunters, uuid, player);
+
+        String playerName = player.getName();
+        if (plugin.getConfigManager().getRunnerNames().contains(playerName)
+                && !containsPlayerByUuid(runners, uuid)) {
+            runners.add(player);
+        }
+        if (plugin.getConfigManager().getHunterNames().contains(playerName)
+                && !containsPlayerByUuid(hunters, uuid)) {
+            hunters.add(player);
+        }
+
+        PlayerState state = getPlayerState(player);
+        if (state != null) {
+            if (isRunner(player)) {
+                state.setSelectedTeam(Team.RUNNER);
+            } else if (isHunter(player)) {
+                state.setSelectedTeam(Team.HUNTER);
+            }
+        }
+    }
+
+    private boolean canResumeAfterDisconnectPause() {
+        if (!gameRunning || !gamePaused) {
+            return false;
+        }
+        if (!hasOnlinePlayer(runners)) {
+            return false;
+        }
+        if (huntersRequired(plugin.getCurrentMode())) {
+            return hasOnlinePlayer(hunters);
+        }
+        return true;
+    }
+
+    private boolean hasOnlinePlayer(List<Player> players) {
+        for (Player player : players) {
+            if (player != null && player.isOnline()) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean containsPlayerByUuid(List<Player> players, UUID uuid) {
+        return indexOfPlayerByUuid(players, uuid) >= 0;
+    }
+
+    private int indexOfPlayerByUuid(List<Player> players, UUID uuid) {
+        if (uuid == null) {
+            return -1;
+        }
+        for (int i = 0; i < players.size(); i++) {
+            Player candidate = players.get(i);
+            if (candidate != null && uuid.equals(candidate.getUniqueId())) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    private void replaceTeamReferenceByUuid(List<Player> team, UUID uuid, Player updatedPlayer) {
+        int index = indexOfPlayerByUuid(team, uuid);
+        if (index >= 0) {
+            team.set(index, updatedPlayer);
+        }
     }
 }
