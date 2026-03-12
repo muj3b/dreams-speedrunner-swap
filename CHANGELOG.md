@@ -1,6 +1,6 @@
 # Changelog
 
-## 4.0.10
+## 4.1
 - Finished the multiworld polish pass:
   - Added real assignment enforcement for session-world rules instead of only GUI filtering.
   - `/swap status` now reports session world and multiworld assignment settings.
