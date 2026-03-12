@@ -1,5 +1,13 @@
 # Changelog
 
+## 4.0.10
+- Finished the multiworld polish pass:
+  - Added real assignment enforcement for session-world rules instead of only GUI filtering.
+  - `/swap status` now reports session world and multiworld assignment settings.
+  - Team management and Task runner management now show assignment-world context in the GUI.
+  - Batch `/swap setrunners` and `/swap sethunters` now skip cross-world players when session-world restrictions are enabled and explain why.
+  - The first valid runner assignment now anchors the session world when one has not been established yet.
+
 ## 4.0.9
 - Added multiworld / Multiverse compatibility controls:
   - Runner respawns now prefer the active session world instead of falling back to the server's first world.

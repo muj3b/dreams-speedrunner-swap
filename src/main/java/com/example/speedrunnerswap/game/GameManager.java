@@ -1820,6 +1820,43 @@ public class GameManager {
         return sessionWorldName;
     }
 
+    public World getSessionWorld() {
+        if (sessionWorldName != null) {
+            World persisted = Bukkit.getWorld(sessionWorldName);
+            if (persisted != null) {
+                return persisted;
+            }
+        }
+        return resolveSessionWorld(activeRunner);
+    }
+
+    public String getAssignmentRestrictionReason(Player target, Team team, World referenceWorld) {
+        if (target == null) {
+            return "No player selected.";
+        }
+        if (team == Team.NONE) {
+            return null;
+        }
+        if (team == Team.HUNTER && !huntersAllowed(plugin.getCurrentMode())) {
+            return "Hunters can only be assigned in Dream mode.";
+        }
+        if (!plugin.getConfigManager().isMultiworldCompatibilityEnabled()
+                || !plugin.getConfigManager().isAssignmentRestrictedToSessionWorld()) {
+            return null;
+        }
+
+        World requiredWorld = referenceWorld != null ? referenceWorld : getSessionWorld();
+        World targetWorld = target.getWorld();
+        if (requiredWorld == null || targetWorld == null) {
+            return null;
+        }
+        if (!requiredWorld.equals(targetWorld)) {
+            return "Assignments are restricted to world '" + requiredWorld.getName()
+                    + "'. " + target.getName() + " is in '" + targetWorld.getName() + "'.";
+        }
+        return null;
+    }
+
     public void updateSessionWorldFromPlayer(Player player) {
         if (player == null || !plugin.getConfigManager().isMultiworldCompatibilityEnabled()
                 || !plugin.getConfigManager().isSessionWorldUpdatesEnabled()) {
@@ -1840,6 +1877,20 @@ public class GameManager {
         if (sessionWorld != null) {
             sessionWorldName = sessionWorld.getName();
         }
+    }
+
+    public void establishSessionWorldFromAssignment(Player target, World referenceWorld) {
+        if (!plugin.getConfigManager().isMultiworldCompatibilityEnabled()) {
+            return;
+        }
+        if (getSessionWorld() != null) {
+            return;
+        }
+        World selected = referenceWorld;
+        if (selected == null && target != null) {
+            selected = resolvePreferredNormalWorld(target);
+        }
+        updateSessionWorld(selected);
     }
 
     private void updateSessionWorld(World world) {
@@ -1917,8 +1968,17 @@ public class GameManager {
      * Assign a single player to the requested team (removing them from the other).
      */
     public boolean assignPlayerToTeam(Player target, Team team) {
+        return assignPlayerToTeam(target, team, null);
+    }
+
+    public boolean assignPlayerToTeam(Player target, Team team, World referenceWorld) {
         if (target == null)
             return false;
+
+        String restriction = getAssignmentRestrictionReason(target, team, referenceWorld);
+        if (restriction != null) {
+            return false;
+        }
 
         java.util.List<Player> newRunners = new java.util.ArrayList<>(runners);
         java.util.List<Player> newHunters = new java.util.ArrayList<>(hunters);
@@ -1946,6 +2006,10 @@ public class GameManager {
 
         if (!changed) {
             return false;
+        }
+
+        if (team == Team.RUNNER) {
+            establishSessionWorldFromAssignment(target, referenceWorld);
         }
 
         setRunners(newRunners);

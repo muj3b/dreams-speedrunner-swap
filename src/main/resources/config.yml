@@ -93,6 +93,10 @@ multiworld:
   # When assigning teams from the GUI, show only players in the same world as
   # the admin opening the menu.
   filter_team_selector_to_viewer_world: true
+  # Prevent assigning runners/hunters from a different overworld than the
+  # current game session. Before a session world exists, the first runner
+  # assignment anchors it.
+  restrict_assignments_to_session_world: true
   # If the active runner moves to another overworld-style world, adopt that as
   # the session world for future respawns.
   update_session_world_on_overworld_change: true

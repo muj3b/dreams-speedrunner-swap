@@ -304,6 +304,12 @@ public class SwapCommand implements CommandExecutor, TabCompleter {
         sender.sendMessage("§6=== SpeedrunnerSwap Status ===");
         sender.sendMessage("§eGame Running: §f" + plugin.getGameManager().isGameRunning());
         sender.sendMessage("§eGame Paused: §f" + plugin.getGameManager().isGamePaused());
+        sender.sendMessage("§eSession World: §f" + (plugin.getGameManager().getSessionWorldName() != null
+                ? plugin.getGameManager().getSessionWorldName()
+                : "Not set"));
+        sender.sendMessage("§eSame-World Team UI: §f" + plugin.getConfigManager().isTeamSelectorSameWorldOnly());
+        sender.sendMessage("§eAssignment Restriction: §f"
+                + plugin.getConfigManager().isAssignmentRestrictedToSessionWorld());
         
         if (plugin.getGameManager().isGameRunning()) {
             Player activeRunner = plugin.getGameManager().getActiveRunner();
@@ -323,6 +329,23 @@ public class SwapCommand implements CommandExecutor, TabCompleter {
         }
         
         return true;
+    }
+
+    private org.bukkit.World determineAssignmentReferenceWorld(CommandSender sender, List<Player> players) {
+        org.bukkit.World sessionWorld = plugin.getGameManager().getSessionWorld();
+        if (sessionWorld != null) {
+            return sessionWorld;
+        }
+        if (sender instanceof Player playerSender) {
+            return playerSender.getWorld();
+        }
+        for (Player player : players) {
+            if (player != null && player.getWorld() != null
+                    && player.getWorld().getEnvironment() == org.bukkit.World.Environment.NORMAL) {
+                return player.getWorld();
+            }
+        }
+        return null;
     }
     
     private boolean handleSetRunners(CommandSender sender, String[] playerNames) {
@@ -350,11 +373,39 @@ public class SwapCommand implements CommandExecutor, TabCompleter {
             sender.sendMessage("§cNo valid players specified.");
             return false;
         }
-        
-        plugin.getGameManager().setRunners(players);
-        sender.sendMessage("§aRunners set: " + players.stream()
+
+        org.bukkit.World referenceWorld = determineAssignmentReferenceWorld(sender, players);
+        List<Player> accepted = new ArrayList<>();
+        List<String> rejected = new ArrayList<>();
+        for (Player player : players) {
+            String reason = plugin.getGameManager().getAssignmentRestrictionReason(player,
+                    com.example.speedrunnerswap.models.Team.RUNNER, referenceWorld);
+            if (reason == null) {
+                accepted.add(player);
+            } else {
+                rejected.add(reason);
+            }
+        }
+
+        if (accepted.isEmpty()) {
+            sender.sendMessage("§cNo valid runners could be assigned.");
+            for (String reason : rejected) {
+                sender.sendMessage("§7- §c" + reason);
+            }
+            return false;
+        }
+
+        plugin.getGameManager().establishSessionWorldFromAssignment(accepted.get(0), referenceWorld);
+        plugin.getGameManager().setRunners(accepted);
+        sender.sendMessage("§aRunners set: " + accepted.stream()
                 .map(Player::getName)
                 .collect(Collectors.joining(", ")));
+        if (!rejected.isEmpty()) {
+            sender.sendMessage("§eSkipped players due to multiworld rules:");
+            for (String reason : rejected) {
+                sender.sendMessage("§7- §e" + reason);
+            }
+        }
         
         return true;
     }
@@ -384,11 +435,38 @@ public class SwapCommand implements CommandExecutor, TabCompleter {
             sender.sendMessage("§cNo valid players specified.");
             return false;
         }
-        
-        plugin.getGameManager().setHunters(players);
-        sender.sendMessage("§aHunters set: " + players.stream()
+
+        org.bukkit.World referenceWorld = determineAssignmentReferenceWorld(sender, players);
+        List<Player> accepted = new ArrayList<>();
+        List<String> rejected = new ArrayList<>();
+        for (Player player : players) {
+            String reason = plugin.getGameManager().getAssignmentRestrictionReason(player,
+                    com.example.speedrunnerswap.models.Team.HUNTER, referenceWorld);
+            if (reason == null) {
+                accepted.add(player);
+            } else {
+                rejected.add(reason);
+            }
+        }
+
+        if (accepted.isEmpty()) {
+            sender.sendMessage("§cNo valid hunters could be assigned.");
+            for (String reason : rejected) {
+                sender.sendMessage("§7- §c" + reason);
+            }
+            return false;
+        }
+
+        plugin.getGameManager().setHunters(accepted);
+        sender.sendMessage("§aHunters set: " + accepted.stream()
                 .map(Player::getName)
                 .collect(Collectors.joining(", ")));
+        if (!rejected.isEmpty()) {
+            sender.sendMessage("§eSkipped players due to multiworld rules:");
+            for (String reason : rejected) {
+                sender.sendMessage("§7- §e" + reason);
+            }
+        }
         
         return true;
     }

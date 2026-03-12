@@ -449,6 +449,15 @@ public class ConfigManager {
         plugin.saveConfig();
     }
 
+    public boolean isAssignmentRestrictedToSessionWorld() {
+        return config.getBoolean("multiworld.restrict_assignments_to_session_world", true);
+    }
+
+    public void setAssignmentRestrictedToSessionWorld(boolean enabled) {
+        config.set("multiworld.restrict_assignments_to_session_world", enabled);
+        plugin.saveConfig();
+    }
+
     public boolean isSessionWorldUpdatesEnabled() {
         return config.getBoolean("multiworld.update_session_world_on_overworld_change", true);
     }

@@ -13,6 +13,7 @@ import com.example.speedrunnerswap.utils.TextUtil;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
+import org.bukkit.World;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
@@ -340,12 +341,16 @@ public final class GuiManager implements Listener {
         statusLore.add("§7Mode: §f" + mode.name());
         statusLore.add("§7Running: " + (running ? "§aYes" : "§cNo"));
         statusLore.add("§7Paused: " + (paused ? "§eYes" : "§cNo"));
+        statusLore.add("§7Session World: §f" + Optional.ofNullable(gm.getSessionWorldName()).orElse("Not set"));
         statusLore.add("§7Speedrunners: §b" + gm.getRunners().size());
         if (mode == SpeedrunnerSwap.SwapMode.DREAM) {
             statusLore.add("§7Hunters: §c" + gm.getHunters().size());
         } else {
             statusLore.add("§7Hunters: §8Not used in this mode");
         }
+        statusLore.add("§7Assign Same World Only: " + (cfg.isTeamSelectorSameWorldOnly() ? "§aYes" : "§cNo"));
+        statusLore.add("§7Restrict To Session World: "
+                + (cfg.isAssignmentRestrictedToSessionWorld() ? "§aYes" : "§cNo"));
         items.add(simpleItem(4, () -> icon(Material.CLOCK, "§6§lGame Status", statusLore)));
 
         if (!running) {
@@ -565,6 +570,10 @@ public final class GuiManager implements Listener {
             instructionLore.add("§cThis mode uses speedrunners only.");
             instructionLore.add("§7Assigning hunters is disabled.");
         }
+        if (plugin.getConfigManager().isAssignmentRestrictedToSessionWorld()) {
+            instructionLore.add("§7Assignment world: §f"
+                    + Optional.ofNullable(gm.getSessionWorldName()).orElse(ctx.player().getWorld().getName()));
+        }
         if (plugin.getConfigManager().isTeamSelectorSameWorldOnly()) {
             instructionLore.add("§bWorld filter: §f" + ctx.player().getWorld().getName());
         } else {
@@ -644,7 +653,16 @@ public final class GuiManager implements Listener {
                     Msg.send(ctxClick.player(), "§eAssign hunters only when Dream mode is active.");
                     return;
                 }
-                boolean changed = gm.assignPlayerToTeam(online, targetTeam);
+                World referenceWorld = gm.getSessionWorld();
+                if (referenceWorld == null) {
+                    referenceWorld = ctxClick.player().getWorld();
+                }
+                String reason = gm.getAssignmentRestrictionReason(online, targetTeam, referenceWorld);
+                if (reason != null) {
+                    Msg.send(ctxClick.player(), "§c" + reason);
+                    return;
+                }
+                boolean changed = gm.assignPlayerToTeam(online, targetTeam, referenceWorld);
                 if (!changed) {
                     Msg.send(ctxClick.player(), "§eNo change for §f" + online.getName());
                 } else if (targetTeam == Team.NONE) {
@@ -1669,6 +1687,10 @@ public final class GuiManager implements Listener {
         List<String> taskRunnerLore = new ArrayList<>();
         taskRunnerLore.add("§7Runners only. Hunters are unused");
         taskRunnerLore.add("§7Shift-click to remove players");
+        if (plugin.getConfigManager().isAssignmentRestrictedToSessionWorld()) {
+            taskRunnerLore.add("§7Assignment world: §f"
+                    + Optional.ofNullable(gm.getSessionWorldName()).orElse(ctx.player().getWorld().getName()));
+        }
         if (plugin.getConfigManager().isTeamSelectorSameWorldOnly()) {
             taskRunnerLore.add("§bWorld filter: §f" + ctx.player().getWorld().getName());
         } else {
@@ -1709,7 +1731,16 @@ public final class GuiManager implements Listener {
             items.add(clickItem(slot, () -> head, ctxClick -> {
                 boolean remove = ctxClick.shift();
                 Team target = remove ? Team.NONE : Team.RUNNER;
-                boolean changed = gm.assignPlayerToTeam(online, target);
+                World referenceWorld = gm.getSessionWorld();
+                if (referenceWorld == null) {
+                    referenceWorld = ctxClick.player().getWorld();
+                }
+                String reason = gm.getAssignmentRestrictionReason(online, target, referenceWorld);
+                if (reason != null) {
+                    Msg.send(ctxClick.player(), "§c" + reason);
+                    return;
+                }
+                boolean changed = gm.assignPlayerToTeam(online, target, referenceWorld);
                 if (!changed) {
                     Msg.send(ctxClick.player(), "§eNo change for §f" + online.getName());
                 } else if (remove) {
@@ -1774,6 +1805,11 @@ public final class GuiManager implements Listener {
                 cfg::isTeamSelectorSameWorldOnly,
                 cfg::setTeamSelectorSameWorldOnly,
                 "§7Only show players in your current world when assigning teams"));
+
+        items.add(toggleItem(29, Material.IRON_BARS, "§e§lRestrict Assignments",
+                cfg::isAssignmentRestrictedToSessionWorld,
+                cfg::setAssignmentRestrictedToSessionWorld,
+                "§7Block assigning players from outside the session world"));
 
         items.add(toggleItem(30, Material.COMPASS, "§e§lUpdate Session World",
                 cfg::isSessionWorldUpdatesEnabled,
