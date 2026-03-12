@@ -309,6 +309,7 @@ public final class GuiManager implements Listener {
         builders.put(MenuKey.TASK_ASSIGNMENTS, this::buildTaskAssignments);
         builders.put(MenuKey.TASK_RUNNERS, this::buildTaskRunners);
         builders.put(MenuKey.TASK_ADVANCED, this::buildTaskAdvanced);
+        builders.put(MenuKey.SETTINGS_MULTIWORLD, this::buildMultiworldSettings);
         builders.put(MenuKey.SETTINGS_VOICE_CHAT, this::buildVoiceChat);
         builders.put(MenuKey.SETTINGS_BROADCAST, this::buildBroadcast);
         builders.put(MenuKey.SETTINGS_END_MESSAGES, this::buildEndGameMessages);
@@ -564,6 +565,11 @@ public final class GuiManager implements Listener {
             instructionLore.add("§cThis mode uses speedrunners only.");
             instructionLore.add("§7Assigning hunters is disabled.");
         }
+        if (plugin.getConfigManager().isTeamSelectorSameWorldOnly()) {
+            instructionLore.add("§bWorld filter: §f" + ctx.player().getWorld().getName());
+        } else {
+            instructionLore.add("§7World filter: §fAll online players");
+        }
         items.add(simpleItem(4, () -> icon(Material.BOOK, "§e§lInstructions", instructionLore)));
 
         items.add(clickItem(6, () -> icon(Material.IRON_SWORD,
@@ -597,8 +603,9 @@ public final class GuiManager implements Listener {
                     ctxClick.reopen();
                 }));
 
+        List<Player> candidates = getTeamSelectionCandidates(ctx.player());
         int slot = 9;
-        for (Player online : Bukkit.getOnlinePlayers()) {
+        for (Player online : candidates) {
             if (slot >= 54)
                 break;
             Team assigned = gm.isRunner(online) ? Team.RUNNER : gm.isHunter(online) ? Team.HUNTER : Team.NONE;
@@ -618,6 +625,7 @@ public final class GuiManager implements Listener {
                 case HUNTER -> "§cHunter";
                 case NONE -> "§7Unassigned";
             });
+            lore.add("§7World: §f" + online.getWorld().getName());
             lore.add("§7Focus: " + (currentFocus == Team.RUNNER ? "§bSpeedrunners" : "§cHunters"));
             lore.add("§7Click to assign, shift-click to clear");
             GuiCompat.setLore(meta, lore);
@@ -698,6 +706,8 @@ public final class GuiManager implements Listener {
                 "§7Toggle kits and quick actions"));
         items.add(navigateItem(29, Material.MAGMA_BLOCK, "§c§lDangerous Blocks", MenuKey.DANGEROUS_BLOCKS,
                 "§7Edit safe-swap blacklist"));
+        items.add(navigateItem(30, Material.ENDER_PEARL, "§b§lMultiworld", MenuKey.SETTINGS_MULTIWORLD,
+                "§7Multiverse and respawn compatibility"));
 
         return new MenuScreen(plugin.getConfigManager().getGuiSettingsTitle(), 54, items);
     }
@@ -1656,8 +1666,15 @@ public final class GuiManager implements Listener {
         List<MenuItem> items = new ArrayList<>();
         items.add(backButton(0, "§7§lBack", MenuKey.TASK_HOME, null, this::openTaskManagerMenu));
 
-        items.add(simpleItem(2, () -> icon(Material.BOOK, "§6§lTask Competition",
-                List.of("§7Runners only. Hunters are unused", "§7Shift-click to remove players"))));
+        List<String> taskRunnerLore = new ArrayList<>();
+        taskRunnerLore.add("§7Runners only. Hunters are unused");
+        taskRunnerLore.add("§7Shift-click to remove players");
+        if (plugin.getConfigManager().isTeamSelectorSameWorldOnly()) {
+            taskRunnerLore.add("§bWorld filter: §f" + ctx.player().getWorld().getName());
+        } else {
+            taskRunnerLore.add("§7World filter: §fAll online players");
+        }
+        items.add(simpleItem(2, () -> icon(Material.BOOK, "§6§lTask Competition", taskRunnerLore)));
 
         items.add(clickItem(6, () -> icon(Material.BARRIER, "§c§lClear Runners",
                 List.of("§7Remove all runner assignments")), ctxClick -> {
@@ -1672,8 +1689,9 @@ public final class GuiManager implements Listener {
                     ctxClick.reopen();
                 }));
 
+        List<Player> candidates = getTeamSelectionCandidates(ctx.player());
         int slot = 9;
-        for (Player online : Bukkit.getOnlinePlayers()) {
+        for (Player online : candidates) {
             if (slot >= 54)
                 break;
             boolean isRunner = gm.isRunner(online);
@@ -1683,6 +1701,7 @@ public final class GuiManager implements Listener {
             GuiCompat.setDisplayName(meta, (isRunner ? "§b" : "§7") + online.getName());
             GuiCompat.setLore(meta, List.of(
                     isRunner ? "§aCurrently a runner" : "§7Not assigned",
+                    "§7World: §f" + online.getWorld().getName(),
                     "§7Click: assign as runner",
                     "§7Shift-click: clear"));
             head.setItemMeta(meta);
@@ -1713,6 +1732,62 @@ public final class GuiManager implements Listener {
         }
 
         return new MenuScreen("§b§lRunner Management", 54, items);
+    }
+
+    private MenuScreen buildMultiworldSettings(MenuContext ctx) {
+        ConfigManager cfg = plugin.getConfigManager();
+        List<MenuItem> items = new ArrayList<>();
+        items.add(backButton(0, "§7§lBack", MenuKey.SETTINGS_HOME, null, this::openSettingsMenu));
+
+        String sessionWorld = Optional.ofNullable(plugin.getGameManager().getSessionWorldName()).orElse("none");
+        boolean mvCore = plugin.getServer().getPluginManager().getPlugin("Multiverse-Core") != null;
+        boolean mvInv = plugin.getServer().getPluginManager().getPlugin("Multiverse-Inventories") != null;
+        items.add(simpleItem(4, () -> icon(Material.MAP, "§b§lCompatibility Status",
+                List.of(
+                        "§7Multiverse-Core: " + (mvCore ? "§aDetected" : "§7Not detected"),
+                        "§7Multiverse-Inventories: " + (mvInv ? "§aDetected" : "§7Not detected"),
+                        "§7Session world: §f" + sessionWorld,
+                        "§7Use this menu to keep respawns in the game world"))));
+
+        items.add(toggleItem(10, Material.ENDER_EYE, "§e§lMultiworld Compatibility",
+                cfg::isMultiworldCompatibilityEnabled,
+                cfg::setMultiworldCompatibilityEnabled,
+                "§7Master toggle for multiworld support"));
+
+        items.add(toggleItem(12, Material.RESPAWN_ANCHOR, "§e§lSession-World Respawns",
+                cfg::isKeepRunnersInSessionWorldEnabled,
+                cfg::setKeepRunnersInSessionWorldEnabled,
+                "§7Prefer the active game's overworld for runner respawns"));
+
+        items.add(toggleItem(14, Material.CHORUS_FRUIT, "§e§lPost-Respawn Enforcement",
+                cfg::isRunnerRespawnEnforcementEnabled,
+                cfg::setRunnerRespawnEnforcementEnabled,
+                "§7Re-teleport after respawn if another plugin overrides it"));
+
+        items.add(adjustItem(16, Material.CLOCK, "§6§lEnforcement Delay",
+                cfg::getRunnerRespawnEnforcementDelayTicks,
+                cfg::setRunnerRespawnEnforcementDelayTicks,
+                1, 5, 1, 40,
+                "§7Ticks before the first respawn correction"));
+
+        items.add(toggleItem(28, Material.PLAYER_HEAD, "§e§lSame-World Team Selector",
+                cfg::isTeamSelectorSameWorldOnly,
+                cfg::setTeamSelectorSameWorldOnly,
+                "§7Only show players in your current world when assigning teams"));
+
+        items.add(toggleItem(30, Material.COMPASS, "§e§lUpdate Session World",
+                cfg::isSessionWorldUpdatesEnabled,
+                cfg::setSessionWorldUpdatesEnabled,
+                "§7Follow the active runner into other overworld-style worlds"));
+
+        items.add(simpleItem(32, () -> icon(Material.BOOK,
+                "§7What This Fixes",
+                List.of(
+                        "§7Prevents fallback respawns to the server's first world",
+                        "§7Helps with Multiverse-Core world routing",
+                        "§7Helps when Multiverse-Inventories applies a second location"))));
+
+        return new MenuScreen("§b§lMultiworld", 45, items);
     }
 
     private MenuScreen buildTaskPool(MenuContext ctx) {
@@ -1852,6 +1927,22 @@ public final class GuiManager implements Listener {
                     return type;
                 },
                 List.of("§7Cycle between allowed particle IDs"));
+    }
+
+    private List<Player> getTeamSelectionCandidates(Player viewer) {
+        List<Player> candidates = new ArrayList<>();
+        if (viewer == null) {
+            return candidates;
+        }
+        boolean sameWorldOnly = plugin.getConfigManager().isTeamSelectorSameWorldOnly();
+        for (Player online : Bukkit.getOnlinePlayers()) {
+            boolean assigned = plugin.getGameManager().isRunner(online) || plugin.getGameManager().isHunter(online);
+            if (!sameWorldOnly || online.getWorld().equals(viewer.getWorld()) || assigned) {
+                candidates.add(online);
+            }
+        }
+        candidates.sort(java.util.Comparator.comparing(Player::getName, String.CASE_INSENSITIVE_ORDER));
+        return candidates;
     }
 
     private MenuScreen buildTaskAssignments(MenuContext ctx) {
@@ -2241,6 +2332,7 @@ public final class GuiManager implements Listener {
         TASK_ADVANCED,
         STATS_ROOT,
         STATS_ADVANCED,
+        SETTINGS_MULTIWORLD,
         SETTINGS_VOICE_CHAT,
         SETTINGS_BROADCAST,
         SETTINGS_END_MESSAGES,

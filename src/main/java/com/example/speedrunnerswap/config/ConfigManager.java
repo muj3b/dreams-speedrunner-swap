@@ -404,6 +404,60 @@ public class ConfigManager {
         }
     }
 
+    public boolean isMultiworldCompatibilityEnabled() {
+        return config.getBoolean("multiworld.enabled", true);
+    }
+
+    public void setMultiworldCompatibilityEnabled(boolean enabled) {
+        config.set("multiworld.enabled", enabled);
+        plugin.saveConfig();
+    }
+
+    public boolean isKeepRunnersInSessionWorldEnabled() {
+        return config.getBoolean("multiworld.keep_runners_in_session_world", true);
+    }
+
+    public void setKeepRunnersInSessionWorldEnabled(boolean enabled) {
+        config.set("multiworld.keep_runners_in_session_world", enabled);
+        plugin.saveConfig();
+    }
+
+    public boolean isRunnerRespawnEnforcementEnabled() {
+        return config.getBoolean("multiworld.enforce_runner_respawn", true);
+    }
+
+    public void setRunnerRespawnEnforcementEnabled(boolean enabled) {
+        config.set("multiworld.enforce_runner_respawn", enabled);
+        plugin.saveConfig();
+    }
+
+    public int getRunnerRespawnEnforcementDelayTicks() {
+        return Math.max(1, config.getInt("multiworld.enforce_runner_respawn_delay_ticks", 2));
+    }
+
+    public void setRunnerRespawnEnforcementDelayTicks(int ticks) {
+        config.set("multiworld.enforce_runner_respawn_delay_ticks", Math.max(1, ticks));
+        plugin.saveConfig();
+    }
+
+    public boolean isTeamSelectorSameWorldOnly() {
+        return config.getBoolean("multiworld.filter_team_selector_to_viewer_world", true);
+    }
+
+    public void setTeamSelectorSameWorldOnly(boolean enabled) {
+        config.set("multiworld.filter_team_selector_to_viewer_world", enabled);
+        plugin.saveConfig();
+    }
+
+    public boolean isSessionWorldUpdatesEnabled() {
+        return config.getBoolean("multiworld.update_session_world_on_overworld_change", true);
+    }
+
+    public void setSessionWorldUpdatesEnabled(boolean enabled) {
+        config.set("multiworld.update_session_world_on_overworld_change", enabled);
+        plugin.saveConfig();
+    }
+
     public void setBroadcastsEnabled(boolean broadcastsEnabled) {
         config.set("broadcasts.enabled", broadcastsEnabled);
         plugin.saveConfig();

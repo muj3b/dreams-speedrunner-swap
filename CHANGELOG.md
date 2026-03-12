@@ -1,5 +1,13 @@
 # Changelog
 
+## 4.0.9
+- Added multiworld / Multiverse compatibility controls:
+  - Runner respawns now prefer the active session world instead of falling back to the server's first world.
+  - Optional post-respawn enforcement helps win conflicts when another plugin applies a second teleport after respawn.
+  - Added a new Multiworld settings GUI with toggles for compatibility, respawn enforcement, session-world updates, and same-world team filtering.
+  - Team selection menus can now focus on the admin's current world while still showing already-assigned off-world players for cleanup.
+- Added `Multiverse-Core` and `Multiverse-Inventories` as soft dependencies.
+
 ## 4.0.8
 - Fixed reconnect reliability in live games (1.21+):
   - Team membership checks are now UUID-safe, preventing stale player-reference issues after disconnect/rejoin.

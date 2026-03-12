@@ -51,6 +51,7 @@ public class GameManager {
     private boolean swapInProgress = false;
     private boolean pausedByDisconnect = false;
     private Location sharedRunnerSpawn;
+    private String sessionWorldName;
     private boolean spawnSyncInFlight;
 
     private static final EnumSet<InventoryType> RETURN_CONTAINERS = EnumSet.of(
@@ -146,6 +147,7 @@ public class GameManager {
                     gamePaused = false;
                     activeRunnerIndex = 0;
                     activeRunner = runners.get(activeRunnerIndex);
+                    initializeSessionWorld();
                     saveAllPlayerStates();
                     portalSwapRetries.clear();
                     swapInProgress = false;
@@ -298,6 +300,7 @@ public class GameManager {
                 gameRunning = false;
                 gamePaused = false;
                 activeRunner = null;
+                sessionWorldName = null;
 
                 if (plugin.getConfigManager().isBroadcastGameEvents()) {
                     Msg.broadcast(formatEndGameBroadcast(winner));
@@ -1680,6 +1683,7 @@ public class GameManager {
         }
         ensureChunkLoaded(prepared);
         this.sharedRunnerSpawn = prepared;
+        updateSessionWorld(prepared.getWorld());
         for (Player runner : runners) {
             if (runner != null && runner.isOnline()) {
                 syncRunnerRespawn(runner, prepared);
@@ -1702,6 +1706,16 @@ public class GameManager {
         Location candidate = prepareSafeSpawn(sharedRunnerSpawn, null);
         if (candidate != null) {
             return candidate;
+        }
+
+        World sessionWorld = resolveSessionWorld(player);
+        if (sessionWorld != null && plugin.getConfigManager().isKeepRunnersInSessionWorldEnabled()) {
+            Location sessionSpawn = sessionWorld.getSpawnLocation();
+            Location safeSessionSpawn = prepareSafeSpawn(sessionSpawn, sessionWorld);
+            if (safeSessionSpawn != null) {
+                return safeSessionSpawn;
+            }
+            return sessionSpawn;
         }
 
         if (plugin.getConfigManager().isForceGlobalSpawn()) {
@@ -1750,6 +1764,42 @@ public class GameManager {
         }
     }
 
+    public void scheduleRunnerRespawnEnforcement(Player player, Location target) {
+        if (player == null || target == null || target.getWorld() == null) {
+            return;
+        }
+        if (!plugin.getConfigManager().isMultiworldCompatibilityEnabled()
+                || !plugin.getConfigManager().isRunnerRespawnEnforcementEnabled()) {
+            return;
+        }
+
+        int firstDelay = plugin.getConfigManager().getRunnerRespawnEnforcementDelayTicks();
+        int secondDelay = firstDelay + 10;
+        scheduleRunnerRespawnCheck(player.getUniqueId(), target.clone(), firstDelay);
+        scheduleRunnerRespawnCheck(player.getUniqueId(), target.clone(), secondDelay);
+    }
+
+    private void scheduleRunnerRespawnCheck(UUID playerId, Location target, long delayTicks) {
+        Bukkit.getScheduler().runTaskLater(plugin, () -> {
+            Player online = Bukkit.getPlayer(playerId);
+            if (online == null || !online.isOnline() || target.getWorld() == null) {
+                return;
+            }
+            if (!isRunner(online)) {
+                return;
+            }
+            Location current = online.getLocation();
+            if (current != null && current.getWorld() != null
+                    && current.getWorld().equals(target.getWorld())
+                    && current.distanceSquared(target) <= 1.0D) {
+                return;
+            }
+            ensureChunkLoaded(target);
+            syncRunnerRespawn(online, target);
+            online.teleport(target);
+        }, delayTicks);
+    }
+
     /** Replace hunters list and update config team names */
     public void setHunters(java.util.List<Player> players) {
         java.util.LinkedHashSet<Player> unique = new java.util.LinkedHashSet<>(players);
@@ -1764,6 +1814,94 @@ public class GameManager {
 
         this.hunters = new java.util.ArrayList<>(unique);
         refreshTeamSelections();
+    }
+
+    public String getSessionWorldName() {
+        return sessionWorldName;
+    }
+
+    public void updateSessionWorldFromPlayer(Player player) {
+        if (player == null || !plugin.getConfigManager().isMultiworldCompatibilityEnabled()
+                || !plugin.getConfigManager().isSessionWorldUpdatesEnabled()) {
+            return;
+        }
+        World world = player.getWorld();
+        if (world != null && world.getEnvironment() == World.Environment.NORMAL) {
+            updateSessionWorld(world);
+        }
+    }
+
+    private void initializeSessionWorld() {
+        if (!plugin.getConfigManager().isMultiworldCompatibilityEnabled()) {
+            sessionWorldName = null;
+            return;
+        }
+        World sessionWorld = resolveSessionWorld(activeRunner);
+        if (sessionWorld != null) {
+            sessionWorldName = sessionWorld.getName();
+        }
+    }
+
+    private void updateSessionWorld(World world) {
+        if (world == null || !plugin.getConfigManager().isMultiworldCompatibilityEnabled()) {
+            return;
+        }
+        if (world.getEnvironment() != World.Environment.NORMAL) {
+            return;
+        }
+        sessionWorldName = world.getName();
+    }
+
+    private World resolveSessionWorld(Player player) {
+        if (!plugin.getConfigManager().isMultiworldCompatibilityEnabled()) {
+            return null;
+        }
+        if (sharedRunnerSpawn != null && sharedRunnerSpawn.getWorld() != null
+                && sharedRunnerSpawn.getWorld().getEnvironment() == World.Environment.NORMAL) {
+            return sharedRunnerSpawn.getWorld();
+        }
+        if (sessionWorldName != null) {
+            World persisted = Bukkit.getWorld(sessionWorldName);
+            if (persisted != null) {
+                return persisted;
+            }
+        }
+        World fromPlayer = resolvePreferredNormalWorld(player);
+        if (fromPlayer != null) {
+            sessionWorldName = fromPlayer.getName();
+            return fromPlayer;
+        }
+        World fromActive = resolvePreferredNormalWorld(activeRunner);
+        if (fromActive != null) {
+            sessionWorldName = fromActive.getName();
+            return fromActive;
+        }
+        for (Player runner : runners) {
+            World runnerWorld = resolvePreferredNormalWorld(runner);
+            if (runnerWorld != null) {
+                sessionWorldName = runnerWorld.getName();
+                return runnerWorld;
+            }
+        }
+        for (Player hunter : hunters) {
+            World hunterWorld = resolvePreferredNormalWorld(hunter);
+            if (hunterWorld != null) {
+                sessionWorldName = hunterWorld.getName();
+                return hunterWorld;
+            }
+        }
+        return null;
+    }
+
+    private World resolvePreferredNormalWorld(Player player) {
+        if (player == null) {
+            return null;
+        }
+        World world = player.getWorld();
+        if (world != null && world.getEnvironment() == World.Environment.NORMAL) {
+            return world;
+        }
+        return null;
     }
 
     /** Clear all team assignments */

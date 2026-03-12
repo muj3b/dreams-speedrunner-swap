@@ -80,6 +80,23 @@ spawn:
   y: 64.0
   z: 0.5
 
+# Multiworld / Multiverse compatibility
+multiworld:
+  enabled: true
+  # Keep runner respawns anchored to the active game's main world instead of the
+  # server's first world. Helps with Multiverse-Core and Multiverse-Inventories.
+  keep_runners_in_session_world: true
+  # Re-teleport runners shortly after respawn to win conflicts with plugins that
+  # apply a second location after PlayerRespawnEvent.
+  enforce_runner_respawn: true
+  enforce_runner_respawn_delay_ticks: 2
+  # When assigning teams from the GUI, show only players in the same world as
+  # the admin opening the menu.
+  filter_team_selector_to_viewer_world: true
+  # If the active runner moves to another overworld-style world, adopt that as
+  # the session world for future respawns.
+  update_session_world_on_overworld_change: true
+
 # Movement and Interaction Control
 cancel:
   # Cancel movement for inactive runners

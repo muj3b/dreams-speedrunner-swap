@@ -305,6 +305,7 @@ public class EventListeners implements Listener {
             if (target != null) {
                 event.setRespawnLocation(target);
                 plugin.getGameManager().syncRunnerRespawn(player, target);
+                plugin.getGameManager().scheduleRunnerRespawnEnforcement(player, target);
             }
         } else if (plugin.getGameManager().isGameRunning() &&
                 plugin.getGameManager().isHunter(player)) {
@@ -382,6 +383,7 @@ public class EventListeners implements Listener {
         // If the active runner changes world, push updates to all hunters
         Player active = plugin.getGameManager().getActiveRunner();
         if (active != null && active.equals(player)) {
+            plugin.getGameManager().updateSessionWorldFromPlayer(player);
             plugin.getTrackerManager().updateAllHunterCompasses();
         }
     }
