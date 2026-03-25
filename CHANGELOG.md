@@ -1,5 +1,23 @@
 # Changelog
 
+## 4.3
+- Added a brand-new `Task Race` mode for 2+ simultaneous runners:
+  - Runners keep their own bodies, inventories, and world state instead of sharing one swapped character.
+  - The round now supports secret-task racing without periodic swaps or inactive-runner lockouts.
+  - Existing swap-based `Task Master` mode remains available unchanged for sabotage-style shared-body play.
+- Updated task competition support across the plugin:
+  - Task detection and `/swap complete` now work in both task competition modes.
+  - Task disconnect handling, late joiner support, and `end_when_one_left` logic now cover both task variants.
+  - Voice chat muting and inactive-runner restrictions no longer incorrectly affect the no-swap mode.
+- Improved the GUI and commands for production use:
+  - Added `Task Race` to the mode selector and task hub.
+  - The Task hub now makes you explicitly choose between swap-based `Task Master` and no-swap `Task Race`.
+  - Main control screens now avoid offering misleading swap-only controls while `Task Race` is active.
+  - Added `/swap mode taskrace` aliases and updated status/help output accordingly.
+- Docs and release polish:
+  - README and config comments now document the fourth gameplay mode.
+  - Helper build/package scripts were updated for the 4.3 release.
+
 ## 4.1
 - Finished the multiworld polish pass:
   - Added real assignment enforcement for session-world rules instead of only GUI filtering.

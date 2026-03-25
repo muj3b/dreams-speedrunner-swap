@@ -45,10 +45,11 @@ public final class SpeedrunnerSwap extends JavaPlugin {
     // Task Manager mode
     private com.example.speedrunnerswap.task.TaskManagerMode taskManagerMode;
 
-    // Mode selection (Dream = runners+hunters, Sapnap = runners only, Task Manager
-    // = runners only with secret tasks)
+    // Mode selection (Dream = runners+hunters, Sapnap = runners only, Task
+    // Manager = runners only with secret tasks, Task Race = runners only with
+    // simultaneous secret tasks and no swapping)
     public enum SwapMode {
-        DREAM, SAPNAP, TASK
+        DREAM, SAPNAP, TASK, TASK_RACE
     }
 
     private SwapMode currentMode = SwapMode.DREAM;
@@ -262,13 +263,29 @@ public final class SpeedrunnerSwap extends JavaPlugin {
         return currentMode;
     }
 
+    public boolean isTaskCompetitionMode() {
+        return isTaskCompetitionMode(currentMode);
+    }
+
+    public boolean isTaskCompetitionMode(SwapMode mode) {
+        return mode == SwapMode.TASK || mode == SwapMode.TASK_RACE;
+    }
+
+    public boolean isParallelTaskMode() {
+        return currentMode == SwapMode.TASK_RACE;
+    }
+
+    public boolean usesSharedRunnerControl() {
+        return currentMode != SwapMode.TASK_RACE;
+    }
+
     public void setCurrentMode(SwapMode mode) {
         if (mode == null)
             mode = SwapMode.DREAM;
         this.currentMode = mode;
         // When switching to Task Manager mode, ensure tracker is disabled and hunters
         // list is ignored
-        if (this.currentMode == SwapMode.TASK) {
+        if (isTaskCompetitionMode(this.currentMode)) {
             try {
                 getConfigManager().setTrackerEnabled(false);
             } catch (Exception ignored) {

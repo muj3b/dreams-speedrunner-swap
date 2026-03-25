@@ -713,6 +713,10 @@ public class ConfigManager {
             m = "dream";
         if ("sapnap".equalsIgnoreCase(m))
             return com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode.SAPNAP;
+        if ("task_race".equalsIgnoreCase(m) || "taskrace".equalsIgnoreCase(m)
+                || "task_parallel".equalsIgnoreCase(m) || "taskparallel".equalsIgnoreCase(m)
+                || "noswap_task".equalsIgnoreCase(m) || "noswap".equalsIgnoreCase(m))
+            return com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode.TASK_RACE;
         if ("task".equalsIgnoreCase(m) || "taskmanager".equalsIgnoreCase(m))
             return com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode.TASK;
         return com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode.DREAM;
@@ -722,6 +726,7 @@ public class ConfigManager {
         String v = switch (mode) {
             case SAPNAP -> "sapnap";
             case TASK -> "task";
+            case TASK_RACE -> "task_race";
             default -> "dream";
         };
         config.set("game.default_mode", v);
@@ -1042,6 +1047,7 @@ public class ConfigManager {
         String key = switch (mode) {
             case SAPNAP -> "swap.default_intervals.sapnap";
             case TASK -> "swap.default_intervals.task";
+            case TASK_RACE -> "swap.default_intervals.task_race";
             default -> "swap.default_intervals.dream";
         };
         return config.getInt(key, 60);
@@ -1051,6 +1057,7 @@ public class ConfigManager {
         String key = switch (mode) {
             case SAPNAP -> "swap.default_intervals.sapnap";
             case TASK -> "swap.default_intervals.task";
+            case TASK_RACE -> "swap.default_intervals.task_race";
             default -> "swap.default_intervals.dream";
         };
         seconds = Math.max(10, seconds);

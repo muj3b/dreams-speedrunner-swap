@@ -72,6 +72,10 @@ public class VoiceChatIntegration {
      */
     public void updateRunnerMuteStatus() {
         if (!enabled || !pluginDetected) return;
+        if (!plugin.usesSharedRunnerControl()) {
+            resetAllPlayerMuteStatus();
+            return;
+        }
         
         Player activeRunner = plugin.getGameManager().getActiveRunner();
         

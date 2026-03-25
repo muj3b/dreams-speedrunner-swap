@@ -132,7 +132,8 @@ public class EventListeners implements Listener {
 
                 boolean shouldBlock = false;
                 try {
-                    if (plugin.getGameManager().isGameRunning() &&
+                    if (plugin.usesSharedRunnerControl() &&
+                            plugin.getGameManager().isGameRunning() &&
                             plugin.getGameManager().isRunner(player) &&
                             plugin.getGameManager().getActiveRunner() != player) {
                         shouldBlock = true;
@@ -193,6 +194,8 @@ public class EventListeners implements Listener {
         if (!plugin.getGameManager().isGameRunning())
             return;
         if (!plugin.getConfigManager().isHotPotatoModeEnabled())
+            return;
+        if (!plugin.usesSharedRunnerControl())
             return;
 
         if (!(event.getEntity() instanceof Player player))
@@ -362,7 +365,9 @@ public class EventListeners implements Listener {
         if (!plugin.getGameManager().isGameRunning())
             return;
         // Cancel any damage to inactive runners in cages
-        if (plugin.getGameManager().isRunner(victim) && plugin.getGameManager().getActiveRunner() != victim) {
+        if (plugin.usesSharedRunnerControl()
+                && plugin.getGameManager().isRunner(victim)
+                && plugin.getGameManager().getActiveRunner() != victim) {
             if ("CAGE".equalsIgnoreCase(plugin.getConfigManager().getFreezeMode())) {
                 event.setCancelled(true);
             }
@@ -485,7 +490,9 @@ public class EventListeners implements Listener {
         }
 
         // For non-GUI inventories, enforce runner interaction rules and sync
-        if (plugin.getGameManager().isGameRunning() && plugin.getGameManager().isRunner(player)) {
+        if (plugin.usesSharedRunnerControl()
+                && plugin.getGameManager().isGameRunning()
+                && plugin.getGameManager().isRunner(player)) {
             if (plugin.getGameManager().getActiveRunner() != player) {
                 // Inactive runners can't interact
                 event.setCancelled(true);
@@ -516,6 +523,7 @@ public class EventListeners implements Listener {
                 normalized.contains("team management") ||
                 normalized.contains("mode selector") ||
                 normalized.contains("task master") ||
+                normalized.contains("task competition") ||
                 normalized.contains("task settings") ||
                 normalized.contains("statistics") ||
                 normalized.contains("power-ups") ||
@@ -545,6 +553,8 @@ public class EventListeners implements Listener {
             return;
         if (!plugin.getGameManager().isRunner(player))
             return;
+        if (!plugin.usesSharedRunnerControl())
+            return;
         if (plugin.getGameManager().getActiveRunner() == player)
             return;
         player.sendMessage("§c[SpeedrunnerSwap] You cannot chat while inactive.");
@@ -556,7 +566,8 @@ public class EventListeners implements Listener {
         Player player = event.getPlayer();
 
         // If the player is an inactive runner, prevent movement
-        if (plugin.getGameManager().isGameRunning() &&
+        if (plugin.usesSharedRunnerControl() &&
+                plugin.getGameManager().isGameRunning() &&
                 plugin.getGameManager().isRunner(player) &&
                 plugin.getGameManager().getActiveRunner() != player) {
 
@@ -588,6 +599,9 @@ public class EventListeners implements Listener {
 
         // If game is running and sleep mechanic is enabled, control who can sleep
         if (plugin.getGameManager().isGameRunning() && plugin.getConfigManager().isSinglePlayerSleepEnabled()) {
+            if (!plugin.usesSharedRunnerControl()) {
+                return;
+            }
             // If this is a runner but not the active one, cancel the bed enter
             if (plugin.getGameManager().isRunner(player) && !player.equals(plugin.getGameManager().getActiveRunner())) {
                 event.setCancelled(true);

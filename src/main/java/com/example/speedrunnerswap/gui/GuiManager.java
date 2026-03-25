@@ -338,7 +338,7 @@ public final class GuiManager implements Listener {
         items.add(backButton(0, "§7§lBack", null, null, null));
 
         List<String> statusLore = new ArrayList<>();
-        statusLore.add("§7Mode: §f" + mode.name());
+        statusLore.add("§7Mode: §f" + modeDisplayName(mode));
         statusLore.add("§7Running: " + (running ? "§aYes" : "§cNo"));
         statusLore.add("§7Paused: " + (paused ? "§eYes" : "§cNo"));
         statusLore.add("§7Session World: §f" + Optional.ofNullable(gm.getSessionWorldName()).orElse("Not set"));
@@ -355,7 +355,9 @@ public final class GuiManager implements Listener {
 
         if (!running) {
             items.add(clickItem(10, () -> icon(Material.LIME_CONCRETE, "§a§lStart Game",
-                    List.of("§7Swap interval: §f" + cfg.getSwapInterval() + "s")), ctxClick -> {
+                    plugin.usesSharedRunnerControl()
+                            ? List.of("§7Swap interval: §f" + cfg.getSwapInterval() + "s")
+                            : List.of("§7This mode has no periodic swaps")), ctxClick -> {
                         if (gm.startGame()) {
                             Msg.send(ctxClick.player(), "§aGame started!");
                         } else {
@@ -371,21 +373,31 @@ public final class GuiManager implements Listener {
                         ctxClick.reopen();
                     }));
             if (paused) {
-                items.add(clickItem(12, () -> icon(Material.ORANGE_CONCRETE, "§a§lResume", List.of("§7Resume swaps")),
+                items.add(clickItem(12, () -> icon(Material.ORANGE_CONCRETE, "§a§lResume",
+                        List.of(plugin.usesSharedRunnerControl() ? "§7Resume swaps" : "§7Resume the current match")),
                         ctxClick -> {
                             gm.resumeGame();
                             ctxClick.reopen();
                         }));
             } else {
-                items.add(clickItem(12, () -> icon(Material.YELLOW_CONCRETE, "§e§lPause", List.of("§7Pause swaps")),
+                items.add(clickItem(12, () -> icon(Material.YELLOW_CONCRETE, "§e§lPause",
+                        List.of(plugin.usesSharedRunnerControl() ? "§7Pause swaps" : "§7Pause the current match")),
                         ctxClick -> {
                             gm.pauseGame();
                             ctxClick.reopen();
                         }));
             }
             items.add(clickItem(14,
-                    () -> icon(Material.NETHER_STAR, "§e§lForce Swap", List.of("§7Trigger immediate swap")),
+                    () -> icon(Material.NETHER_STAR,
+                            plugin.usesSharedRunnerControl() ? "§e§lForce Swap" : "§7§lNo Swaps In This Mode",
+                            plugin.usesSharedRunnerControl()
+                                    ? List.of("§7Trigger immediate swap")
+                                    : List.of("§7Task Race keeps all runners active at once")),
                     ctxClick -> {
+                        if (!plugin.usesSharedRunnerControl()) {
+                            Msg.send(ctxClick.player(), "§eThis mode does not use periodic swaps.");
+                            return;
+                        }
                         gm.triggerImmediateSwap();
                         Msg.send(ctxClick.player(), "§eSwap triggered.");
                     }));
@@ -445,10 +457,11 @@ public final class GuiManager implements Listener {
             items.add(simpleItem(4, () -> icon(Material.NETHER_STAR, "§e§lWelcome to Speedrunner Swap",
                     List.of("§7Pick the challenge you want to run", "§7and jump straight into setup."))));
             items.add(modeItem(10, SpeedrunnerSwap.SwapMode.DREAM, true, current));
-            items.add(modeItem(13, SpeedrunnerSwap.SwapMode.SAPNAP, true, current));
-            items.add(modeItem(16, SpeedrunnerSwap.SwapMode.TASK, true, current));
+            items.add(modeItem(12, SpeedrunnerSwap.SwapMode.SAPNAP, true, current));
+            items.add(modeItem(14, SpeedrunnerSwap.SwapMode.TASK, true, current));
+            items.add(modeItem(16, SpeedrunnerSwap.SwapMode.TASK_RACE, true, current));
             items.add(simpleItem(22, () -> icon(Material.MAP, "§b§lCurrent Mode",
-                    List.of("§7Active: §f" + current.name(), "", "§7Select another icon to switch."))));
+                    List.of("§7Active: §f" + modeDisplayName(current), "", "§7Select another icon to switch."))));
             items.add(clickItem(29, () -> icon(Material.PLAYER_HEAD, "§a§lTeam Manager",
                     List.of("§7Assign runners & hunters")),
                     context -> open(context.player(), MenuKey.TEAM_MANAGEMENT, null, false)));
@@ -460,9 +473,10 @@ public final class GuiManager implements Listener {
                     context -> open(context.player(), MenuKey.SETTINGS_HOME, null, false)));
             items.add(backButton(35, "§7§lBack", null, null, null));
         } else {
-            items.add(modeItem(11, SpeedrunnerSwap.SwapMode.DREAM, false, current));
-            items.add(modeItem(13, SpeedrunnerSwap.SwapMode.SAPNAP, false, current));
-            items.add(modeItem(15, SpeedrunnerSwap.SwapMode.TASK, false, current));
+            items.add(modeItem(10, SpeedrunnerSwap.SwapMode.DREAM, false, current));
+            items.add(modeItem(12, SpeedrunnerSwap.SwapMode.SAPNAP, false, current));
+            items.add(modeItem(14, SpeedrunnerSwap.SwapMode.TASK, false, current));
+            items.add(modeItem(16, SpeedrunnerSwap.SwapMode.TASK_RACE, false, current));
             items.add(backButton(22, "§7§lBack", MenuKey.MAIN, null,
                     player -> openPrevious(player)));
         }
@@ -480,6 +494,7 @@ public final class GuiManager implements Listener {
             case DREAM -> Material.DIAMOND_SWORD;
             case SAPNAP -> Material.DIAMOND_BOOTS;
             case TASK -> Material.TARGET;
+            case TASK_RACE -> Material.RECOVERY_COMPASS;
         };
         List<String> lore = new ArrayList<>();
         lore.add("§8────────────────");
@@ -487,6 +502,7 @@ public final class GuiManager implements Listener {
             case DREAM -> lore.addAll(List.of("§e§lSpeedrunners vs Hunters", "§7Classic chase experience"));
             case SAPNAP -> lore.addAll(List.of("§b§lMulti-runner Control", "§7Share one body cooperatively"));
             case TASK -> lore.addAll(List.of("§6§lTask Master", "§7Secret objectives and deception"));
+            case TASK_RACE -> lore.addAll(List.of("§6§lTask Race", "§7Parallel no-swap objective race"));
         }
         if (direct) {
             lore.add("");
@@ -494,6 +510,7 @@ public final class GuiManager implements Listener {
                 case DREAM -> lore.addAll(List.of("§7Recommended: §f3+ players", "§7(1 runner, 2+ hunters)"));
                 case SAPNAP -> lore.addAll(List.of("§7Recommended: §f2-4 players", "§7Perfect for co-op runs"));
                 case TASK -> lore.addAll(List.of("§7Recommended: §f3+ players", "§7For strategic chaos"));
+                case TASK_RACE -> lore.addAll(List.of("§7Recommended: §f2+ players", "§7Everyone plays at once"));
             }
         }
         lore.add("");
@@ -506,6 +523,7 @@ public final class GuiManager implements Listener {
                 case DREAM -> "Dream";
                 case SAPNAP -> "Sapnap";
                 case TASK -> "Task Master";
+                case TASK_RACE -> "Task Race";
             }, lore);
             if (selected || isDefault) {
                 ItemMeta meta = icon.getItemMeta();
@@ -517,7 +535,7 @@ public final class GuiManager implements Listener {
         }, ctx -> {
             if (ctx.shift()) {
                 plugin.getConfigManager().setDefaultMode(mode);
-                Msg.send(ctx.player(), "§eStartup mode set to §f" + mode.name().toLowerCase(Locale.ROOT) + "§e.");
+                Msg.send(ctx.player(), "§eStartup mode set to §f" + modeDisplayName(mode) + "§e.");
                 ctx.reopen();
                 return;
             }
@@ -530,13 +548,22 @@ public final class GuiManager implements Listener {
                 return;
             }
             plugin.setCurrentMode(mode);
-            Msg.send(ctx.player(), "§aSwitched to §f" + mode.name() + "§a mode.");
+            Msg.send(ctx.player(), "§aSwitched to §f" + modeDisplayName(mode) + "§a mode.");
             if (direct) {
                 open(ctx.player(), MenuKey.MAIN, null, false);
             } else {
                 ctx.reopen();
             }
         });
+    }
+
+    private String modeDisplayName(SpeedrunnerSwap.SwapMode mode) {
+        return switch (mode) {
+            case DREAM -> "Dream";
+            case SAPNAP -> "Sapnap";
+            case TASK -> "Task Master";
+            case TASK_RACE -> "Task Race";
+        };
     }
 
     private MenuScreen buildTeamMenu(MenuContext ctx) {
@@ -815,6 +842,11 @@ public final class GuiManager implements Listener {
                 value -> cfg.setModeDefaultInterval(SpeedrunnerSwap.SwapMode.TASK, value),
                 5, 15, 5, 600,
                 "§7Default interval for Task mode"));
+        items.add(adjustItem(27, Material.RECOVERY_COMPASS, "§6§lTask Race Default",
+                () -> cfg.getModeDefaultInterval(SpeedrunnerSwap.SwapMode.TASK_RACE),
+                value -> cfg.setModeDefaultInterval(SpeedrunnerSwap.SwapMode.TASK_RACE, value),
+                5, 15, 5, 600,
+                "§7Stored for mode switching; no swaps happen in Task Race"));
 
         items.add(adjustItem(28, Material.SHIELD, "§6§lGrace Period (s)",
                 () -> (int) Math.round(plugin.getConfig().getInt("swap.grace_period_ticks", 40) / 20.0),
@@ -1457,32 +1489,65 @@ public final class GuiManager implements Listener {
     private MenuScreen buildTaskHome(MenuContext ctx) {
         GameManager gm = plugin.getGameManager();
         TaskManagerMode taskMode = plugin.getTaskManagerMode();
+        SpeedrunnerSwap.SwapMode currentMode = plugin.getCurrentMode();
+        boolean taskModeSelected = plugin.isTaskCompetitionMode();
+        boolean noSwapMode = plugin.isParallelTaskMode();
 
         List<MenuItem> items = new ArrayList<>();
         items.add(backButton(0, "§7§lBack", MenuKey.MAIN, null, this::openMainMenu));
+        items.add(clickItem(2, () -> icon(Material.TARGET,
+                currentMode == SpeedrunnerSwap.SwapMode.TASK ? "§a§lUsing Task Master" : "§6§lUse Task Master",
+                List.of("§7Shared-body swap competition", "§7Classic secret-task sabotage mode")), ctxClick -> {
+                    if (plugin.getGameManager().isGameRunning()) {
+                        Msg.send(ctxClick.player(), "§cStop the current game before switching task modes.");
+                        return;
+                    }
+                    plugin.setCurrentMode(SpeedrunnerSwap.SwapMode.TASK);
+                    Msg.send(ctxClick.player(), "§aTask hub set to §fTask Master§a.");
+                    ctxClick.reopen();
+                }));
+        items.add(simpleItem(4, () -> icon(Material.BOOK, "§e§lCurrent Task Mode",
+                List.of(
+                        "§7Current plugin mode: §f" + modeDisplayName(currentMode),
+                        taskModeSelected
+                                ? (noSwapMode ? "§7Competition type: §fNo-swap parallel race"
+                                        : "§7Competition type: §fShared-body swap")
+                                : "§cSwitch to a task mode before starting from this hub"))));
+        items.add(clickItem(6, () -> icon(Material.RECOVERY_COMPASS,
+                currentMode == SpeedrunnerSwap.SwapMode.TASK_RACE ? "§a§lUsing Task Race" : "§6§lUse Task Race",
+                List.of("§72+ runners play simultaneously", "§7No periodic swaps or inactive lockout")), ctxClick -> {
+                    if (plugin.getGameManager().isGameRunning()) {
+                        Msg.send(ctxClick.player(), "§cStop the current game before switching task modes.");
+                        return;
+                    }
+                    plugin.setCurrentMode(SpeedrunnerSwap.SwapMode.TASK_RACE);
+                    Msg.send(ctxClick.player(), "§aTask hub set to §fTask Race§a.");
+                    ctxClick.reopen();
+                }));
 
         boolean running = gm.isGameRunning();
         boolean paused = gm.isGamePaused();
-        boolean ready = gm.canStartGame();
+        boolean ready = taskModeSelected && gm.canStartGame();
         int runnerCount = gm.getRunners().size();
         int onlineRunners = (int) gm.getRunners().stream().filter(Player::isOnline).count();
+        int requiredRunners = noSwapMode ? 2 : 1;
 
         // Status tiles ------------------------------------------------
         items.add(clickItem(10, () -> {
             if (running) {
                 return icon(Material.BARRIER, "§c§lStop Competition",
                         List.of("§7Running with §f" + onlineRunners + " §7online runners",
-                                "", "§eClick to end the Task Master round"));
+                                "", "§eClick to end the current round"));
             }
 
             List<String> lore = new ArrayList<>();
-            if (!ready) {
+            if (!taskModeSelected) {
+                lore.add("§cChoose Task Master or Task Race first");
+            } else if (!ready) {
                 lore.add("§cNot enough players selected");
-                if (runnerCount == 0) {
-                    lore.add("§7Select at least one §brunner");
-                }
+                lore.add("§7Select at least §f" + requiredRunners + " §brunner" + (requiredRunners == 1 ? "" : "s"));
             } else {
-                lore.add("§7Ready with §f" + runnerCount + " §7queued runners");
+                lore.add("§7Ready with §f" + runnerCount + " §7runner" + (runnerCount == 1 ? "" : "s"));
             }
             lore.add("");
             lore.add(ready ? "§eClick to start" : "§cAssign runners to begin");
@@ -1492,16 +1557,21 @@ public final class GuiManager implements Listener {
         }, ctxClick -> {
             if (running) {
                 gm.stopGame();
-                Msg.send(ctxClick.player(), "§cTask Master round stopped.");
+                Msg.send(ctxClick.player(), "§c" + modeDisplayName(currentMode) + " round stopped.");
                 ctxClick.reopen();
                 return;
             }
+            if (!taskModeSelected) {
+                Msg.send(ctxClick.player(), "§cSelect Task Master or Task Race in this hub first.");
+                return;
+            }
             if (!ready) {
-                Msg.send(ctxClick.player(), "§cAssign at least one runner before starting.");
+                Msg.send(ctxClick.player(), "§cAssign at least " + requiredRunners + " runner"
+                        + (requiredRunners == 1 ? "" : "s") + " before starting.");
                 return;
             }
             if (gm.startGame()) {
-                Msg.send(ctxClick.player(), "§aTask Master competition started.");
+                Msg.send(ctxClick.player(), "§a" + modeDisplayName(currentMode) + " competition started.");
             } else {
                 Msg.send(ctxClick.player(), "§cUnable to start. Check team assignments.");
             }
@@ -1515,7 +1585,7 @@ public final class GuiManager implements Listener {
             }
             if (paused) {
                 return icon(Material.LIME_DYE, "§a§lResume Competition",
-                        List.of("§7Resumes swaps and tracker updates"));
+                        List.of("§7Resumes the current competition"));
             }
             return icon(Material.CLOCK, "§e§lPause Competition",
                     List.of("§7Freeze progress without ending", "§eClick to pause"));
@@ -1598,7 +1668,7 @@ public final class GuiManager implements Listener {
         items.add(navigateItem(34, Material.COMPARATOR, "§b§lAdvanced Controls", MenuKey.TASK_ADVANCED,
                 "§7UI performance, timers, config browser"));
 
-        return new MenuScreen("§6§lTask Master", 45, items);
+        return new MenuScreen("§6§lTask Competition", 45, items);
     }
 
     private MenuScreen buildTaskSettings(MenuContext ctx) {
@@ -1607,7 +1677,7 @@ public final class GuiManager implements Listener {
 
         items.add(toggleConfigItem(10, Material.REDSTONE_TORCH, "§e§lPause on Disconnect",
                 "task_manager.pause_on_disconnect", true,
-                "§7Pause when active runner disconnects"));
+                "§7Pause when a runner disconnects"));
 
         items.add(toggleConfigItem(11, Material.BARRIER, "§e§lRemove On Timeout",
                 "task_manager.remove_on_timeout", true,

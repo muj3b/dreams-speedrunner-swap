@@ -2,7 +2,7 @@
 
 # 🌀 Speedrunner Swap + Task Master 🌀
 
-### Three Epic Game Modes in One Plugin
+### Four Epic Game Modes in One Plugin
 
 </div>
 
@@ -10,13 +10,13 @@
 
 ![Minecraft](https://img.shields.io/badge/Minecraft-1.21.x%2B-28A745?style=for-the-badge&logo=minecraft)
 ![API](https://img.shields.io/badge/API-Paper%2FSpigot-2875D7?style=for-the-badge)
-![Game Modes](https://img.shields.io/badge/Game_Modes-3_in_1-8A2BE2?style=for-the-badge)
+![Game Modes](https://img.shields.io/badge/Game_Modes-4_in_1-8A2BE2?style=for-the-badge)
 ![Task Master](https://img.shields.io/badge/Task_Master-BETA-FF6B35?style=for-the-badge)
 ![Tasks](https://img.shields.io/badge/100%2B_Tasks-Included-FFC107?style=for-the-badge)
 
 </div>
 
-> **Experience Dream's legendary challenges in one powerful plugin! Play the classic Speedrunners vs Hunters, the cooperative Multi-Runner Control Swap, or the brand-new mind-bending Task Master mode where deception and strategy reign supreme.**
+> **Experience Dream's legendary challenges in one powerful plugin! Play the classic Speedrunners vs Hunters, the cooperative Multi-Runner Control Swap, the shared-body Task Master sabotage mode, or the new no-swap Task Race mode where everyone plays at once.**
 
 ---
 
@@ -55,6 +55,10 @@
 </div>
 
 In Task Master mode, players take turns controlling a single character while racing to complete their secret objectives. Every minute, control swaps to the next player. Will you help others to hide your true goal? Will you sabotage their progress? The choice is yours, but only the first to complete their task wins!
+
+## 🏁 NEW: Task Race Mode
+
+Task Race uses the same secret task pool, but removes the shared-body swap loop entirely. Two or more runners can play at the same time on their own characters, and the first player to finish their task wins instantly.
 
 ### 🎲 100+ Unique Tasks Included!
 
@@ -201,7 +205,7 @@ In Task Master mode, players take turns controlling a single character while rac
 
 <table>
   <tr>
-    <td width="33%" valign="top">
+    <td width="25%" valign="top">
       <h3>🏹 Speedrunners vs Hunters</h3>
       <p>The classic chase. Speedrunners must defeat the Ender Dragon while being hunted. Control swaps between runners at intervals.</p>
       <ul>
@@ -211,7 +215,7 @@ In Task Master mode, players take turns controlling a single character while rac
         <li>🎯 Goal: Defeat Ender Dragon</li>
       </ul>
     </td>
-    <td width="33%" valign="top">
+    <td width="25%" valign="top">
       <h3>🎛️ Multi-Runner Control</h3>
       <p>Pure cooperation. Multiple players share control of one character in a queue system to beat the game together.</p>
       <ul>
@@ -221,7 +225,7 @@ In Task Master mode, players take turns controlling a single character while rac
         <li>🎯 Goal: Beat the game as one</li>
       </ul>
     </td>
-    <td width="33%" valign="top">
+    <td width="25%" valign="top">
       <h3>🎯 Task Master <span style="color: #FF6B35;">(BETA)</span></h3>
       <p>Strategic competition. Complete your secret task while sharing control and preventing others from completing theirs.</p>
       <ul>
@@ -229,6 +233,16 @@ In Task Master mode, players take turns controlling a single character while rac
         <li>➕ Custom task support</li>
         <li>🕵️ Hidden objectives</li>
         <li>🎯 Goal: Complete your task first</li>
+      </ul>
+    </td>
+    <td width="25%" valign="top">
+      <h3>🏁 Task Race</h3>
+      <p>Parallel competition. Every runner keeps their own body, inventory, and progress while racing to finish a hidden task first.</p>
+      <ul>
+        <li>👥 2+ runners at once</li>
+        <li>🚫 No periodic swaps</li>
+        <li>🕵️ Hidden objectives</li>
+        <li>🎯 Goal: Finish before everyone else</li>
       </ul>
     </td>
   </tr>
@@ -270,7 +284,7 @@ In Task Master mode, players take turns controlling a single character while rac
 |:--|:--|
 | `/swap gui` | Opens the full management hub (mode selector, team setup, settings, task pool, stats, kits, etc.). |
 | `/swap start` · `/swap stop` · `/swap pause` · `/swap resume` · `/swap status` | Runtime controls for starting, stopping, pausing and inspecting the current match. |
-| `/swap mode <dream|sapnap|task>` | Switches the active gameplay mode. Automatically blocks switching mid-match unless `--force` is provided. |
+| `/swap mode <dream|sapnap|task|taskrace>` | Switches the active gameplay mode. Automatically blocks switching mid-match unless `--force` is provided. |
 | `/swap setrunners <players…>` · `/swap sethunters <players…>` · `/swap clearteams` | Quick team assignment helpers (mirrors the GUI team selector). |
 | `/swap interval <seconds>` · `/swap randomize <on|off>` | Fast tweaks for the base swap interval and randomisation without opening the menu. |
 | `/swap tasks list` | Prints all registered Task Master objectives with their enabled state and difficulty. |
@@ -348,7 +362,7 @@ The plugin ships with a comprehensive `config.yml`, but every option can be adju
 
 ### 🎉 Experience Dream's Challenges Today! 🎉
 
-**100+ tasks included • Custom task support • Three game modes • Endless possibilities**
+**100+ tasks included • Custom task support • Four game modes • Endless possibilities**
 
 *Task Master mode is in BETA - Report issues and suggest new tasks on our Discord!*
 

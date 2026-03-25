@@ -23,6 +23,15 @@ public class SwapCommand implements CommandExecutor, TabCompleter {
         this.plugin = plugin;
     }
 
+    private String modeName(com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode mode) {
+        return switch (mode) {
+            case DREAM -> "dream";
+            case SAPNAP -> "sapnap";
+            case TASK -> "task";
+            case TASK_RACE -> "taskrace";
+        };
+    }
+
     private boolean handleInterval(CommandSender sender, String[] rest) {
         if (!sender.hasPermission("speedrunnerswap.admin")) { sender.sendMessage("§cYou do not have permission to run this."); return true; }
         if (rest.length < 1) { sender.sendMessage("§cUsage: /swap interval <seconds>"); return false; }
@@ -59,7 +68,7 @@ public class SwapCommand implements CommandExecutor, TabCompleter {
         sender.sendMessage("§e/swap start|stop|pause|resume §7Control game");
         sender.sendMessage("§e/swap interval <seconds> §7Set base swap interval");
         sender.sendMessage("§e/swap randomize <on|off> §7Toggle randomized swaps");
-        sender.sendMessage("§e/swap mode <dream|sapnap|task> §7Set mode");
+        sender.sendMessage("§e/swap mode <dream|sapnap|task|taskrace> §7Set mode");
         sender.sendMessage("§e/swap tasks list §7List tasks with difficulty + enabled");
         sender.sendMessage("§e/swap tasks enable|disable <id> §7Toggle a task");
         sender.sendMessage("§e/swap tasks difficulty <easy|medium|hard> §7Set difficulty pool");
@@ -130,8 +139,8 @@ public class SwapCommand implements CommandExecutor, TabCompleter {
         }
 
         if (rest.length == 0) {
-            sender.sendMessage("§eCurrent mode: §f" + plugin.getCurrentMode().name().toLowerCase());
-            sender.sendMessage("§7Usage: /swap mode <dream|sapnap|task> [--force]");
+            sender.sendMessage("§eCurrent mode: §f" + modeName(plugin.getCurrentMode()));
+            sender.sendMessage("§7Usage: /swap mode <dream|sapnap|task|taskrace> [--force]");
             return true;
         }
 
@@ -146,7 +155,7 @@ public class SwapCommand implements CommandExecutor, TabCompleter {
         }
 
         if (targetArg == null) {
-            sender.sendMessage("§cSpecify a mode to switch to (dream, sapnap, task).");
+            sender.sendMessage("§cSpecify a mode to switch to (dream, sapnap, task, taskrace).");
             return false;
         }
 
@@ -161,11 +170,13 @@ public class SwapCommand implements CommandExecutor, TabCompleter {
             case "dream", "hunters", "manhunt" -> com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode.DREAM;
             case "sapnap", "control", "multi", "multirunner", "runners" -> com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode.SAPNAP;
             case "task", "taskmaster", "task-manager", "taskmanager" -> com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode.TASK;
+            case "taskrace", "task_race", "task-race", "noswap", "paralleltask", "taskparallel", "task_parallel" ->
+                com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode.TASK_RACE;
             default -> null;
         };
 
         if (target == null) {
-            sender.sendMessage("§cUnknown mode: " + mode + ". Use dream|sapnap|task.");
+            sender.sendMessage("§cUnknown mode: " + mode + ". Use dream|sapnap|task|taskrace.");
             return false;
         }
 
@@ -184,6 +195,7 @@ public class SwapCommand implements CommandExecutor, TabCompleter {
             case DREAM -> "§aMode set to §fDream§a (runners + hunters).";
             case SAPNAP -> "§aMode set to §fSapnap§a (multi-runner control).";
             case TASK -> "§aMode set to §6Task Master§a (secret objectives).";
+            case TASK_RACE -> "§aMode set to §6Task Race§a (no-swap secret objective race).";
         };
         sender.sendMessage(confirmation);
 
@@ -250,8 +262,10 @@ public class SwapCommand implements CommandExecutor, TabCompleter {
             var mode = plugin.getCurrentMode();
             if (mode == com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode.DREAM) {
                 sender.sendMessage("§cFailed to start. Dream mode requires at least §e1 runner§c and §e1 hunter§c.");
+            } else if (mode == com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode.TASK_RACE) {
+                sender.sendMessage("§cFailed to start. Task Race requires at least §e2 runners§c and no hunters.");
             } else {
-                sender.sendMessage("§cFailed to start. You must set at least §e1 runner§c.");
+                sender.sendMessage("§cFailed to start. You must set at least §e1 runner§c and no hunters.");
             }
         }
         
@@ -302,6 +316,7 @@ public class SwapCommand implements CommandExecutor, TabCompleter {
         }
         
         sender.sendMessage("§6=== SpeedrunnerSwap Status ===");
+        sender.sendMessage("§eCurrent Mode: §f" + modeName(plugin.getCurrentMode()));
         sender.sendMessage("§eGame Running: §f" + plugin.getGameManager().isGameRunning());
         sender.sendMessage("§eGame Paused: §f" + plugin.getGameManager().isGamePaused());
         sender.sendMessage("§eSession World: §f" + (plugin.getGameManager().getSessionWorldName() != null
@@ -312,9 +327,13 @@ public class SwapCommand implements CommandExecutor, TabCompleter {
                 + plugin.getConfigManager().isAssignmentRestrictedToSessionWorld());
         
         if (plugin.getGameManager().isGameRunning()) {
-            Player activeRunner = plugin.getGameManager().getActiveRunner();
-            sender.sendMessage("§eActive Runner: §f" + (activeRunner != null ? activeRunner.getName() : "None"));
-            sender.sendMessage("§eTime Until Next Swap: §f" + plugin.getGameManager().getTimeUntilNextSwap() + "s");
+            if (plugin.usesSharedRunnerControl()) {
+                Player activeRunner = plugin.getGameManager().getActiveRunner();
+                sender.sendMessage("§eActive Runner: §f" + (activeRunner != null ? activeRunner.getName() : "None"));
+                sender.sendMessage("§eTime Until Next Swap: §f" + plugin.getGameManager().getTimeUntilNextSwap() + "s");
+            } else {
+                sender.sendMessage("§eMode Type: §fNo-swap parallel runners");
+            }
             
             List<Player> runners = plugin.getGameManager().getRunners();
             List<Player> hunters = plugin.getGameManager().getHunters();
@@ -546,8 +565,8 @@ public class SwapCommand implements CommandExecutor, TabCompleter {
                     sender.sendMessage("§cYou can only reroll before the game starts.");
                     return false;
                 }
-                if (plugin.getCurrentMode() != com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode.TASK) {
-                    sender.sendMessage("§cSwitch to Task Manager mode first: /swap mode task");
+                if (!plugin.isTaskCompetitionMode()) {
+                    sender.sendMessage("§cSwitch to a task competition mode first: /swap mode task or /swap mode taskrace");
                     return false;
                 }
                 var tmm = plugin.getTaskManagerMode();
@@ -643,7 +662,7 @@ public class SwapCommand implements CommandExecutor, TabCompleter {
                     completions.add("confirm");
                 }
             } else if (args[0].equalsIgnoreCase("mode") && args.length == 2) {
-                for (String opt : new String[]{"dream", "sapnap", "task"}) {
+                for (String opt : new String[]{"dream", "sapnap", "task", "taskrace"}) {
                     if (opt.startsWith(args[1].toLowerCase())) completions.add(opt);
                 }
                 if ("--force".startsWith(args[1].toLowerCase())) {
@@ -682,8 +701,8 @@ public class SwapCommand implements CommandExecutor, TabCompleter {
             return false;
         }
         
-        if (plugin.getCurrentMode() != com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode.TASK) {
-            sender.sendMessage("§cTask completion is only available in Task Manager mode.");
+        if (!plugin.isTaskCompetitionMode()) {
+            sender.sendMessage("§cTask completion is only available in Task Master or Task Race.");
             return false;
         }
         

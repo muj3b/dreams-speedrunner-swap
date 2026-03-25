@@ -1,5 +1,5 @@
 # SpeedrunnerSwap Configuration
-# Version 2.1
+# Version 4.3
 
 # Teams Configuration
 teams:
@@ -24,6 +24,7 @@ swap:
     dream: 60
     sapnap: 60
     task: 60
+    task_race: 60
   # Jitter settings (only used if randomize is true)
   jitter:
     # Standard deviation in seconds
@@ -335,5 +336,5 @@ task_manager:
 
 # General game settings
 game:
-  # Default mode selected on server start: dream | sapnap | task
+  # Default mode selected on server start: dream | sapnap | task | task_race
   default_mode: dream

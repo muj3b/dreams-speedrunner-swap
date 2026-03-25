@@ -33,7 +33,7 @@ public class TaskEventListener implements Listener {
     }
 
     private boolean isTaskMode() {
-        return plugin.getCurrentMode() == SpeedrunnerSwap.SwapMode.TASK && plugin.getGameManager().isGameRunning();
+        return plugin.isTaskCompetitionMode() && plugin.getGameManager().isGameRunning();
     }
 
 
