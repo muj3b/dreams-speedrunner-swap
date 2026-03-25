@@ -40,7 +40,10 @@ public class GameManager {
     private BukkitTask freezeCheckTask;
     private BukkitTask cageTask;
     private BukkitTask runnerTimeoutTask;
+    private BukkitTask taskMaxDurationTask;
     private long nextSwapTime;
+    private long taskGameDeadlineMs;
+    private long taskGameRemainingMs;
     private final Map<UUID, PlayerState> playerStates;
     private final Map<UUID, Long> runnerDisconnectAt = new HashMap<>();
     // Shared cage management per-world (one cage in each world)
@@ -197,6 +200,7 @@ public class GameManager {
                             plugin.getLogger().warning("Task assignment failed: " + t.getMessage());
                         }
                         startRunnerTimeoutWatcher();
+                        startTaskMaxDurationWatcher(getConfiguredTaskDurationMs());
                         Bukkit.getScheduler().runTaskLater(plugin, postStart, TASK_INTRO_DELAY_TICKS);
                     } else {
                         postStart.run();
@@ -269,10 +273,16 @@ public class GameManager {
             runnerTimeoutTask.cancel();
             runnerTimeoutTask = null;
         }
+        if (taskMaxDurationTask != null) {
+            taskMaxDurationTask.cancel();
+            taskMaxDurationTask = null;
+        }
         plugin.getTrackerManager().stopTracking();
         portalSwapRetries.clear();
         swapInProgress = false;
         pausedByDisconnect = false;
+        taskGameDeadlineMs = 0L;
+        taskGameRemainingMs = 0L;
         try {
             plugin.getStatsManager().stopTracking();
         } catch (Exception ignored) {
@@ -510,7 +520,11 @@ public class GameManager {
         boolean huntersRequired = huntersRequired(plugin.getCurrentMode());
         boolean teamEmpty = runners.isEmpty() || (huntersRequired && hunters.isEmpty());
         if (gameRunning && teamEmpty) {
-            if (plugin.getConfigManager().isPauseOnDisconnect()) {
+            boolean pauseOnDc = plugin.isTaskCompetitionMode()
+                    ? plugin.getConfig().getBoolean("task_manager.pause_on_disconnect",
+                            plugin.getConfigManager().isPauseOnDisconnect())
+                    : plugin.getConfigManager().isPauseOnDisconnect();
+            if (pauseOnDc) {
                 if (pauseGame()) {
                     pausedByDisconnect = true;
                 }
@@ -561,11 +575,13 @@ public class GameManager {
                         plugin.getConfigManager().isPauseOnDisconnect())
                 : plugin.getConfigManager().isPauseOnDisconnect();
 
-        if (plugin.isParallelTaskMode() && isRunner(player)) {
+        if (plugin.isTaskCompetitionMode() && isRunner(player)) {
             if (pauseOnDc) {
                 if (pauseGame()) {
                     pausedByDisconnect = true;
                 }
+            } else if (plugin.usesSharedRunnerControl() && player.equals(activeRunner)) {
+                performSwap();
             } else {
                 reselectSessionLeader();
             }
@@ -688,6 +704,51 @@ public class GameManager {
                 }
             }
         }.runTaskTimer(plugin, 20L, 20L * 5);
+    }
+
+    private long getConfiguredTaskDurationMs() {
+        int minutes = plugin.getConfig().getInt("task_manager.max_game_duration", 0);
+        if (minutes <= 0) {
+            return 0L;
+        }
+        return minutes * 60_000L;
+    }
+
+    private void startTaskMaxDurationWatcher(long durationMs) {
+        if (taskMaxDurationTask != null) {
+            taskMaxDurationTask.cancel();
+            taskMaxDurationTask = null;
+        }
+        taskGameDeadlineMs = 0L;
+        taskGameRemainingMs = 0L;
+        if (!plugin.isTaskCompetitionMode() || durationMs <= 0L) {
+            return;
+        }
+        scheduleTaskMaxDurationWatcher(durationMs);
+    }
+
+    private void scheduleTaskMaxDurationWatcher(long durationMs) {
+        if (!plugin.isTaskCompetitionMode() || durationMs <= 0L) {
+            taskGameDeadlineMs = 0L;
+            taskGameRemainingMs = 0L;
+            return;
+        }
+        if (taskMaxDurationTask != null) {
+            taskMaxDurationTask.cancel();
+        }
+        long delayTicks = Math.max(1L, (long) Math.ceil(durationMs / 50.0D));
+        taskGameDeadlineMs = System.currentTimeMillis() + durationMs;
+        taskGameRemainingMs = durationMs;
+        taskMaxDurationTask = Bukkit.getScheduler().runTaskLater(plugin, () -> {
+            taskMaxDurationTask = null;
+            taskGameDeadlineMs = 0L;
+            taskGameRemainingMs = 0L;
+            if (!gameRunning) {
+                return;
+            }
+            Msg.broadcast("§e[Task Manager] Maximum game duration reached. Ending the round.");
+            stopGame();
+        }, delayTicks);
     }
 
     private void setRuntimeDisconnectTime(UUID uuid, long when) {
@@ -1638,6 +1699,14 @@ public class GameManager {
         if (titleTask != null) {
             titleTask.cancel();
         }
+        if (taskMaxDurationTask != null) {
+            taskMaxDurationTask.cancel();
+            taskMaxDurationTask = null;
+        }
+        if (plugin.isTaskCompetitionMode() && taskGameDeadlineMs > 0L) {
+            taskGameRemainingMs = Math.max(0L, taskGameDeadlineMs - System.currentTimeMillis());
+            taskGameDeadlineMs = 0L;
+        }
         // Apply a brief heavy slowness to current active runner as a visual pause cue
         Player ar = getActiveRunner();
         if (plugin.usesSharedRunnerControl() && ar != null) {
@@ -1668,6 +1737,10 @@ public class GameManager {
             startActionBarUpdates();
             startTitleUpdates();
             startCageEnforcement();
+        }
+        if (plugin.isTaskCompetitionMode()) {
+            long resumeDurationMs = taskGameRemainingMs > 0L ? taskGameRemainingMs : getConfiguredTaskDurationMs();
+            scheduleTaskMaxDurationWatcher(resumeDurationMs);
         }
         if (plugin.getCurrentMode() == com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode.DREAM) {
             scheduleNextHunterSwap();
@@ -1753,9 +1826,11 @@ public class GameManager {
         if (player == null) {
             return null;
         }
-        Location candidate = prepareSafeSpawn(sharedRunnerSpawn, null);
-        if (candidate != null) {
-            return candidate;
+        if (plugin.usesSharedRunnerControl()) {
+            Location candidate = prepareSafeSpawn(sharedRunnerSpawn, null);
+            if (candidate != null) {
+                return candidate;
+            }
         }
 
         World sessionWorld = resolveSessionWorld(player);
@@ -2445,6 +2520,9 @@ public class GameManager {
         }
         if (!hasOnlinePlayer(runners)) {
             return false;
+        }
+        if (plugin.isTaskCompetitionMode()) {
+            return runnerDisconnectAt.isEmpty();
         }
         if (huntersRequired(plugin.getCurrentMode())) {
             return hasOnlinePlayer(hunters);

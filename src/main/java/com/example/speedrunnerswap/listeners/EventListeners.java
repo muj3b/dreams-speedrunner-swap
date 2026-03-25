@@ -304,6 +304,14 @@ public class EventListeners implements Listener {
         Player player = event.getPlayer();
 
         if (plugin.getGameManager().isRunner(player)) {
+            if (plugin.isParallelTaskMode() && (event.isBedSpawn() || event.isAnchorSpawn())) {
+                org.bukkit.Location target = event.getRespawnLocation();
+                if (target != null) {
+                    plugin.getGameManager().syncRunnerRespawn(player, target);
+                    plugin.getGameManager().scheduleRunnerRespawnEnforcement(player, target);
+                }
+                return;
+            }
             org.bukkit.Location target = plugin.getGameManager().resolveRunnerRespawn(player);
             if (target != null) {
                 event.setRespawnLocation(target);
@@ -326,6 +334,9 @@ public class EventListeners implements Listener {
     @EventHandler(priority = EventPriority.MONITOR)
     public void onPlayerSpawnChange(PlayerRespawnEvent event) {
         if (!event.isBedSpawn() && !event.isAnchorSpawn()) {
+            return;
+        }
+        if (!plugin.usesSharedRunnerControl()) {
             return;
         }
         if (plugin.getGameManager().isSpawnSyncInFlight()) {
