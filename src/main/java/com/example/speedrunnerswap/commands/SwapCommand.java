@@ -73,6 +73,7 @@ public class SwapCommand implements CommandExecutor, TabCompleter {
         sender.sendMessage("§e/swap tasks enable|disable <id> §7Toggle a task");
         sender.sendMessage("§e/swap tasks difficulty <easy|medium|hard> §7Set difficulty pool");
         sender.sendMessage("§e/swap tasks reload §7Reload tasks.yml");
+        sender.sendMessage("§e/swap complete reroll confirm §7Use your one-time task reroll if eligible");
         return true;
     }
     
@@ -572,11 +573,7 @@ public class SwapCommand implements CommandExecutor, TabCompleter {
                 var tmm = plugin.getTaskManagerMode();
                 if (tmm == null) { sender.sendMessage("§cTask Manager not initialized."); return false; }
                 // Build runner list from selected team assignments
-                java.util.List<Player> selectedRunners = new java.util.ArrayList<>();
-                for (Player p : Bukkit.getOnlinePlayers()) {
-                    var st = plugin.getGameManager().getPlayerState(p);
-                    if (st != null && st.getSelectedTeam() == com.example.speedrunnerswap.models.Team.RUNNER) selectedRunners.add(p);
-                }
+                java.util.List<Player> selectedRunners = new java.util.ArrayList<>(plugin.getGameManager().getRunners());
                 if (selectedRunners.isEmpty()) {
                     sender.sendMessage("§cNo selected runners found. Use the Team Selector first.");
                     return false;
@@ -661,6 +658,14 @@ public class SwapCommand implements CommandExecutor, TabCompleter {
                 if ("confirm".startsWith(args[1].toLowerCase())) {
                     completions.add("confirm");
                 }
+                if ("reroll".startsWith(args[1].toLowerCase())) {
+                    completions.add("reroll");
+                }
+            } else if (args[0].equalsIgnoreCase("complete") && args.length == 3
+                    && args[1].equalsIgnoreCase("reroll")) {
+                if ("confirm".startsWith(args[2].toLowerCase())) {
+                    completions.add("confirm");
+                }
             } else if (args[0].equalsIgnoreCase("mode") && args.length == 2) {
                 for (String opt : new String[]{"dream", "sapnap", "task", "taskrace"}) {
                     if (opt.startsWith(args[1].toLowerCase())) completions.add(opt);
@@ -706,17 +711,18 @@ public class SwapCommand implements CommandExecutor, TabCompleter {
             return false;
         }
         
-        if (!plugin.getGameManager().isGameRunning()) {
-            sender.sendMessage("§cTasks can only be completed during an active game.");
-            return false;
-        }
-        
         var taskMode = plugin.getTaskManagerMode();
         if (taskMode == null) {
             sender.sendMessage("§cTask Manager not initialized.");
             return false;
         }
-        
+
+        boolean gameRunning = plugin.getGameManager().isGameRunning();
+        if (!gameRunning && taskMode.getAssignedTask(player) == null) {
+            sender.sendMessage("§cYou do not have a task assigned right now.");
+            return false;
+        }
+
         String assignedTask = taskMode.getAssignedTask(player);
         if (assignedTask == null) {
             sender.sendMessage("§cYou don't have a task assigned. Join the game as a runner first.");
@@ -735,16 +741,49 @@ public class SwapCommand implements CommandExecutor, TabCompleter {
             player.sendMessage("");
             player.sendMessage("§a§lTo complete your task:");
             player.sendMessage("§e/swap complete confirm");
+            if (taskMode.isTaskRerollEnabled()) {
+                player.sendMessage("§e/swap complete reroll confirm");
+                player.sendMessage("§7Rerolls left: §f" + taskMode.getRemainingRerolls(player));
+            }
             player.sendMessage("");
-            player.sendMessage("§7When you use this command, you will win the game!");
+            player.sendMessage("§7When you use the completion command, you will win the game.");
             player.sendMessage("§7Only use it when you have actually finished your task.");
             player.sendMessage("§6" + "=".repeat(35));
             return true;
         }
         
         String action = rest[0].toLowerCase();
+        if ("reroll".equals(action)) {
+            String blocked = taskMode.getRerollUnavailableReason(player);
+            if (blocked != null) {
+                sender.sendMessage("§c" + blocked);
+                return false;
+            }
+            if (rest.length < 2 || !"confirm".equalsIgnoreCase(rest[1])) {
+                sender.sendMessage("§eCurrent task: §f" + description);
+                sender.sendMessage("§7Use §e/swap complete reroll confirm §7to spend your reroll.");
+                sender.sendMessage("§7Rerolls left: §f" + taskMode.getRemainingRerolls(player));
+                return true;
+            }
+
+            var newTask = taskMode.rerollTask(player);
+            if (newTask == null) {
+                sender.sendMessage("§cNo alternate task is available for you right now.");
+                return false;
+            }
+            sender.sendMessage("§aYour task has been rerolled.");
+            sender.sendMessage("§eNew task: §f" + newTask.description());
+            sender.sendMessage("§7Rerolls left: §f" + taskMode.getRemainingRerolls(player));
+            return true;
+        }
+
         if (!"confirm".equals(action)) {
-            sender.sendMessage("§cUse '/swap complete confirm' to complete your task, or '/swap complete' to see your task.");
+            sender.sendMessage("§cUse '/swap complete confirm' to complete your task, '/swap complete reroll confirm' to reroll, or '/swap complete' to see your task.");
+            return false;
+        }
+
+        if (!gameRunning) {
+            sender.sendMessage("§cTask completion is only available during an active game.");
             return false;
         }
         

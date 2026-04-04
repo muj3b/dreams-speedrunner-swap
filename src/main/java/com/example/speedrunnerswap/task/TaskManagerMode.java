@@ -20,6 +20,9 @@ public class TaskManagerMode {
     final Map<UUID, EnumSet<org.bukkit.DyeColor>> sheepKilledWithIronShovel = new HashMap<>();
     // Bed exploder attribution per world
     final Map<String, UUID> lastBedExploderPerWorld = new HashMap<>();
+    private final Map<UUID, Integer> rerollsUsed = new HashMap<>();
+    private final Set<UUID> completedFirstTurn = new HashSet<>();
+    private long roundStartedAtMs = 0L;
 
     // Task registry: id -> definition
     private final Map<String, TaskDefinition> registry = new LinkedHashMap<>();
@@ -69,37 +72,50 @@ public class TaskManagerMode {
     }
 
     public void assignAndAnnounceTasks(List<Player> players) {
-        assignments.clear();
-        sheepKilledWithIronShovel.clear();
-        lastBedExploderPerWorld.clear();
-        resetProgressGates();
+        assignAndAnnounceTasks(players, true);
+    }
 
-        // Build candidate pool with current filter and gates
-        List<String> candidates = getCandidateTaskIds();
-        if (candidates.isEmpty()) {
-            // Fallback: use all enabled tasks regardless of gating
-            candidates = registry.values().stream()
-                    .filter(TaskDefinition::enabled)
-                    .map(TaskDefinition::id)
-                    .toList();
+    public void assignAdditionalTasks(List<Player> players) {
+        assignAndAnnounceTasks(players, false);
+    }
+
+    private void assignAndAnnounceTasks(List<Player> players, boolean resetExistingAssignments) {
+        if (players == null || players.isEmpty()) {
+            return;
         }
 
+        if (resetExistingAssignments) {
+            assignments.clear();
+            sheepKilledWithIronShovel.clear();
+            lastBedExploderPerWorld.clear();
+            rerollsUsed.clear();
+            completedFirstTurn.clear();
+            if (!plugin.getGameManager().isGameRunning()) {
+                roundStartedAtMs = 0L;
+            }
+            resetProgressGates();
+        }
+
+        List<String> candidates = getAssignableTaskIds();
         if (candidates.isEmpty()) {
             handleEmptyTaskPool(players);
             return;
         }
 
-        // Build a randomized selection without duplicates (wrap if more players than
-        // tasks)
         List<String> shuffled = new ArrayList<>(candidates);
         Collections.shuffle(shuffled, new Random());
         int idx = 0;
         for (Player p : players) {
-            String taskId = shuffled.get(idx % shuffled.size());
+            if (p == null) {
+                continue;
+            }
+            String taskId = pickTaskForPlayer(p.getUniqueId(), shuffled, idx++);
+            if (taskId == null) {
+                continue;
+            }
             assignments.put(p.getUniqueId(), taskId);
             TaskDefinition def = registry.get(taskId);
             announceTask(p, def);
-            idx++;
         }
         saveAssignmentsToConfig();
     }
@@ -117,6 +133,38 @@ public class TaskManagerMode {
                 p.sendMessage("§eEnable tasks in /swap gui → Task Manager before starting this mode.");
             }
         }
+    }
+
+    private List<String> getAssignableTaskIds() {
+        List<String> candidates = getCandidateTaskIds();
+        if (!candidates.isEmpty()) {
+            return candidates;
+        }
+        return registry.values().stream()
+                .filter(TaskDefinition::enabled)
+                .map(TaskDefinition::id)
+                .toList();
+    }
+
+    private String pickTaskForPlayer(UUID playerId, List<String> shuffledCandidates, int fallbackIndex) {
+        if (shuffledCandidates == null || shuffledCandidates.isEmpty()) {
+            return null;
+        }
+
+        Set<String> taken = new HashSet<>();
+        for (Map.Entry<UUID, String> entry : assignments.entrySet()) {
+            if (!entry.getKey().equals(playerId)) {
+                taken.add(entry.getValue());
+            }
+        }
+
+        for (String candidate : shuffledCandidates) {
+            if (!taken.contains(candidate)) {
+                return candidate;
+            }
+        }
+
+        return shuffledCandidates.get(fallbackIndex % shuffledCandidates.size());
     }
 
     private void announceTask(Player p, TaskDefinition def) {
@@ -139,6 +187,9 @@ public class TaskManagerMode {
         p.sendMessage("§a§lCOMPLETION OPTIONS:");
         p.sendMessage("§7• §fSome tasks complete automatically when detected");
         p.sendMessage("§7• §fFor manual completion: §e/swap complete confirm");
+        if (isTaskRerollEnabled()) {
+            p.sendMessage("§7• §fOne reroll: §e/swap complete reroll confirm");
+        }
         p.sendMessage("§7• §fTo view your task again: §e/swap complete");
         p.sendMessage("");
         p.sendMessage("§6⚠ Manual completion will instantly win the game!");
@@ -170,6 +221,134 @@ public class TaskManagerMode {
 
     public Map<UUID, String> getAssignments() {
         return Collections.unmodifiableMap(assignments);
+    }
+
+    public void beginRound(List<Player> players) {
+        roundStartedAtMs = System.currentTimeMillis();
+        rerollsUsed.clear();
+        completedFirstTurn.clear();
+        if (players != null) {
+            for (Player player : players) {
+                if (player != null) {
+                    rerollsUsed.put(player.getUniqueId(), 0);
+                }
+            }
+        }
+    }
+
+    public void markFirstTurnCompleted(Player player) {
+        if (player == null) {
+            return;
+        }
+        completedFirstTurn.add(player.getUniqueId());
+    }
+
+    public boolean isTaskRerollEnabled() {
+        return plugin.getConfig().getBoolean("task_manager.reroll.enabled", true)
+                && plugin.getConfig().getInt("task_manager.reroll.uses_per_player", 1) > 0;
+    }
+
+    public int getRemainingRerolls(Player player) {
+        if (player == null) {
+            return 0;
+        }
+        int maxUses = Math.max(0, plugin.getConfig().getInt("task_manager.reroll.uses_per_player", 1));
+        int used = rerollsUsed.getOrDefault(player.getUniqueId(), 0);
+        return Math.max(0, maxUses - used);
+    }
+
+    public String getAssignedTaskDescription(Player player) {
+        if (player == null) {
+            return null;
+        }
+        String taskId = assignments.get(player.getUniqueId());
+        if (taskId == null) {
+            return null;
+        }
+        TaskDefinition definition = registry.get(taskId);
+        return definition != null ? definition.description() : taskId;
+    }
+
+    public String getRerollUnavailableReason(Player player) {
+        if (player == null) {
+            return "Player not found.";
+        }
+        if (!isTaskRerollEnabled()) {
+            return "Task rerolls are disabled.";
+        }
+        if (!assignments.containsKey(player.getUniqueId())) {
+            return "You do not have a task assigned.";
+        }
+        if (getRemainingRerolls(player) <= 0) {
+            return "You have already used your task reroll.";
+        }
+
+        boolean gameRunning = plugin.getGameManager() != null && plugin.getGameManager().isGameRunning();
+        if (!gameRunning) {
+            if (!plugin.getConfig().getBoolean("task_manager.reroll.allow_before_start", true)) {
+                return "Task rerolls are disabled before the round starts.";
+            }
+            return null;
+        }
+
+        if (!plugin.getConfig().getBoolean("task_manager.reroll.allow_during_first_turn", true)) {
+            return "Task rerolls are disabled after the round starts.";
+        }
+
+        if (plugin.isParallelTaskMode()) {
+            int windowSeconds = Math.max(0, plugin.getConfig().getInt("task_manager.reroll.task_race_window_seconds", 60));
+            if (windowSeconds <= 0) {
+                return "Task Race rerolls are disabled once the round starts.";
+            }
+            if (roundStartedAtMs <= 0L) {
+                return "The reroll window is not ready yet. Try again in a moment.";
+            }
+            long deadline = roundStartedAtMs + (windowSeconds * 1000L);
+            if (System.currentTimeMillis() > deadline) {
+                return "Your Task Race reroll window has expired.";
+            }
+            return null;
+        }
+
+        if (completedFirstTurn.contains(player.getUniqueId())) {
+            return "Your first turn has already ended.";
+        }
+        return null;
+    }
+
+    public TaskDefinition rerollTask(Player player) {
+        String blocked = getRerollUnavailableReason(player);
+        if (blocked != null || player == null) {
+            return null;
+        }
+
+        String currentTask = assignments.get(player.getUniqueId());
+        List<String> candidates = new ArrayList<>(getAssignableTaskIds());
+        candidates.remove(currentTask);
+        if (candidates.isEmpty()) {
+            return null;
+        }
+
+        Set<String> assignedToOthers = new HashSet<>();
+        for (Map.Entry<UUID, String> entry : assignments.entrySet()) {
+            if (!entry.getKey().equals(player.getUniqueId())) {
+                assignedToOthers.add(entry.getValue());
+            }
+        }
+
+        List<String> preferred = candidates.stream()
+                .filter(candidate -> !assignedToOthers.contains(candidate))
+                .toList();
+        List<String> pool = preferred.isEmpty() ? candidates : preferred;
+        String taskId = pool.get(new Random().nextInt(pool.size()));
+        assignments.put(player.getUniqueId(), taskId);
+        rerollsUsed.merge(player.getUniqueId(), 1, Integer::sum);
+        sheepKilledWithIronShovel.remove(player.getUniqueId());
+        saveAssignmentsToConfig();
+
+        TaskDefinition definition = registry.get(taskId);
+        announceTask(player, definition);
+        return definition;
     }
 
     /** Broadcast the current assignments to the whole server. */

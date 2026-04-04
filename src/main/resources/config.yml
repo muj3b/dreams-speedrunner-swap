@@ -328,7 +328,16 @@ task_manager:
   remove_on_timeout: true
   allow_late_joiners: false
   end_when_one_left: false
+  # Default assignment pool for new rounds
   difficulty: MEDIUM
+  # Player-controlled task rerolls
+  reroll:
+    enabled: true
+    uses_per_player: 1
+    allow_before_start: true
+    allow_during_first_turn: true
+    # For Task Race only: how many seconds after round start players can reroll
+    task_race_window_seconds: 60
   # Runtime state (do not edit manually unless you know what you're doing)
   runtime:
     assignments: {}

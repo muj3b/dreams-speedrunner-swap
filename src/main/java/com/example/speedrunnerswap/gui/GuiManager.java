@@ -1509,6 +1509,8 @@ public final class GuiManager implements Listener {
         items.add(simpleItem(4, () -> icon(Material.BOOK, "§e§lCurrent Task Mode",
                 List.of(
                         "§7Current plugin mode: §f" + modeDisplayName(currentMode),
+                        "§7Task difficulty: §f"
+                                + (taskMode != null ? taskMode.getDifficultyFilter().name() : "MEDIUM"),
                         taskModeSelected
                                 ? (noSwapMode ? "§7Competition type: §fNo-swap parallel race"
                                         : "§7Competition type: §fShared-body swap")
@@ -1605,6 +1607,55 @@ public final class GuiManager implements Listener {
         }));
 
         items.add(clickItem(14, () -> {
+            String assigned = taskMode != null ? taskMode.getAssignedTaskDescription(ctx.player()) : null;
+            List<String> lore = new ArrayList<>();
+            if (assigned == null) {
+                lore.add("§7No task assigned to you yet");
+                lore.add("§7Start or preroll the round first");
+            } else {
+                lore.add("§7Current task:");
+                lore.add("§f" + assigned);
+                lore.add("");
+                lore.add("§eClick to message your task again");
+                lore.add("§dShift-click to spend your reroll");
+                lore.add("§7Rerolls left: §f" + taskMode.getRemainingRerolls(ctx.player()));
+            }
+            return icon(Material.PAPER, "§e§lYour Task", lore);
+        }, ctxClick -> {
+            if (taskMode == null) {
+                Msg.send(ctxClick.player(), "§cTask Manager is not available.");
+                return;
+            }
+            String assigned = taskMode.getAssignedTaskDescription(ctxClick.player());
+            if (assigned == null) {
+                Msg.send(ctxClick.player(), "§eNo task is assigned to you yet.");
+                return;
+            }
+            if (ctxClick.shift()) {
+                String blocked = taskMode.getRerollUnavailableReason(ctxClick.player());
+                if (blocked != null) {
+                    Msg.send(ctxClick.player(), "§c" + blocked);
+                    return;
+                }
+                TaskDefinition newTask = taskMode.rerollTask(ctxClick.player());
+                if (newTask == null) {
+                    Msg.send(ctxClick.player(), "§cNo alternate task is available right now.");
+                    return;
+                }
+                Msg.send(ctxClick.player(), "§aTask rerolled to: §f" + newTask.description());
+                ctxClick.reopen();
+                return;
+            }
+            Msg.send(ctxClick.player(), "§6Your task: §f" + assigned);
+            if (taskMode.isTaskRerollEnabled()) {
+                String blocked = taskMode.getRerollUnavailableReason(ctxClick.player());
+                Msg.send(ctxClick.player(),
+                        blocked == null ? "§7Shift-click this tile or use §e/swap complete reroll confirm"
+                                : "§7Reroll status: §f" + blocked);
+            }
+        }));
+
+        items.add(clickItem(16, () -> {
             boolean hasAssignments = taskMode != null && !taskMode.getAssignments().isEmpty();
             List<String> lore = new ArrayList<>();
             lore.add("§7Broadcast current secret tasks");
@@ -1620,6 +1671,29 @@ public final class GuiManager implements Listener {
             taskMode.broadcastAssignments();
             Msg.send(ctxClick.player(), "§aBroadcasting current assignments to all players.");
         }));
+
+        items.add(clickItem(15, () -> icon(Material.NETHERITE_SWORD, "§6§lTask Difficulty",
+                List.of("§7Current pool: §f" + (taskMode != null ? taskMode.getDifficultyFilter().name() : "MEDIUM"),
+                        "§eClick to cycle EASY → MEDIUM → HARD",
+                        "§7Choose this before starting a new round")), ctxClick -> {
+                    if (taskMode == null) {
+                        Msg.send(ctxClick.player(), "§cTask Manager is not available.");
+                        return;
+                    }
+                    if (plugin.getGameManager().isGameRunning()) {
+                        Msg.send(ctxClick.player(), "§cStop the current round before changing task difficulty.");
+                        return;
+                    }
+                    TaskDifficulty cur = taskMode.getDifficultyFilter();
+                    TaskDifficulty next = switch (cur) {
+                        case EASY -> TaskDifficulty.MEDIUM;
+                        case MEDIUM -> TaskDifficulty.HARD;
+                        case HARD -> TaskDifficulty.EASY;
+                    };
+                    taskMode.setDifficultyFilter(next);
+                    Msg.send(ctxClick.player(), "§aTask difficulty set to §f" + next.name());
+                    ctxClick.reopen();
+                }));
 
         // Runner-only management --------------------------------------
         items.add(navigateItem(19, Material.PLAYER_HEAD, "§b§lRunner Management", MenuKey.TASK_RUNNERS,
@@ -1704,7 +1778,58 @@ public final class GuiManager implements Listener {
                 "task_manager.end_when_one_left", false,
                 "§7Automatically finish when one runner remains"));
 
-        return new MenuScreen("§6§lTask Settings", 36, items);
+        items.add(clickItem(19, () -> icon(Material.NETHERITE_SWORD, "§6§lTask Difficulty",
+                List.of("§7Current pool: §f"
+                        + (plugin.getTaskManagerMode() != null ? plugin.getTaskManagerMode().getDifficultyFilter().name()
+                                : "MEDIUM"),
+                        "§eClick to cycle EASY → MEDIUM → HARD")), ctxClick -> {
+                    TaskManagerMode mode = plugin.getTaskManagerMode();
+                    if (mode == null) {
+                        Msg.send(ctxClick.player(), "§cTask Manager is not available.");
+                        return;
+                    }
+                    if (plugin.getGameManager().isGameRunning()) {
+                        Msg.send(ctxClick.player(), "§cStop the current round before changing task difficulty.");
+                        return;
+                    }
+                    TaskDifficulty cur = mode.getDifficultyFilter();
+                    TaskDifficulty next = switch (cur) {
+                        case EASY -> TaskDifficulty.MEDIUM;
+                        case MEDIUM -> TaskDifficulty.HARD;
+                        case HARD -> TaskDifficulty.EASY;
+                    };
+                    mode.setDifficultyFilter(next);
+                    Msg.send(ctxClick.player(), "§aTask difficulty set to §f" + next.name());
+                    ctxClick.reopen();
+                }));
+
+        items.add(toggleConfigItem(20, Material.AMETHYST_SHARD, "§e§lPlayer Task Rerolls",
+                "task_manager.reroll.enabled", true,
+                "§7Allow players to reroll their own task"));
+
+        items.add(adjustConfigItem(21, Material.EXPERIENCE_BOTTLE, "§6§lRerolls Per Player",
+                "task_manager.reroll.uses_per_player", 1,
+                1, 1, 0, 5,
+                "§70 disables player rerolls"));
+
+        items.add(toggleConfigItem(22, Material.LIME_DYE, "§e§lAllow Before Start",
+                "task_manager.reroll.allow_before_start", true,
+                "§7Players may reroll pre-assigned tasks before start"));
+
+        items.add(toggleConfigItem(23, Material.CLOCK, "§e§lAllow During First Turn",
+                "task_manager.reroll.allow_during_first_turn", true,
+                "§7Shared-control: until a player's first turn ends"));
+
+        items.add(adjustConfigItem(24, Material.RECOVERY_COMPASS, "§6§lTask Race Window (s)",
+                "task_manager.reroll.task_race_window_seconds", 60,
+                15, 30, 0, 600,
+                "§7Opening reroll window for Task Race"));
+
+        items.add(simpleItem(31, () -> icon(Material.PAPER, "§7Player Shortcut",
+                List.of("§7Players can use §e/swap complete reroll confirm",
+                        "§7or shift-click §eYour Task §7in the Task hub"))));
+
+        return new MenuScreen("§6§lTask Settings", 45, items);
     }
 
     private MenuScreen buildTaskCustom(MenuContext ctx) {

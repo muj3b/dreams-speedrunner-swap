@@ -45,6 +45,7 @@ public class GameManager {
     private long taskGameDeadlineMs;
     private long taskGameRemainingMs;
     private final Map<UUID, PlayerState> playerStates;
+    private final Set<UUID> restorableParticipantIds = new HashSet<>();
     private final Map<UUID, Long> runnerDisconnectAt = new HashMap<>();
     // Shared cage management per-world (one cage in each world)
     private final java.util.Map<org.bukkit.World, java.util.List<org.bukkit.block.BlockState>> sharedCageBlocks = new java.util.HashMap<>();
@@ -82,6 +83,25 @@ public class GameManager {
         this.runners = new ArrayList<>();
         this.hunters = new ArrayList<>();
         this.playerStates = new HashMap<>();
+    }
+
+    private List<Player> getOnlineGameParticipants() {
+        LinkedHashMap<UUID, Player> participants = new LinkedHashMap<>();
+        for (Player runner : runners) {
+            if (runner != null && runner.isOnline()) {
+                participants.put(runner.getUniqueId(), runner);
+            }
+        }
+        for (Player hunter : hunters) {
+            if (hunter != null && hunter.isOnline()) {
+                participants.put(hunter.getUniqueId(), hunter);
+            }
+        }
+        return new ArrayList<>(participants.values());
+    }
+
+    public boolean isActiveRunner(Player player) {
+        return player != null && activeRunner != null && player.getUniqueId().equals(activeRunner.getUniqueId());
     }
 
     // shuffleQueue() is implemented later in this class
@@ -138,7 +158,7 @@ public class GameManager {
                         case TASK_RACE -> "§6§lTask Race starting in " + count;
                     };
                     String subtitle = "§7Made by muj4b";
-                    for (Player player : Bukkit.getOnlinePlayers()) {
+                    for (Player player : getOnlineGameParticipants()) {
                         BukkitCompat.showTitle(player, title, subtitle, 10, 70, 10);
                     }
                     count--;
@@ -149,7 +169,7 @@ public class GameManager {
                         case TASK -> "§6§lTaskmaster GO!";
                         case TASK_RACE -> "§6§lTask Race GO!";
                     };
-                    for (Player player : Bukkit.getOnlinePlayers()) {
+                    for (Player player : getOnlineGameParticipants()) {
                         BukkitCompat.showTitle(player, goTitle, "§7Made by muj4b", 10, 60, 10);
                     }
                     this.cancel();
@@ -158,6 +178,8 @@ public class GameManager {
                     activeRunnerIndex = 0;
                     activeRunner = runners.get(activeRunnerIndex);
                     initializeSessionWorld();
+                    playerStates.clear();
+                    restorableParticipantIds.clear();
                     saveAllPlayerStates();
                     portalSwapRetries.clear();
                     swapInProgress = false;
@@ -195,6 +217,7 @@ public class GameManager {
 
                     if (plugin.isTaskCompetitionMode()) {
                         try {
+                            plugin.getTaskManagerMode().beginRound(runners);
                             plugin.getTaskManagerMode().assignAndAnnounceTasks(runners);
                         } catch (Throwable t) {
                             plugin.getLogger().warning("Task assignment failed: " + t.getMessage());
@@ -250,7 +273,7 @@ public class GameManager {
             hunterSubtitle = cfg.getEndGameNoWinnerHunterSubtitle();
         }
 
-        for (Player player : Bukkit.getOnlinePlayers()) {
+        for (Player player : getOnlineGameParticipants()) {
             String sub = isRunner(player) ? runnerSubtitle : hunterSubtitle;
             BukkitCompat.showTitle(player, titleStr, sub, 10, 100, 10);
         }
@@ -323,10 +346,13 @@ public class GameManager {
                 sessionWorldName = null;
 
                 if (plugin.getConfigManager().isBroadcastGameEvents()) {
-                    Msg.broadcast(formatEndGameBroadcast(winner));
+                    String endMessage = formatEndGameBroadcast(winner);
+                    for (Player participant : getOnlineGameParticipants()) {
+                        participant.sendMessage(endMessage);
+                    }
                 }
 
-                broadcastDonationMessage();
+                broadcastDonationMessage(getOnlineGameParticipants());
             }
         }.runTaskLater(plugin, 200L);
     }
@@ -369,8 +395,13 @@ public class GameManager {
         player.sendMessage("");
     }
 
-    private void broadcastDonationMessage() {
-        sendDonationMessage(null);
+    private void broadcastDonationMessage(List<Player> recipients) {
+        if (recipients == null || recipients.isEmpty()) {
+            return;
+        }
+        for (Player player : recipients) {
+            deliverDonationMessage(player, SpeedrunnerSwap.DONATION_URL);
+        }
     }
 
     /** Stop the game without declaring a winner */
@@ -628,7 +659,7 @@ public class GameManager {
                     runners.add(player);
                 }
                 if (tmm != null && tmm.getAssignedTask(player) == null) {
-                    tmm.assignAndAnnounceTasks(java.util.List.of(player));
+                    tmm.assignAdditionalTasks(java.util.List.of(player));
                 }
             }
 
@@ -636,6 +667,15 @@ public class GameManager {
         reselectSessionLeader();
         if (isGamePaused() && pausedByDisconnect && canResumeAfterDisconnectPause()) {
             resumeGame();
+        }
+        if (plugin.usesSharedRunnerControl() && !gamePaused) {
+            Bukkit.getScheduler().runTask(plugin, () -> {
+                if (!gameRunning || !player.isOnline()) {
+                    return;
+                }
+                applyInactiveEffects();
+                refreshActiveTrackerTargets();
+            });
         }
         portalSwapRetries.remove(player.getUniqueId());
         ensureRunnerQueueCoherence();
@@ -780,8 +820,19 @@ public class GameManager {
     }
 
     private void saveAllPlayerStates() {
+        LinkedHashMap<UUID, Player> participants = new LinkedHashMap<>();
         for (Player runner : runners) {
-            savePlayerState(runner);
+            if (runner != null) {
+                participants.put(runner.getUniqueId(), runner);
+            }
+        }
+        for (Player hunter : hunters) {
+            if (hunter != null) {
+                participants.put(hunter.getUniqueId(), hunter);
+            }
+        }
+        for (Player participant : participants.values()) {
+            savePlayerState(participant);
         }
     }
 
@@ -793,40 +844,70 @@ public class GameManager {
         reclaimOpenContainerItems(player);
         PlayerState state = PlayerStateUtil.capturePlayerState(player);
         playerStates.put(player.getUniqueId(), state);
+        restorableParticipantIds.add(player.getUniqueId());
     }
 
     private void restoreAllPlayerStates() {
-        for (Player player : Bukkit.getOnlinePlayers()) {
-            if (playerStates.containsKey(player.getUniqueId())) {
-                restorePlayerState(player);
+        Set<UUID> restored = new HashSet<>();
+        for (UUID participantId : new HashSet<>(restorableParticipantIds)) {
+            Player player = Bukkit.getPlayer(participantId);
+            if (player == null || !player.isOnline()) {
+                continue;
             }
 
-            // Remove effects using compat lookups for cross-version support
-            PotionEffectType eff;
-            if ((eff = BukkitCompat.resolvePotionEffect("blindness")) != null)
-                player.removePotionEffect(eff);
-            if ((eff = BukkitCompat.resolvePotionEffect("darkness")) != null)
-                player.removePotionEffect(eff);
-            if ((eff = BukkitCompat.resolvePotionEffect("weakness")) != null)
-                player.removePotionEffect(eff);
-            if ((eff = BukkitCompat.resolvePotionEffect("slow_falling")) != null)
-                player.removePotionEffect(eff);
-            if ((eff = BukkitCompat.resolvePotionEffect("slowness")) != null)
-                player.removePotionEffect(eff);
-            if ((eff = BukkitCompat.resolvePotionEffect("jump_boost")) != null)
-                player.removePotionEffect(eff);
+            restoreTrackedParticipant(player);
+            restored.add(participantId);
+        }
 
-            if (player.getGameMode() == GameMode.SPECTATOR && isRunner(player)) {
-                player.setGameMode(GameMode.SURVIVAL);
-            }
-            // Ensure everyone can see everyone again after cleanup
-            for (Player viewer : Bukkit.getOnlinePlayers()) {
-                try {
-                    viewer.showPlayer(plugin, player);
-                } catch (Throwable ignored) {
-                }
+        for (UUID restoredId : restored) {
+            restorableParticipantIds.remove(restoredId);
+            playerStates.remove(restoredId);
+        }
+    }
+
+    private void restoreTrackedParticipant(Player player) {
+        if (player == null || !player.isOnline()) {
+            return;
+        }
+
+        restorePlayerState(player);
+
+        PotionEffectType eff;
+        if ((eff = BukkitCompat.resolvePotionEffect("blindness")) != null)
+            player.removePotionEffect(eff);
+        if ((eff = BukkitCompat.resolvePotionEffect("darkness")) != null)
+            player.removePotionEffect(eff);
+        if ((eff = BukkitCompat.resolvePotionEffect("weakness")) != null)
+            player.removePotionEffect(eff);
+        if ((eff = BukkitCompat.resolvePotionEffect("slow_falling")) != null)
+            player.removePotionEffect(eff);
+        if ((eff = BukkitCompat.resolvePotionEffect("slowness")) != null)
+            player.removePotionEffect(eff);
+        if ((eff = BukkitCompat.resolvePotionEffect("jump_boost")) != null)
+            player.removePotionEffect(eff);
+
+        if (player.getGameMode() == GameMode.SPECTATOR && isRunner(player)) {
+            player.setGameMode(GameMode.SURVIVAL);
+        }
+        for (Player viewer : Bukkit.getOnlinePlayers()) {
+            try {
+                viewer.showPlayer(plugin, player);
+            } catch (Throwable ignored) {
             }
         }
+    }
+
+    public void restorePendingStateIfNeeded(Player player) {
+        if (player == null || gameRunning) {
+            return;
+        }
+        UUID uuid = player.getUniqueId();
+        if (!restorableParticipantIds.contains(uuid) || !playerStates.containsKey(uuid)) {
+            return;
+        }
+        restoreTrackedParticipant(player);
+        restorableParticipantIds.remove(uuid);
+        playerStates.remove(uuid);
     }
 
     private void restorePlayerState(Player player) {
@@ -1378,6 +1459,13 @@ public class GameManager {
             Player nextRunner = runners.get(activeRunnerIndex);
             Player previousRunner = activeRunner;
             boolean sameRunner = previousRunner != null && previousRunner.equals(nextRunner);
+
+            if (plugin.isTaskCompetitionMode() && !plugin.isParallelTaskMode() && previousRunner != null && !sameRunner) {
+                try {
+                    plugin.getTaskManagerMode().markFirstTurnCompleted(previousRunner);
+                } catch (Throwable ignored) {
+                }
+            }
 
             activeRunner = nextRunner;
             portalSwapRetries.remove(nextRunner.getUniqueId());
@@ -2502,6 +2590,11 @@ public class GameManager {
         if (plugin.getConfigManager().getHunterNames().contains(playerName)
                 && !containsPlayerByUuid(hunters, uuid)) {
             hunters.add(player);
+        }
+
+        if (activeRunner != null && uuid.equals(activeRunner.getUniqueId())) {
+            activeRunner = player;
+            cagedPlayers.remove(uuid);
         }
 
         PlayerState state = getPlayerState(player);

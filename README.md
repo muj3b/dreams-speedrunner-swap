@@ -196,6 +196,7 @@ Task Race uses the same secret task pool, but removes the shared-body swap loop 
 | **🕵️ Secret Objectives** | Tasks hidden from other players to maintain mystery |
 | **📊 Task Balancing** | All tasks designed for similar completion times |
 | **🎚 Difficulty Buckets** | Pick Easy, Medium, or Hard pools for assignments |
+| **↩️ First-Turn Rerolls** | Players can spend a configurable reroll before start or during their opening turn |
 | **🎭 Strategic Deception** | Hide your true objective while sabotaging others |
 | **🏆 Instant Victory** | First to complete their task wins immediately |
 
@@ -294,12 +295,13 @@ Task Race uses the same secret task pool, but removes the shared-body swap loop 
 | `/swap tasks endwhenoneleft <on|off|toggle>` | Controls the “end when one runner remains” rule. |
 | `/swap tasks reload` | Reloads `tasks.yml` without restarting the server. |
 | `/swap complete [confirm]` | Shows your current secret task or, with `confirm`, manually completes it (and ends the game). |
+| `/swap complete reroll confirm` | Spends your configurable one-time task reroll when the current round rules allow it. |
 | `/swap creator` · `/swap help` | Plugin credits and in-game help. |
 
 Permissions:
 - `speedrunnerswap.command` lets trusted players open the GUI, start/stop rounds, and manage teams.
 - `speedrunnerswap.admin` is required for mode changes, interval/randomize tweaks, task management, reloads, and `/swap clearteams`.
-- `/swap complete` is available to runners who have been assigned a Task Master objective.
+- `/swap complete` and `/swap complete reroll confirm` are available to runners who have been assigned a Task Master objective.
 
 ---
 
@@ -320,7 +322,7 @@ The plugin ships with a comprehensive `config.yml`, but every option can be adju
 | **✨ Particle Trail** | `particle_trail.*` | Toggle runner particle trail, tick interval, particle id, and RGB colour (new GUI controls). |
 | **🎙 Voice Chat** | `voice_chat.*` | Simple Voice Chat integration toggles. |
 | **🎒 Kits** | `kits.*` & `kits.yml` | Enable runner/hunter kits and quick testing buttons. |
-| **🎯 Task Master** | `task_manager.*` | Pause behaviour, reconnection grace, max duration, include defaults, difficulty filter, per-task enable/disable, custom task creator, task pool management, assignments viewer. |
+| **🎯 Task Master** | `task_manager.*` | Pause behaviour, reconnection grace, max duration, include defaults, difficulty filter, player reroll rules, per-task enable/disable, custom task creator, task pool management, assignments viewer. |
 
 > 📝 **Tip:** Use `/swap gui` (or the `/swap` hotkey in the tab completions) to reach any of these menus instantly—every slider, toggle, and button writes back to `config.yml` (or `tasks.yml` / `kits.yml`) for persistence.
 
@@ -330,14 +332,16 @@ The plugin ships with a comprehensive `config.yml`, but every option can be adju
 
 ### GUI Workflow
 1. Open `/swap gui` → **Task Master**.
-2. **Custom Tasks** lets you add new objectives (ID + description) and remove existing ones.
-3. **Task Pool** provides page-based toggles to enable/disable any built-in or custom task, adjust the difficulty filter, and reload `tasks.yml` live.
+2. **Task Settings** now exposes the round difficulty plus player-reroll rules.
+3. **Custom Tasks** lets you add new objectives (ID + description) and remove existing ones.
+4. **Task Pool** provides page-based toggles to enable/disable any built-in or custom task, adjust the difficulty filter, and reload `tasks.yml` live.
 
 ### Command Workflow
 - `/swap tasks list` – review all definitions.
 - `/swap tasks enable|disable <id>` – quick toggles from console or chat.
 - `/swap tasks difficulty <easy|medium|hard>` – change the pool filter.
 - `/swap tasks reroll` – reassign secret tasks prior to a round.
+- `/swap complete reroll confirm` – let a player spend their opening-round reroll.
 - `/swap tasks reload` – re-read `tasks.yml` after editing.
 
 ### Design Tips

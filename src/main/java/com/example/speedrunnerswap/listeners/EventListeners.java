@@ -135,7 +135,7 @@ public class EventListeners implements Listener {
                     if (plugin.usesSharedRunnerControl() &&
                             plugin.getGameManager().isGameRunning() &&
                             plugin.getGameManager().isRunner(player) &&
-                            plugin.getGameManager().getActiveRunner() != player) {
+                            !plugin.getGameManager().isActiveRunner(player)) {
                         shouldBlock = true;
                     }
                 } catch (Throwable ignored) {
@@ -172,6 +172,8 @@ public class EventListeners implements Listener {
     @EventHandler
     public void onPlayerJoin(PlayerJoinEvent event) {
         Player player = event.getPlayer();
+
+        plugin.getGameManager().restorePendingStateIfNeeded(player);
 
         if (plugin.getGameManager() != null && plugin.getGameManager().isGameRunning()) {
             // Handle task mode rejoin logic and resume if needed
@@ -378,7 +380,7 @@ public class EventListeners implements Listener {
         // Cancel any damage to inactive runners in cages
         if (plugin.usesSharedRunnerControl()
                 && plugin.getGameManager().isRunner(victim)
-                && plugin.getGameManager().getActiveRunner() != victim) {
+                && !plugin.getGameManager().isActiveRunner(victim)) {
             if ("CAGE".equalsIgnoreCase(plugin.getConfigManager().getFreezeMode())) {
                 event.setCancelled(true);
             }
@@ -504,7 +506,7 @@ public class EventListeners implements Listener {
         if (plugin.usesSharedRunnerControl()
                 && plugin.getGameManager().isGameRunning()
                 && plugin.getGameManager().isRunner(player)) {
-            if (plugin.getGameManager().getActiveRunner() != player) {
+            if (!plugin.getGameManager().isActiveRunner(player)) {
                 // Inactive runners can't interact
                 event.setCancelled(true);
                 player.sendMessage("§cYou cannot interact with items while inactive!");
@@ -566,7 +568,7 @@ public class EventListeners implements Listener {
             return;
         if (!plugin.usesSharedRunnerControl())
             return;
-        if (plugin.getGameManager().getActiveRunner() == player)
+        if (plugin.getGameManager().isActiveRunner(player))
             return;
         player.sendMessage("§c[SpeedrunnerSwap] You cannot chat while inactive.");
         event.setCancelled(true);
@@ -580,7 +582,7 @@ public class EventListeners implements Listener {
         if (plugin.usesSharedRunnerControl() &&
                 plugin.getGameManager().isGameRunning() &&
                 plugin.getGameManager().isRunner(player) &&
-                plugin.getGameManager().getActiveRunner() != player) {
+                !plugin.getGameManager().isActiveRunner(player)) {
 
             // Check if getTo() is not null to prevent NullPointerException
             if (event.getTo() != null) {
