@@ -856,6 +856,24 @@ public class ConfigManager {
         return config.getInt("swap.hunter_swap.interval", 60);
     }
 
+    public boolean isSharedHunterControlEnabled() {
+        return config.getBoolean("swap.shared_hunter_control.enabled", false);
+    }
+
+    public void setSharedHunterControlEnabled(boolean enabled) {
+        config.set("swap.shared_hunter_control.enabled", enabled);
+        saveConfig();
+    }
+
+    public int getSharedHunterControlInterval() {
+        return config.getInt("swap.shared_hunter_control.interval", 60);
+    }
+
+    public void setSharedHunterControlInterval(int seconds) {
+        config.set("swap.shared_hunter_control.interval", Math.max(10, seconds));
+        saveConfig();
+    }
+
     public List<String> getGoodPowerUps() {
         return config.getStringList("power_ups.good_effects");
     }

@@ -72,18 +72,27 @@ public class VoiceChatIntegration {
      */
     public void updateRunnerMuteStatus() {
         if (!enabled || !pluginDetected) return;
-        if (!plugin.usesSharedRunnerControl()) {
+        if (!plugin.usesSharedRunnerControl() && !plugin.usesSharedHunterControl()) {
             resetAllPlayerMuteStatus();
             return;
         }
         
         Player activeRunner = plugin.getGameManager().getActiveRunner();
+        Player activeHunter = plugin.getGameManager().getActiveHunter();
         
         for (Player runner : plugin.getGameManager().getRunners()) {
-            if (runner.equals(activeRunner)) {
+            if (!plugin.usesSharedRunnerControl() || runner.equals(activeRunner)) {
                 unmutePlayer(runner);
             } else {
                 mutePlayer(runner);
+            }
+        }
+
+        for (Player hunter : plugin.getGameManager().getHunters()) {
+            if (!plugin.usesSharedHunterControl() || hunter.equals(activeHunter)) {
+                unmutePlayer(hunter);
+            } else {
+                mutePlayer(hunter);
             }
         }
     }
@@ -97,6 +106,9 @@ public class VoiceChatIntegration {
         
         for (Player runner : plugin.getGameManager().getRunners()) {
             unmutePlayer(runner);
+        }
+        for (Player hunter : plugin.getGameManager().getHunters()) {
+            unmutePlayer(hunter);
         }
     }
     

@@ -68,8 +68,7 @@ public class TrackerManager {
                 }
                 cacheRunnerPositions(activeRunner);
 
-                // Update compass for all hunters regardless of dimension
-                for (Player hunter : plugin.getGameManager().getHunters()) {
+                for (Player hunter : getTrackedHunters()) {
                     if (hunter.isOnline()) {
                         updateHunterCompass(hunter, activeRunner);
                     }
@@ -196,12 +195,23 @@ public class TrackerManager {
                 stopTracking();
                 return;
             }
-            for (Player hunter : plugin.getGameManager().getHunters()) {
+            for (Player hunter : getTrackedHunters()) {
                 if (hunter.isOnline()) {
                     updateHunterCompass(hunter, activeRunner);
                 }
             }
         }
+    }
+
+    private java.util.List<Player> getTrackedHunters() {
+        if (plugin.usesSharedHunterControl()) {
+            Player activeHunter = plugin.getGameManager().getActiveHunter();
+            if (activeHunter == null) {
+                return java.util.Collections.emptyList();
+            }
+            return java.util.Collections.singletonList(activeHunter);
+        }
+        return plugin.getGameManager().getHunters();
     }
 
     private void cacheRunnerPositions(Player runner) {

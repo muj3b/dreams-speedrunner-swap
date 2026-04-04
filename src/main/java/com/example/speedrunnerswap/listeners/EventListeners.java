@@ -132,10 +132,13 @@ public class EventListeners implements Listener {
 
                 boolean shouldBlock = false;
                 try {
-                    if (plugin.usesSharedRunnerControl() &&
-                            plugin.getGameManager().isGameRunning() &&
-                            plugin.getGameManager().isRunner(player) &&
-                            !plugin.getGameManager().isActiveRunner(player)) {
+                    if (plugin.getGameManager().isGameRunning()
+                            && ((plugin.usesSharedRunnerControl()
+                                    && plugin.getGameManager().isRunner(player)
+                                    && !plugin.getGameManager().isActiveRunner(player))
+                                    || (plugin.usesSharedHunterControl()
+                                            && plugin.getGameManager().isHunter(player)
+                                            && !plugin.getGameManager().isActiveHunter(player)))) {
                         shouldBlock = true;
                     }
                 } catch (Throwable ignored) {
@@ -186,7 +189,11 @@ public class EventListeners implements Listener {
 
             // Ensure hunters rejoining mid-game receive a tracking compass immediately
             if (plugin.getGameManager().isHunter(player)) {
-                Bukkit.getScheduler().runTask(plugin, () -> plugin.getTrackerManager().giveTrackingCompass(player));
+                Bukkit.getScheduler().runTask(plugin, () -> {
+                    if (!plugin.usesSharedHunterControl() || plugin.getGameManager().isActiveHunter(player)) {
+                        plugin.getTrackerManager().giveTrackingCompass(player);
+                    }
+                });
             }
         }
     }
@@ -322,7 +329,9 @@ public class EventListeners implements Listener {
             }
         } else if (plugin.getGameManager().isGameRunning() &&
                 plugin.getGameManager().isHunter(player)) {
-            plugin.getTrackerManager().giveTrackingCompass(player);
+            if (!plugin.usesSharedHunterControl() || plugin.getGameManager().isActiveHunter(player)) {
+                plugin.getTrackerManager().giveTrackingCompass(player);
+            }
         }
     }
 
@@ -384,6 +393,12 @@ public class EventListeners implements Listener {
             if ("CAGE".equalsIgnoreCase(plugin.getConfigManager().getFreezeMode())) {
                 event.setCancelled(true);
             }
+        } else if (plugin.usesSharedHunterControl()
+                && plugin.getGameManager().isHunter(victim)
+                && !plugin.getGameManager().isActiveHunter(victim)) {
+            if ("CAGE".equalsIgnoreCase(plugin.getConfigManager().getFreezeMode())) {
+                event.setCancelled(true);
+            }
         }
     }
 
@@ -394,7 +409,8 @@ public class EventListeners implements Listener {
             return;
 
         // If a hunter changes world, (re)give/update their compass
-        if (plugin.getGameManager().isHunter(player)) {
+        if (plugin.getGameManager().isHunter(player)
+                && (!plugin.usesSharedHunterControl() || plugin.getGameManager().isActiveHunter(player))) {
             plugin.getTrackerManager().giveTrackingCompass(player);
         }
 
@@ -503,15 +519,21 @@ public class EventListeners implements Listener {
         }
 
         // For non-GUI inventories, enforce runner interaction rules and sync
-        if (plugin.usesSharedRunnerControl()
-                && plugin.getGameManager().isGameRunning()
-                && plugin.getGameManager().isRunner(player)) {
-            if (!plugin.getGameManager().isActiveRunner(player)) {
+        if (plugin.getGameManager().isGameRunning()) {
+            boolean inactiveRunner = plugin.usesSharedRunnerControl()
+                    && plugin.getGameManager().isRunner(player)
+                    && !plugin.getGameManager().isActiveRunner(player);
+            boolean inactiveHunter = plugin.usesSharedHunterControl()
+                    && plugin.getGameManager().isHunter(player)
+                    && !plugin.getGameManager().isActiveHunter(player);
+            if (inactiveRunner || inactiveHunter) {
                 // Inactive runners can't interact
                 event.setCancelled(true);
                 player.sendMessage("§cYou cannot interact with items while inactive!");
                 return;
-            } else {
+            } else if (plugin.usesSharedRunnerControl()
+                    && plugin.getGameManager().isRunner(player)
+                    && plugin.getGameManager().isActiveRunner(player)) {
                 // Do not sync inventories between runners. Inactive runners should
                 // never see or receive the active runner's inventory until swapped in.
                 // Intentionally no-op here.
@@ -564,11 +586,13 @@ public class EventListeners implements Listener {
             return;
         if (!plugin.getGameManager().isGameRunning())
             return;
-        if (!plugin.getGameManager().isRunner(player))
-            return;
-        if (!plugin.usesSharedRunnerControl())
-            return;
-        if (plugin.getGameManager().isActiveRunner(player))
+        boolean inactiveRunner = plugin.usesSharedRunnerControl()
+                && plugin.getGameManager().isRunner(player)
+                && !plugin.getGameManager().isActiveRunner(player);
+        boolean inactiveHunter = plugin.usesSharedHunterControl()
+                && plugin.getGameManager().isHunter(player)
+                && !plugin.getGameManager().isActiveHunter(player);
+        if (!inactiveRunner && !inactiveHunter)
             return;
         player.sendMessage("§c[SpeedrunnerSwap] You cannot chat while inactive.");
         event.setCancelled(true);
@@ -579,10 +603,16 @@ public class EventListeners implements Listener {
         Player player = event.getPlayer();
 
         // If the player is an inactive runner, prevent movement
-        if (plugin.usesSharedRunnerControl() &&
+        boolean inactiveRunner = plugin.usesSharedRunnerControl() &&
                 plugin.getGameManager().isGameRunning() &&
                 plugin.getGameManager().isRunner(player) &&
-                !plugin.getGameManager().isActiveRunner(player)) {
+                !plugin.getGameManager().isActiveRunner(player);
+        boolean inactiveHunter = plugin.usesSharedHunterControl() &&
+                plugin.getGameManager().isGameRunning() &&
+                plugin.getGameManager().isHunter(player) &&
+                !plugin.getGameManager().isActiveHunter(player);
+
+        if (inactiveRunner || inactiveHunter) {
 
             // Check if getTo() is not null to prevent NullPointerException
             if (event.getTo() != null) {

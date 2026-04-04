@@ -279,6 +279,12 @@ public final class SpeedrunnerSwap extends JavaPlugin {
         return currentMode != SwapMode.TASK_RACE;
     }
 
+    public boolean usesSharedHunterControl() {
+        return currentMode == SwapMode.DREAM
+                && configManager != null
+                && configManager.isSharedHunterControlEnabled();
+    }
+
     public void setCurrentMode(SwapMode mode) {
         if (mode == null)
             mode = SwapMode.DREAM;

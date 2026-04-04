@@ -37,6 +37,11 @@ swap:
   pause_on_disconnect: true
   # If true, apply the final active runner's state to all runners when ending the game
   preserve_runner_progress_on_end: false
+  # Optional second shared body for Dream mode hunters
+  shared_hunter_control:
+    enabled: false
+    interval: 60
+  # Legacy full-team hunter shuffle (ignored while shared_hunter_control is enabled)
   hunter_swap:
     enabled: false
     interval: 60

@@ -4,14 +4,14 @@ main: com.example.speedrunnerswap.SpeedrunnerSwap
 api-version: '1.21'
 authors: [muj4b]
 description: |
-  Dream-style challenge plugin with shared-body swap modes, secret-task competitions, and a no-swap Task Race mode.
+  Dream-style challenge plugin with shared-body swap modes, optional shared hunter control, secret-task competitions, and a no-swap Task Race mode.
   Features include:
   - Random power-ups on swap
   - Last Stand mode for final runner
   - Custom kits for runners and hunters
   - Configurable swap intervals
   - Safe swap locations
-  - Hunter swap system
+  - Hunter swap / shared hunter body system
   - Compass tracking system
   - Parallel no-swap task racing
 website: https://github.com/muj3b/minecraft-speedrunner-swap-plugin

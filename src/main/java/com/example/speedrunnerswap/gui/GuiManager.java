@@ -801,16 +801,27 @@ public final class GuiManager implements Listener {
                 value -> plugin.getConfig().set("swap.jitter.clamp", value),
                 "§7Restrict random interval within min/max"));
 
-        items.add(toggleItem(19, Material.PISTON, "§e§lHunter Swap",
+        items.add(toggleItem(17, Material.WITHER_SKELETON_SKULL, "§e§lShared Hunter Body",
+                cfg::isSharedHunterControlEnabled,
+                value -> cfg.setSharedHunterControlEnabled(value),
+                "§7Dream mode only: hunters share one body"));
+
+        items.add(adjustItem(18, Material.CROSSBOW, "§6§lShared Hunter Interval",
+                cfg::getSharedHunterControlInterval,
+                value -> cfg.setSharedHunterControlInterval(value),
+                10, 30, 10, 600,
+                "§7Seconds between shared hunter turns"));
+
+        items.add(toggleItem(19, Material.PISTON, "§e§lLegacy Hunter Shuffle",
                 cfg::isHunterSwapEnabled,
                 value -> plugin.getConfig().set("swap.hunter_swap.enabled", value),
-                "§7Rotate which hunter chases"));
+                "§7Dream mode only when shared hunter body is off"));
 
-        items.add(adjustItem(20, Material.ARROW, "§6§lHunter Swap Interval",
+        items.add(adjustItem(20, Material.ARROW, "§6§lLegacy Hunter Interval",
                 cfg::getHunterSwapInterval,
                 value -> plugin.getConfig().set("swap.hunter_swap.interval", value),
                 10, 30, 10, 600,
-                "§7Seconds between hunter rotations"));
+                "§7Seconds between full hunter shuffles"));
 
         items.add(toggleItem(21, Material.BLAZE_POWDER, "§e§lHot Potato Mode",
                 cfg::isHotPotatoModeEnabled,

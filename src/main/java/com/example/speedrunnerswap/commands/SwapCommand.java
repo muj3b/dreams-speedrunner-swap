@@ -69,6 +69,7 @@ public class SwapCommand implements CommandExecutor, TabCompleter {
         sender.sendMessage("§e/swap interval <seconds> §7Set base swap interval");
         sender.sendMessage("§e/swap randomize <on|off> §7Toggle randomized swaps");
         sender.sendMessage("§e/swap mode <dream|sapnap|task|taskrace> §7Set mode");
+        sender.sendMessage("§7Dream mode can optionally use a shared hunter body from the GUI/config.");
         sender.sendMessage("§e/swap tasks list §7List tasks with difficulty + enabled");
         sender.sendMessage("§e/swap tasks enable|disable <id> §7Toggle a task");
         sender.sendMessage("§e/swap tasks difficulty <easy|medium|hard> §7Set difficulty pool");
@@ -326,6 +327,10 @@ public class SwapCommand implements CommandExecutor, TabCompleter {
         sender.sendMessage("§eSame-World Team UI: §f" + plugin.getConfigManager().isTeamSelectorSameWorldOnly());
         sender.sendMessage("§eAssignment Restriction: §f"
                 + plugin.getConfigManager().isAssignmentRestrictedToSessionWorld());
+        if (plugin.getCurrentMode() == com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode.DREAM) {
+            sender.sendMessage("§eShared Hunter Body: §f" + plugin.getConfigManager().isSharedHunterControlEnabled());
+            sender.sendMessage("§eLegacy Hunter Shuffle: §f" + plugin.getConfigManager().isHunterSwapEnabled());
+        }
         
         if (plugin.getGameManager().isGameRunning()) {
             if (plugin.usesSharedRunnerControl()) {
@@ -338,6 +343,17 @@ public class SwapCommand implements CommandExecutor, TabCompleter {
             
             List<Player> runners = plugin.getGameManager().getRunners();
             List<Player> hunters = plugin.getGameManager().getHunters();
+
+            if (plugin.usesSharedHunterControl()) {
+                Player activeHunter = plugin.getGameManager().getActiveHunter();
+                sender.sendMessage("§eActive Hunter: §f" + (activeHunter != null ? activeHunter.getName() : "None"));
+                sender.sendMessage(
+                        "§eTime Until Next Hunter Swap: §f" + plugin.getGameManager().getTimeUntilNextHunterSwap()
+                                + "s");
+            } else if (plugin.getCurrentMode() == com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode.DREAM
+                    && plugin.getConfigManager().isHunterSwapEnabled()) {
+                sender.sendMessage("§eHunter Rotation: §fLegacy full-team shuffle");
+            }
             
             sender.sendMessage("§eRunners: §f" + runners.stream()
                     .map(Player::getName)

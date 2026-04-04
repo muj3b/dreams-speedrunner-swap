@@ -16,7 +16,7 @@
 
 </div>
 
-> **Experience Dream's legendary challenges in one powerful plugin! Play the classic Speedrunners vs Hunters, the cooperative Multi-Runner Control Swap, the shared-body Task Master sabotage mode, or the new no-swap Task Race mode where everyone plays at once.**
+> **Experience Dream's legendary challenges in one powerful plugin! Play the classic Speedrunners vs Hunters, the cooperative Multi-Runner Control Swap, the shared-body Task Master sabotage mode, or the new no-swap Task Race mode where everyone plays at once. Dream mode can also run with a second shared hunter body for team-vs-team body swapping.**
 
 ---
 
@@ -59,6 +59,10 @@ In Task Master mode, players take turns controlling a single character while rac
 ## 🏁 NEW: Task Race Mode
 
 Task Race uses the same secret task pool, but removes the shared-body swap loop entirely. Two or more runners can play at the same time on their own characters, and the first player to finish their task wins instantly.
+
+## 🏹 NEW: Shared Hunter Body Option
+
+Dream mode can now optionally give hunters their own shared body too. That means one runner body and one hunter body can exist at the same time, each rotating between the players assigned to that side. If you want classic manhunt, leave it off. If you want Dream/George sharing the runner and Sapnap/Bad sharing the hunter, enable it from the swap settings GUI or `config.yml`.
 
 ### 🎲 100+ Unique Tasks Included!
 
@@ -257,6 +261,7 @@ Task Race uses the same secret task pool, but removes the shared-body swap loop 
 |:--|:--|
 | **🖥️ Full GUI Control** | Manage teams, settings, task pools, spawn, and cosmetics without touching files |
 | **🔄 Customizable Swaps** | Set intervals, randomization, grace periods, and jitter |
+| **🏹 Shared Hunter Body** | Optional Dream-mode hunter queue so runners and hunters can each share a separate body |
 | **🛡️ Safe Swap System** | Prevents swapping into dangerous situations |
 | **🎤 Voice Chat Integration** | Auto-mute inactive players via Simple Voice Chat support |
 | **📚 Task Pool Manager** | Enable/disable every objective, adjust difficulty filters, and reload `tasks.yml` live |
