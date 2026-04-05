@@ -1,5 +1,29 @@
 # Changelog
 
+## 4.3.2
+- Rolled the post-`4.3` task competition fixes into the release notes:
+  - Fixed task-mode respawn handling so `Task Race` no longer leaks shared runner spawns across players.
+  - Wired `task_manager.max_game_duration` into the actual round lifecycle so configured time limits now end the game.
+  - Corrected task-mode disconnect pausing so it waits for the missing runners instead of auto-resuming too early.
+  - Scoped Task Master start/end cleanup to actual participants, preventing multiverse/non-participant inventory wipes and lobby teleports.
+  - Fixed Task Master reconnect handling so returning players no longer get stuck in the bedrock box.
+  - Added clearer pre-round task difficulty control in the GUI/config flow.
+  - Added player task rerolls with GUI + command support.
+  - Fixed late-join task assignment so it no longer wipes existing task assignments.
+- Added optional shared hunter control for Dream mode:
+  - Hunters can now share a second body while runners keep using the main shared runner body.
+  - Runner and hunter swap queues can operate independently, enabling true team-vs-team body swapping.
+  - Added `swap.shared_hunter_control.{enabled,interval}` to config and surfaced the feature in the Swap Settings GUI.
+  - `/swap help` and `/swap status` now report the shared hunter body state and active hunter timing.
+- Finished the Dream-mode integration sweep for the new hunter body flow:
+  - Tracker compasses now stay scoped to the active hunter when shared hunter control is enabled.
+  - Rejoin, respawn, and world-change paths no longer hand tracking compasses to inactive hunters.
+  - Inactive-hunter freeze/cage restrictions now match the existing inactive-runner behavior.
+  - Voice-chat muting now respects both shared runners and shared hunters instead of only the runner side.
+- Docs and release polish:
+  - README and plugin metadata now describe the shared hunter body option alongside Task Master and Task Race.
+  - Version bumped to `4.3.2`.
+
 ## 4.3
 - Added a brand-new `Task Race` mode for 2+ simultaneous runners:
   - Runners keep their own bodies, inventories, and world state instead of sharing one swapped character.
