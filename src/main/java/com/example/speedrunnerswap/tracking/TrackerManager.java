@@ -41,7 +41,8 @@ public class TrackerManager {
      * Start tracking the active runner
      */
     public void startTracking() {
-        if (!plugin.getConfigManager().isTrackerEnabled()) {
+        if (plugin.getCurrentMode() != com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode.DREAM
+                || !plugin.getConfigManager().isTrackerEnabled()) {
             stopTracking();
             return;
         }
@@ -100,6 +101,9 @@ public class TrackerManager {
         if (hunter == null || !hunter.isOnline()) {
             return;
         }
+        if (plugin.getCurrentMode() != com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode.DREAM) {
+            return;
+        }
         
         // Avoid duplicates
         if (!hasCompass(hunter)) {
@@ -117,6 +121,9 @@ public class TrackerManager {
      * @param hunter The hunter to update the compass for
      */
     public void updateCompass(Player hunter) {
+        if (plugin.getCurrentMode() != com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode.DREAM) {
+            return;
+        }
         Player activeRunner = plugin.getGameManager().getActiveRunner();
         if (activeRunner != null && activeRunner.isOnline()) {
             updateHunterCompass(hunter, activeRunner);
@@ -189,6 +196,9 @@ public class TrackerManager {
      * Update compasses for all hunters
      */
     public void updateAllHunterCompasses() {
+        if (plugin.getCurrentMode() != com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode.DREAM) {
+            return;
+        }
         Player activeRunner = plugin.getGameManager().getActiveRunner();
         if (activeRunner != null && activeRunner.isOnline()) {
             if (!hasOnlineHunters()) {

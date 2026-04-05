@@ -234,7 +234,8 @@ public class GameManager {
                             plugin.getKitManager().giveKit(player, "runner");
                         }
                         for (Player hunter : hunters) {
-                            plugin.getKitManager().giveKit(hunter, "hunter");
+                            plugin.getKitManager().giveKit(hunter,
+                                    plugin.isDualBodyTaskMode() ? "runner" : "hunter");
                         }
                     }
 
@@ -334,7 +335,9 @@ public class GameManager {
         }
 
         for (Player player : getOnlineGameParticipants()) {
-            String sub = isRunner(player) ? runnerSubtitle : hunterSubtitle;
+            String sub = plugin.isTaskCompetitionMode()
+                    ? runnerSubtitle
+                    : (isRunner(player) ? runnerSubtitle : hunterSubtitle);
             BukkitCompat.showTitle(player, titleStr, sub, 10, 100, 10);
         }
 

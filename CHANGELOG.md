@@ -4,8 +4,11 @@
 - Added `Task Master Duo`, a second shared-body task mode where two groups can swap inside separate bodies at the same time.
 - Added GUI/config/command support for selecting `Task Master Duo`, including its own stored default interval.
 - Task competitions can now end cleanly with a task winner without showing runner-vs-hunter win/lose titles to the wrong body.
+- `Task Master Duo` now gives the second shared body the runner kit instead of leaking Dream hunter kits into task rounds.
+- Task competition stop/end flows now use the task-side subtitle for every participant instead of treating body B like a hunter team.
 - Fixed second-body listener enforcement so inactive `Task Master Duo` players follow the same chat, movement, inventory, and damage restrictions as inactive runners.
 - Kept Dream-only tracker compass rules scoped to Dream so `Task Master Duo` players are not treated like hunters with compasses.
+- Hard-disabled tracker startup/compass updates outside Dream even if the tracker config gets toggled manually.
 - Updated voice chat mute handling so the second body in `Task Master Duo` is muted/unmuted correctly during swaps.
 
 ## 4.3.2
