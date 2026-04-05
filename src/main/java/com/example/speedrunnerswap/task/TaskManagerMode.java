@@ -205,15 +205,11 @@ public class TaskManagerMode {
         if (taskId == null)
             return; // not assigned
         sheepKilledWithIronShovel.remove(p.getUniqueId());
-        // Announce winner and end the game with proper winner attribution
+        TaskDefinition completedTask = registry.get(taskId);
+        String description = completedTask != null ? completedTask.description() : taskId;
         Bukkit.getScheduler().runTask(plugin, () -> {
-            for (Player pl : Bukkit.getOnlinePlayers()) {
-                BukkitCompat.showTitle(pl, "§a§lTASK COMPLETE!",
-                        "§e" + p.getName() + " §7completed: §f" + registry.get(taskId).description(), 10, 80, 16);
-                pl.sendMessage("§a[Task Manager] Winner: §f" + p.getName());
-            }
             try {
-                plugin.getGameManager().endGame(com.example.speedrunnerswap.models.Team.RUNNER);
+                plugin.getGameManager().endTaskCompetitionRound(p, description);
             } catch (Throwable ignored) {
             }
         });
@@ -356,7 +352,7 @@ public class TaskManagerMode {
         if (assignments.isEmpty()) {
             return;
         }
-        Msg.broadcast("§6§l[Task Master] Current Assignments");
+        Msg.broadcast("§6§l[" + (plugin.isDualBodyTaskMode() ? "Task Master Duo" : "Task Master") + "] Current Assignments");
         for (var entry : assignments.entrySet()) {
             UUID uuid = entry.getKey();
             String taskId = entry.getValue();

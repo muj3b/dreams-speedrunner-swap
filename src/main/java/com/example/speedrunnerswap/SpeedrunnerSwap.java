@@ -46,10 +46,10 @@ public final class SpeedrunnerSwap extends JavaPlugin {
     private com.example.speedrunnerswap.task.TaskManagerMode taskManagerMode;
 
     // Mode selection (Dream = runners+hunters, Sapnap = runners only, Task
-    // Manager = runners only with secret tasks, Task Race = runners only with
-    // simultaneous secret tasks and no swapping)
+    // = classic one-body task mode, Task Duel = two shared task bodies,
+    // Task Race = runners only with simultaneous secret tasks and no swapping)
     public enum SwapMode {
-        DREAM, SAPNAP, TASK, TASK_RACE
+        DREAM, SAPNAP, TASK, TASK_DUEL, TASK_RACE
     }
 
     private SwapMode currentMode = SwapMode.DREAM;
@@ -268,11 +268,15 @@ public final class SpeedrunnerSwap extends JavaPlugin {
     }
 
     public boolean isTaskCompetitionMode(SwapMode mode) {
-        return mode == SwapMode.TASK || mode == SwapMode.TASK_RACE;
+        return mode == SwapMode.TASK || mode == SwapMode.TASK_DUEL || mode == SwapMode.TASK_RACE;
     }
 
     public boolean isParallelTaskMode() {
         return currentMode == SwapMode.TASK_RACE;
+    }
+
+    public boolean isDualBodyTaskMode() {
+        return currentMode == SwapMode.TASK_DUEL;
     }
 
     public boolean usesSharedRunnerControl() {
@@ -283,6 +287,10 @@ public final class SpeedrunnerSwap extends JavaPlugin {
         return currentMode == SwapMode.DREAM
                 && configManager != null
                 && configManager.isSharedHunterControlEnabled();
+    }
+
+    public boolean usesSharedSecondBody() {
+        return usesSharedHunterControl() || isDualBodyTaskMode();
     }
 
     public void setCurrentMode(SwapMode mode) {

@@ -24,6 +24,7 @@ swap:
     dream: 60
     sapnap: 60
     task: 60
+    task_duel: 60
     task_race: 60
   # Jitter settings (only used if randomize is true)
   jitter:
@@ -350,5 +351,5 @@ task_manager:
 
 # General game settings
 game:
-  # Default mode selected on server start: dream | sapnap | task | task_race
+  # Default mode selected on server start: dream | sapnap | task | task_duel | task_race
   default_mode: dream

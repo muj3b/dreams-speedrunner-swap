@@ -136,7 +136,7 @@ public class EventListeners implements Listener {
                             && ((plugin.usesSharedRunnerControl()
                                     && plugin.getGameManager().isRunner(player)
                                     && !plugin.getGameManager().isActiveRunner(player))
-                                    || (plugin.usesSharedHunterControl()
+                                    || (plugin.usesSharedSecondBody()
                                             && plugin.getGameManager().isHunter(player)
                                             && !plugin.getGameManager().isActiveHunter(player)))) {
                         shouldBlock = true;
@@ -188,7 +188,8 @@ public class EventListeners implements Listener {
             }
 
             // Ensure hunters rejoining mid-game receive a tracking compass immediately
-            if (plugin.getGameManager().isHunter(player)) {
+            if (plugin.getCurrentMode() == com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode.DREAM
+                    && plugin.getGameManager().isHunter(player)) {
                 Bukkit.getScheduler().runTask(plugin, () -> {
                     if (!plugin.usesSharedHunterControl() || plugin.getGameManager().isActiveHunter(player)) {
                         plugin.getTrackerManager().giveTrackingCompass(player);
@@ -246,7 +247,9 @@ public class EventListeners implements Listener {
         }
 
         // Ensure hunters don't drop tracking compasses on death
-        if (plugin.getGameManager().isGameRunning() && plugin.getGameManager().isHunter(player)) {
+        if (plugin.getCurrentMode() == com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode.DREAM
+                && plugin.getGameManager().isGameRunning()
+                && plugin.getGameManager().isHunter(player)) {
             event.getDrops().removeIf(item -> item != null && item.getType() == Material.COMPASS);
         }
 
@@ -276,7 +279,8 @@ public class EventListeners implements Listener {
         Player player = event.getPlayer();
         ItemStack droppedItem = event.getItemDrop().getItemStack();
 
-        if (plugin.getGameManager().isGameRunning() &&
+        if (plugin.getCurrentMode() == com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode.DREAM
+                && plugin.getGameManager().isGameRunning() &&
                 plugin.getGameManager().isHunter(player) &&
                 droppedItem.getType() == Material.COMPASS) {
             event.setCancelled(true);
@@ -288,7 +292,9 @@ public class EventListeners implements Listener {
     public void onInventoryDrag(org.bukkit.event.inventory.InventoryDragEvent event) {
         if (!(event.getWhoClicked() instanceof Player player))
             return;
-        if (!plugin.getGameManager().isGameRunning() || !plugin.getGameManager().isHunter(player))
+        if (plugin.getCurrentMode() != com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode.DREAM
+                || !plugin.getGameManager().isGameRunning()
+                || !plugin.getGameManager().isHunter(player))
             return;
 
         ItemStack dragged = event.getOldCursor();
@@ -327,7 +333,8 @@ public class EventListeners implements Listener {
                 plugin.getGameManager().syncRunnerRespawn(player, target);
                 plugin.getGameManager().scheduleRunnerRespawnEnforcement(player, target);
             }
-        } else if (plugin.getGameManager().isGameRunning() &&
+        } else if (plugin.getCurrentMode() == com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode.DREAM
+                && plugin.getGameManager().isGameRunning() &&
                 plugin.getGameManager().isHunter(player)) {
             if (!plugin.usesSharedHunterControl() || plugin.getGameManager().isActiveHunter(player)) {
                 plugin.getTrackerManager().giveTrackingCompass(player);
@@ -393,7 +400,7 @@ public class EventListeners implements Listener {
             if ("CAGE".equalsIgnoreCase(plugin.getConfigManager().getFreezeMode())) {
                 event.setCancelled(true);
             }
-        } else if (plugin.usesSharedHunterControl()
+        } else if (plugin.usesSharedSecondBody()
                 && plugin.getGameManager().isHunter(victim)
                 && !plugin.getGameManager().isActiveHunter(victim)) {
             if ("CAGE".equalsIgnoreCase(plugin.getConfigManager().getFreezeMode())) {
@@ -409,7 +416,8 @@ public class EventListeners implements Listener {
             return;
 
         // If a hunter changes world, (re)give/update their compass
-        if (plugin.getGameManager().isHunter(player)
+        if (plugin.getCurrentMode() == com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode.DREAM
+                && plugin.getGameManager().isHunter(player)
                 && (!plugin.usesSharedHunterControl() || plugin.getGameManager().isActiveHunter(player))) {
             plugin.getTrackerManager().giveTrackingCompass(player);
         }
@@ -464,7 +472,9 @@ public class EventListeners implements Listener {
 
         // Hunters: allow moving compass within their own inventory, but block
         // placing it into any container/top inventory or quick-moving into it.
-        if (plugin.getGameManager().isGameRunning() && plugin.getGameManager().isHunter(player)) {
+        if (plugin.getCurrentMode() == com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode.DREAM
+                && plugin.getGameManager().isGameRunning()
+                && plugin.getGameManager().isHunter(player)) {
             boolean clickedInPlayerInv = inventory.equals(player.getInventory());
 
             // If the item on cursor is a compass and the click targets a container, block
@@ -523,7 +533,7 @@ public class EventListeners implements Listener {
             boolean inactiveRunner = plugin.usesSharedRunnerControl()
                     && plugin.getGameManager().isRunner(player)
                     && !plugin.getGameManager().isActiveRunner(player);
-            boolean inactiveHunter = plugin.usesSharedHunterControl()
+            boolean inactiveHunter = plugin.usesSharedSecondBody()
                     && plugin.getGameManager().isHunter(player)
                     && !plugin.getGameManager().isActiveHunter(player);
             if (inactiveRunner || inactiveHunter) {
@@ -589,7 +599,7 @@ public class EventListeners implements Listener {
         boolean inactiveRunner = plugin.usesSharedRunnerControl()
                 && plugin.getGameManager().isRunner(player)
                 && !plugin.getGameManager().isActiveRunner(player);
-        boolean inactiveHunter = plugin.usesSharedHunterControl()
+        boolean inactiveHunter = plugin.usesSharedSecondBody()
                 && plugin.getGameManager().isHunter(player)
                 && !plugin.getGameManager().isActiveHunter(player);
         if (!inactiveRunner && !inactiveHunter)
@@ -607,7 +617,7 @@ public class EventListeners implements Listener {
                 plugin.getGameManager().isGameRunning() &&
                 plugin.getGameManager().isRunner(player) &&
                 !plugin.getGameManager().isActiveRunner(player);
-        boolean inactiveHunter = plugin.usesSharedHunterControl() &&
+        boolean inactiveHunter = plugin.usesSharedSecondBody() &&
                 plugin.getGameManager().isGameRunning() &&
                 plugin.getGameManager().isHunter(player) &&
                 !plugin.getGameManager().isActiveHunter(player);

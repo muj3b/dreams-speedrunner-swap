@@ -345,6 +345,8 @@ public final class GuiManager implements Listener {
         statusLore.add("§7Speedrunners: §b" + gm.getRunners().size());
         if (mode == SpeedrunnerSwap.SwapMode.DREAM) {
             statusLore.add("§7Hunters: §c" + gm.getHunters().size());
+        } else if (mode == SpeedrunnerSwap.SwapMode.TASK_DUEL) {
+            statusLore.add("§7Second Body: §d" + gm.getHunters().size());
         } else {
             statusLore.add("§7Hunters: §8Not used in this mode");
         }
@@ -459,7 +461,8 @@ public final class GuiManager implements Listener {
             items.add(modeItem(10, SpeedrunnerSwap.SwapMode.DREAM, true, current));
             items.add(modeItem(12, SpeedrunnerSwap.SwapMode.SAPNAP, true, current));
             items.add(modeItem(14, SpeedrunnerSwap.SwapMode.TASK, true, current));
-            items.add(modeItem(16, SpeedrunnerSwap.SwapMode.TASK_RACE, true, current));
+            items.add(modeItem(16, SpeedrunnerSwap.SwapMode.TASK_DUEL, true, current));
+            items.add(modeItem(18, SpeedrunnerSwap.SwapMode.TASK_RACE, true, current));
             items.add(simpleItem(22, () -> icon(Material.MAP, "§b§lCurrent Mode",
                     List.of("§7Active: §f" + modeDisplayName(current), "", "§7Select another icon to switch."))));
             items.add(clickItem(29, () -> icon(Material.PLAYER_HEAD, "§a§lTeam Manager",
@@ -476,7 +479,8 @@ public final class GuiManager implements Listener {
             items.add(modeItem(10, SpeedrunnerSwap.SwapMode.DREAM, false, current));
             items.add(modeItem(12, SpeedrunnerSwap.SwapMode.SAPNAP, false, current));
             items.add(modeItem(14, SpeedrunnerSwap.SwapMode.TASK, false, current));
-            items.add(modeItem(16, SpeedrunnerSwap.SwapMode.TASK_RACE, false, current));
+            items.add(modeItem(16, SpeedrunnerSwap.SwapMode.TASK_DUEL, false, current));
+            items.add(modeItem(18, SpeedrunnerSwap.SwapMode.TASK_RACE, false, current));
             items.add(backButton(22, "§7§lBack", MenuKey.MAIN, null,
                     player -> openPrevious(player)));
         }
@@ -494,6 +498,7 @@ public final class GuiManager implements Listener {
             case DREAM -> Material.DIAMOND_SWORD;
             case SAPNAP -> Material.DIAMOND_BOOTS;
             case TASK -> Material.TARGET;
+            case TASK_DUEL -> Material.MACE;
             case TASK_RACE -> Material.RECOVERY_COMPASS;
         };
         List<String> lore = new ArrayList<>();
@@ -502,6 +507,7 @@ public final class GuiManager implements Listener {
             case DREAM -> lore.addAll(List.of("§e§lSpeedrunners vs Hunters", "§7Classic chase experience"));
             case SAPNAP -> lore.addAll(List.of("§b§lMulti-runner Control", "§7Share one body cooperatively"));
             case TASK -> lore.addAll(List.of("§6§lTask Master", "§7Secret objectives and deception"));
+            case TASK_DUEL -> lore.addAll(List.of("§6§lTask Master Duo", "§7Two shared bodies sabotage each other"));
             case TASK_RACE -> lore.addAll(List.of("§6§lTask Race", "§7Parallel no-swap objective race"));
         }
         if (direct) {
@@ -510,6 +516,7 @@ public final class GuiManager implements Listener {
                 case DREAM -> lore.addAll(List.of("§7Recommended: §f3+ players", "§7(1 runner, 2+ hunters)"));
                 case SAPNAP -> lore.addAll(List.of("§7Recommended: §f2-4 players", "§7Perfect for co-op runs"));
                 case TASK -> lore.addAll(List.of("§7Recommended: §f3+ players", "§7For strategic chaos"));
+                case TASK_DUEL -> lore.addAll(List.of("§7Recommended: §f4+ players", "§72 shared bodies active at once"));
                 case TASK_RACE -> lore.addAll(List.of("§7Recommended: §f2+ players", "§7Everyone plays at once"));
             }
         }
@@ -523,6 +530,7 @@ public final class GuiManager implements Listener {
                 case DREAM -> "Dream";
                 case SAPNAP -> "Sapnap";
                 case TASK -> "Task Master";
+                case TASK_DUEL -> "Task Master Duo";
                 case TASK_RACE -> "Task Race";
             }, lore);
             if (selected || isDefault) {
@@ -562,6 +570,7 @@ public final class GuiManager implements Listener {
             case DREAM -> "Dream";
             case SAPNAP -> "Sapnap";
             case TASK -> "Task Master";
+            case TASK_DUEL -> "Task Master Duo";
             case TASK_RACE -> "Task Race";
         };
     }
@@ -571,7 +580,11 @@ public final class GuiManager implements Listener {
         GameManager gm = plugin.getGameManager();
         Team initialFocus = teamFocus.computeIfAbsent(viewer.getUniqueId(), uuid -> Team.RUNNER);
 
-        boolean huntersAvailable = plugin.getCurrentMode() == SpeedrunnerSwap.SwapMode.DREAM;
+        boolean huntersAvailable = plugin.getCurrentMode() == SpeedrunnerSwap.SwapMode.DREAM
+                || plugin.isDualBodyTaskMode();
+        boolean taskDuelMode = plugin.isDualBodyTaskMode();
+        String secondBodyLabel = taskDuelMode ? "Second Body" : "Hunters";
+        String secondBodyPlural = taskDuelMode ? "second body" : "hunters";
         if (!huntersAvailable && initialFocus == Team.HUNTER) {
             initialFocus = Team.RUNNER;
             teamFocus.put(viewer.getUniqueId(), Team.RUNNER);
@@ -590,12 +603,14 @@ public final class GuiManager implements Listener {
                 }));
 
         List<String> instructionLore = new ArrayList<>();
-        instructionLore.add("§71. Select runner/hunter focus");
+        instructionLore.add("§71. Select runner/" + secondBodyPlural + " focus");
         instructionLore.add("§72. Click player head to assign");
         instructionLore.add("§73. Shift-click to remove");
-        if (plugin.getCurrentMode() != SpeedrunnerSwap.SwapMode.DREAM) {
+        if (!huntersAvailable) {
             instructionLore.add("§cThis mode uses speedrunners only.");
-            instructionLore.add("§7Assigning hunters is disabled.");
+            instructionLore.add("§7Assigning " + secondBodyPlural + " is disabled.");
+        } else if (taskDuelMode) {
+            instructionLore.add("§7Task Master Duo uses runners as body A and hunters as body B.");
         }
         if (plugin.getConfigManager().isAssignmentRestrictedToSessionWorld()) {
             instructionLore.add("§7Assignment world: §f"
@@ -610,14 +625,16 @@ public final class GuiManager implements Listener {
 
         items.add(clickItem(6, () -> icon(Material.IRON_SWORD,
                 huntersAvailable
-                        ? (focus == Team.HUNTER ? "§a§lAssigning Hunters" : "§c§lAssign Hunters")
-                        : "§7§lHunters Disabled",
+                        ? (focus == Team.HUNTER ? "§a§lAssigning " + secondBodyLabel
+                                : "§c§lAssign " + secondBodyLabel)
+                        : "§7§l" + secondBodyLabel + " Disabled",
                 huntersAvailable
                         ? List.of("§7Click to set focus")
-                        : List.of("§7Dream mode only")),
+                        : List.of(taskDuelMode ? "§7Task Master Duo only" : "§7Dream mode only")),
                 ctxClick -> {
                     if (!huntersAvailable) {
-                        Msg.send(ctxClick.player(), "§eHunters are only available in Dream mode.");
+                        Msg.send(ctxClick.player(),
+                                "§e" + secondBodyLabel + " are only available in Dream mode or Task Master Duo.");
                         return;
                     }
                     teamFocus.put(ctxClick.player().getUniqueId(), Team.HUNTER);
@@ -658,11 +675,11 @@ public final class GuiManager implements Listener {
             List<String> lore = new ArrayList<>();
             lore.add("§7Team: " + switch (assigned) {
                 case RUNNER -> "§bRunner";
-                case HUNTER -> "§cHunter";
+                case HUNTER -> taskDuelMode ? "§dSecond Body" : "§cHunter";
                 case NONE -> "§7Unassigned";
             });
             lore.add("§7World: §f" + online.getWorld().getName());
-            lore.add("§7Focus: " + (currentFocus == Team.RUNNER ? "§bSpeedrunners" : "§cHunters"));
+            lore.add("§7Focus: " + (currentFocus == Team.RUNNER ? "§bSpeedrunners" : "§d" + secondBodyLabel));
             lore.add("§7Click to assign, shift-click to clear");
             GuiCompat.setLore(meta, lore);
             head.setItemMeta(meta);
@@ -672,12 +689,14 @@ public final class GuiManager implements Listener {
                         : teamFocus.getOrDefault(ctxClick.player().getUniqueId(), Team.RUNNER);
                 if (!huntersAvailable && targetTeam == Team.HUNTER) {
                     teamFocus.put(ctxClick.player().getUniqueId(), Team.RUNNER);
-                    Msg.send(ctxClick.player(), "§eAssign hunters only when Dream mode is active.");
+                    Msg.send(ctxClick.player(),
+                            "§eAssign " + secondBodyPlural + " only when Dream mode or Task Master Duo is active.");
                     ctxClick.reopen();
                     return;
                 }
                 if (targetTeam == Team.HUNTER && !huntersAvailable) {
-                    Msg.send(ctxClick.player(), "§eAssign hunters only when Dream mode is active.");
+                    Msg.send(ctxClick.player(),
+                            "§eAssign " + secondBodyPlural + " only when Dream mode or Task Master Duo is active.");
                     return;
                 }
                 World referenceWorld = gm.getSessionWorld();
@@ -697,7 +716,8 @@ public final class GuiManager implements Listener {
                     if (online != ctxClick.player())
                         Msg.send(online, "§eYou were removed from all teams by §f" + ctxClick.player().getName());
                 } else {
-                    String label = targetTeam == Team.RUNNER ? "§bSpeedrunners" : "§cHunters";
+                    String label = targetTeam == Team.RUNNER ? "§bSpeedrunners"
+                            : (taskDuelMode ? "§dSecond Body" : "§cHunters");
                     Msg.send(ctxClick.player(), "§aAdded §f" + online.getName() + "§a to " + label + "§a.");
                     if (online != ctxClick.player())
                         Msg.send(online, "§eYou were assigned to " + label + " §eby §f" + ctxClick.player().getName());
@@ -858,6 +878,11 @@ public final class GuiManager implements Listener {
                 value -> cfg.setModeDefaultInterval(SpeedrunnerSwap.SwapMode.TASK_RACE, value),
                 5, 15, 5, 600,
                 "§7Stored for mode switching; no swaps happen in Task Race"));
+        items.add(adjustItem(29, Material.MACE, "§6§lTask Duo Default",
+                () -> cfg.getModeDefaultInterval(SpeedrunnerSwap.SwapMode.TASK_DUEL),
+                value -> cfg.setModeDefaultInterval(SpeedrunnerSwap.SwapMode.TASK_DUEL, value),
+                5, 15, 5, 600,
+                "§7Default interval for both Task Master Duo bodies"));
 
         items.add(adjustItem(28, Material.SHIELD, "§6§lGrace Period (s)",
                 () -> (int) Math.round(plugin.getConfig().getInt("swap.grace_period_ticks", 40) / 20.0),
@@ -1503,6 +1528,7 @@ public final class GuiManager implements Listener {
         SpeedrunnerSwap.SwapMode currentMode = plugin.getCurrentMode();
         boolean taskModeSelected = plugin.isTaskCompetitionMode();
         boolean noSwapMode = plugin.isParallelTaskMode();
+        boolean dualBodyMode = plugin.isDualBodyTaskMode();
 
         List<MenuItem> items = new ArrayList<>();
         items.add(backButton(0, "§7§lBack", MenuKey.MAIN, null, this::openMainMenu));
@@ -1517,15 +1543,17 @@ public final class GuiManager implements Listener {
                     Msg.send(ctxClick.player(), "§aTask hub set to §fTask Master§a.");
                     ctxClick.reopen();
                 }));
-        items.add(simpleItem(4, () -> icon(Material.BOOK, "§e§lCurrent Task Mode",
-                List.of(
-                        "§7Current plugin mode: §f" + modeDisplayName(currentMode),
-                        "§7Task difficulty: §f"
-                                + (taskMode != null ? taskMode.getDifficultyFilter().name() : "MEDIUM"),
-                        taskModeSelected
-                                ? (noSwapMode ? "§7Competition type: §fNo-swap parallel race"
-                                        : "§7Competition type: §fShared-body swap")
-                                : "§cSwitch to a task mode before starting from this hub"))));
+        items.add(clickItem(4, () -> icon(Material.MACE,
+                currentMode == SpeedrunnerSwap.SwapMode.TASK_DUEL ? "§a§lUsing Task Master Duo" : "§6§lUse Task Master Duo",
+                List.of("§72 shared bodies stay active at once", "§7Each player still gets a secret task")), ctxClick -> {
+                    if (plugin.getGameManager().isGameRunning()) {
+                        Msg.send(ctxClick.player(), "§cStop the current game before switching task modes.");
+                        return;
+                    }
+                    plugin.setCurrentMode(SpeedrunnerSwap.SwapMode.TASK_DUEL);
+                    Msg.send(ctxClick.player(), "§aTask hub set to §fTask Master Duo§a.");
+                    ctxClick.reopen();
+                }));
         items.add(clickItem(6, () -> icon(Material.RECOVERY_COMPASS,
                 currentMode == SpeedrunnerSwap.SwapMode.TASK_RACE ? "§a§lUsing Task Race" : "§6§lUse Task Race",
                 List.of("§72+ runners play simultaneously", "§7No periodic swaps or inactive lockout")), ctxClick -> {
@@ -1537,33 +1565,59 @@ public final class GuiManager implements Listener {
                     Msg.send(ctxClick.player(), "§aTask hub set to §fTask Race§a.");
                     ctxClick.reopen();
                 }));
+        items.add(simpleItem(8, () -> icon(Material.BOOK, "§e§lCurrent Task Mode",
+                List.of(
+                        "§7Current plugin mode: §f" + modeDisplayName(currentMode),
+                        "§7Task difficulty: §f"
+                                + (taskMode != null ? taskMode.getDifficultyFilter().name() : "MEDIUM"),
+                        taskModeSelected
+                                ? (noSwapMode ? "§7Competition type: §fNo-swap parallel race"
+                                        : dualBodyMode ? "§7Competition type: §fTwo shared bodies"
+                                                : "§7Competition type: §fShared-body swap")
+                                : "§cSwitch to a task mode before starting from this hub"))));
 
         boolean running = gm.isGameRunning();
         boolean paused = gm.isGamePaused();
         boolean ready = taskModeSelected && gm.canStartGame();
         int runnerCount = gm.getRunners().size();
         int onlineRunners = (int) gm.getRunners().stream().filter(Player::isOnline).count();
+        int hunterCount = gm.getHunters().size();
+        int onlineHunters = (int) gm.getHunters().stream().filter(Player::isOnline).count();
         int requiredRunners = noSwapMode ? 2 : 1;
 
         // Status tiles ------------------------------------------------
         items.add(clickItem(10, () -> {
             if (running) {
+                List<String> lore = new ArrayList<>();
+                lore.add("§7Running with §f" + onlineRunners + " §7online runners");
+                if (dualBodyMode) {
+                    lore.add("§7Second body online: §f" + onlineHunters);
+                }
+                lore.add("");
+                lore.add("§eClick to end the current round");
                 return icon(Material.BARRIER, "§c§lStop Competition",
-                        List.of("§7Running with §f" + onlineRunners + " §7online runners",
-                                "", "§eClick to end the current round"));
+                        lore);
             }
 
             List<String> lore = new ArrayList<>();
             if (!taskModeSelected) {
-                lore.add("§cChoose Task Master or Task Race first");
+                lore.add("§cChoose a task mode first");
             } else if (!ready) {
                 lore.add("§cNot enough players selected");
-                lore.add("§7Select at least §f" + requiredRunners + " §brunner" + (requiredRunners == 1 ? "" : "s"));
+                if (dualBodyMode) {
+                    lore.add("§7Need at least §f1 runner §7and §f1 second-body player");
+                } else {
+                    lore.add("§7Select at least §f" + requiredRunners + " §brunner" + (requiredRunners == 1 ? "" : "s"));
+                }
             } else {
                 lore.add("§7Ready with §f" + runnerCount + " §7runner" + (runnerCount == 1 ? "" : "s"));
+                if (dualBodyMode) {
+                    lore.add("§7Second-body players: §f" + hunterCount);
+                }
             }
             lore.add("");
-            lore.add(ready ? "§eClick to start" : "§cAssign runners to begin");
+            lore.add(ready ? "§eClick to start"
+                    : dualBodyMode ? "§cAssign both shared bodies to begin" : "§cAssign runners to begin");
             String label = ready ? "§a§lStart Competition" : "§4§lCannot Start";
             Material mat = ready ? Material.LIME_CONCRETE : Material.RED_CONCRETE;
             return icon(mat, label, lore);
@@ -1575,12 +1629,16 @@ public final class GuiManager implements Listener {
                 return;
             }
             if (!taskModeSelected) {
-                Msg.send(ctxClick.player(), "§cSelect Task Master or Task Race in this hub first.");
+                Msg.send(ctxClick.player(), "§cSelect a task mode in this hub first.");
                 return;
             }
             if (!ready) {
-                Msg.send(ctxClick.player(), "§cAssign at least " + requiredRunners + " runner"
-                        + (requiredRunners == 1 ? "" : "s") + " before starting.");
+                if (dualBodyMode) {
+                    Msg.send(ctxClick.player(), "§cAssign at least one runner and one second-body player before starting.");
+                } else {
+                    Msg.send(ctxClick.player(), "§cAssign at least " + requiredRunners + " runner"
+                            + (requiredRunners == 1 ? "" : "s") + " before starting.");
+                }
                 return;
             }
             if (gm.startGame()) {
@@ -1706,9 +1764,17 @@ public final class GuiManager implements Listener {
                     ctxClick.reopen();
                 }));
 
-        // Runner-only management --------------------------------------
-        items.add(navigateItem(19, Material.PLAYER_HEAD, "§b§lRunner Management", MenuKey.TASK_RUNNERS,
-                "§7Task competition uses runners only"));
+        // Body management --------------------------------------
+        items.add(clickItem(19, () -> icon(Material.PLAYER_HEAD,
+                dualBodyMode ? "§d§lBody Management" : "§b§lRunner Management",
+                dualBodyMode ? List.of("§7Assign shared body A + B players")
+                        : List.of("§7Task competition uses runners only")), ctxClick -> {
+                    if (plugin.isDualBodyTaskMode()) {
+                        open(ctxClick.player(), MenuKey.TEAM_MANAGEMENT, null, false);
+                    } else {
+                        open(ctxClick.player(), MenuKey.TASK_RUNNERS, null, false);
+                    }
+                }));
 
         // Task statistics tile ----------------------------------------
         boolean statsEnabled = plugin.getConfig().getBoolean("stats.enabled", true);
@@ -1731,8 +1797,13 @@ public final class GuiManager implements Listener {
                         return;
                     }
                     if (taskMode != null) {
-                        taskMode.assignAndAnnounceTasks(plugin.getGameManager().getRunners());
-                        Msg.send(ctxClick.player(), "§aTasks rerolled for current runners.");
+                        List<Player> participants = plugin.isDualBodyTaskMode()
+                                ? java.util.stream.Stream.concat(plugin.getGameManager().getRunners().stream(),
+                                        plugin.getGameManager().getHunters().stream()).toList()
+                                : plugin.getGameManager().getRunners();
+                        taskMode.assignAndAnnounceTasks(participants);
+                        Msg.send(ctxClick.player(),
+                                "§aTasks rerolled for current " + (plugin.isDualBodyTaskMode() ? "participants." : "runners."));
                     }
                 }));
 
@@ -1762,7 +1833,7 @@ public final class GuiManager implements Listener {
 
         items.add(toggleConfigItem(10, Material.REDSTONE_TORCH, "§e§lPause on Disconnect",
                 "task_manager.pause_on_disconnect", true,
-                "§7Pause when a runner disconnects"));
+                "§7Pause when a task participant disconnects"));
 
         items.add(toggleConfigItem(11, Material.BARRIER, "§e§lRemove On Timeout",
                 "task_manager.remove_on_timeout", true,
@@ -1787,7 +1858,7 @@ public final class GuiManager implements Listener {
 
         items.add(toggleConfigItem(16, Material.NAME_TAG, "§e§lEnd When One Left",
                 "task_manager.end_when_one_left", false,
-                "§7Automatically finish when one runner remains"));
+                "§7Automatically finish when one participant remains"));
 
         items.add(clickItem(19, () -> icon(Material.NETHERITE_SWORD, "§6§lTask Difficulty",
                 List.of("§7Current pool: §f"
@@ -1835,6 +1906,10 @@ public final class GuiManager implements Listener {
                 "task_manager.reroll.task_race_window_seconds", 60,
                 15, 30, 0, 600,
                 "§7Opening reroll window for Task Race"));
+
+        items.add(simpleItem(29, () -> icon(Material.MACE, "§6§lTask Master Duo",
+                List.of("§7Uses the standard swap interval for both shared bodies",
+                        "§7Assign runners for body A and hunters for body B"))));
 
         items.add(simpleItem(31, () -> icon(Material.PAPER, "§7Player Shortcut",
                 List.of("§7Players can use §e/swap complete reroll confirm",

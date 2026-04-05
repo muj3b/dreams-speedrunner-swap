@@ -72,7 +72,7 @@ public class VoiceChatIntegration {
      */
     public void updateRunnerMuteStatus() {
         if (!enabled || !pluginDetected) return;
-        if (!plugin.usesSharedRunnerControl() && !plugin.usesSharedHunterControl()) {
+        if (!plugin.usesSharedRunnerControl() && !plugin.usesSharedSecondBody()) {
             resetAllPlayerMuteStatus();
             return;
         }
@@ -89,7 +89,7 @@ public class VoiceChatIntegration {
         }
 
         for (Player hunter : plugin.getGameManager().getHunters()) {
-            if (!plugin.usesSharedHunterControl() || hunter.equals(activeHunter)) {
+            if (!plugin.usesSharedSecondBody() || hunter.equals(activeHunter)) {
                 unmutePlayer(hunter);
             } else {
                 mutePlayer(hunter);

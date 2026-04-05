@@ -2,7 +2,7 @@
 
 # 🌀 Speedrunner Swap + Task Master 🌀
 
-### Four Epic Game Modes in One Plugin
+### Five Epic Game Modes in One Plugin
 
 </div>
 
@@ -10,13 +10,13 @@
 
 ![Minecraft](https://img.shields.io/badge/Minecraft-1.21.x%2B-28A745?style=for-the-badge&logo=minecraft)
 ![API](https://img.shields.io/badge/API-Paper%2FSpigot-2875D7?style=for-the-badge)
-![Game Modes](https://img.shields.io/badge/Game_Modes-4_in_1-8A2BE2?style=for-the-badge)
+![Game Modes](https://img.shields.io/badge/Game_Modes-5_in_1-8A2BE2?style=for-the-badge)
 ![Task Master](https://img.shields.io/badge/Task_Master-BETA-FF6B35?style=for-the-badge)
 ![Tasks](https://img.shields.io/badge/100%2B_Tasks-Included-FFC107?style=for-the-badge)
 
 </div>
 
-> **Experience Dream's legendary challenges in one powerful plugin! Play the classic Speedrunners vs Hunters, the cooperative Multi-Runner Control Swap, the shared-body Task Master sabotage mode, or the new no-swap Task Race mode where everyone plays at once. Dream mode can also run with a second shared hunter body for team-vs-team body swapping.**
+> **Experience Dream's legendary challenges in one powerful plugin! Play the classic Speedrunners vs Hunters, the cooperative Multi-Runner Control Swap, the shared-body Task Master sabotage mode, the new Task Master Duo two-body sabotage variant, or the no-swap Task Race mode where everyone plays at once. Dream mode can also run with a second shared hunter body for team-vs-team body swapping.**
 
 ---
 
@@ -59,6 +59,10 @@ In Task Master mode, players take turns controlling a single character while rac
 ## 🏁 NEW: Task Race Mode
 
 Task Race uses the same secret task pool, but removes the shared-body swap loop entirely. Two or more runners can play at the same time on their own characters, and the first player to finish their task wins instantly.
+
+## ⚔️ NEW: Task Master Duo
+
+Task Master Duo keeps the shared-body chaos, but splits the round into two active bodies instead of one. One group shares body A, another group shares body B, and both bodies rotate on the same interval while trying to finish their secret tasks first. That means you still get the sabotage, deception, and swap pressure from classic Task Master, but now another shared body is in the world interfering with you at the same time.
 
 ## 🏹 NEW: Shared Hunter Body Option
 

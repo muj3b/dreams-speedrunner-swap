@@ -28,6 +28,7 @@ public class SwapCommand implements CommandExecutor, TabCompleter {
             case DREAM -> "dream";
             case SAPNAP -> "sapnap";
             case TASK -> "task";
+            case TASK_DUEL -> "taskduel";
             case TASK_RACE -> "taskrace";
         };
     }
@@ -68,8 +69,9 @@ public class SwapCommand implements CommandExecutor, TabCompleter {
         sender.sendMessage("§e/swap start|stop|pause|resume §7Control game");
         sender.sendMessage("§e/swap interval <seconds> §7Set base swap interval");
         sender.sendMessage("§e/swap randomize <on|off> §7Toggle randomized swaps");
-        sender.sendMessage("§e/swap mode <dream|sapnap|task|taskrace> §7Set mode");
+        sender.sendMessage("§e/swap mode <dream|sapnap|task|taskduel|taskrace> §7Set mode");
         sender.sendMessage("§7Dream mode can optionally use a shared hunter body from the GUI/config.");
+        sender.sendMessage("§7Task Master Duo is the two-shared-bodies task variant.");
         sender.sendMessage("§e/swap tasks list §7List tasks with difficulty + enabled");
         sender.sendMessage("§e/swap tasks enable|disable <id> §7Toggle a task");
         sender.sendMessage("§e/swap tasks difficulty <easy|medium|hard> §7Set difficulty pool");
@@ -142,7 +144,7 @@ public class SwapCommand implements CommandExecutor, TabCompleter {
 
         if (rest.length == 0) {
             sender.sendMessage("§eCurrent mode: §f" + modeName(plugin.getCurrentMode()));
-            sender.sendMessage("§7Usage: /swap mode <dream|sapnap|task|taskrace> [--force]");
+            sender.sendMessage("§7Usage: /swap mode <dream|sapnap|task|taskduel|taskrace> [--force]");
             return true;
         }
 
@@ -157,7 +159,7 @@ public class SwapCommand implements CommandExecutor, TabCompleter {
         }
 
         if (targetArg == null) {
-            sender.sendMessage("§cSpecify a mode to switch to (dream, sapnap, task, taskrace).");
+            sender.sendMessage("§cSpecify a mode to switch to (dream, sapnap, task, taskduel, taskrace).");
             return false;
         }
 
@@ -172,13 +174,15 @@ public class SwapCommand implements CommandExecutor, TabCompleter {
             case "dream", "hunters", "manhunt" -> com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode.DREAM;
             case "sapnap", "control", "multi", "multirunner", "runners" -> com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode.SAPNAP;
             case "task", "taskmaster", "task-manager", "taskmanager" -> com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode.TASK;
+            case "taskduel", "task_duel", "task-duel", "taskduo", "task_duo", "task-duo", "taskteams",
+                    "task_teams", "task-teams" -> com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode.TASK_DUEL;
             case "taskrace", "task_race", "task-race", "noswap", "paralleltask", "taskparallel", "task_parallel" ->
                 com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode.TASK_RACE;
             default -> null;
         };
 
         if (target == null) {
-            sender.sendMessage("§cUnknown mode: " + mode + ". Use dream|sapnap|task|taskrace.");
+            sender.sendMessage("§cUnknown mode: " + mode + ". Use dream|sapnap|task|taskduel|taskrace.");
             return false;
         }
 
@@ -197,6 +201,7 @@ public class SwapCommand implements CommandExecutor, TabCompleter {
             case DREAM -> "§aMode set to §fDream§a (runners + hunters).";
             case SAPNAP -> "§aMode set to §fSapnap§a (multi-runner control).";
             case TASK -> "§aMode set to §6Task Master§a (secret objectives).";
+            case TASK_DUEL -> "§aMode set to §6Task Master Duo§a (two shared bodies with secret objectives).";
             case TASK_RACE -> "§aMode set to §6Task Race§a (no-swap secret objective race).";
         };
         sender.sendMessage(confirmation);
@@ -264,6 +269,9 @@ public class SwapCommand implements CommandExecutor, TabCompleter {
             var mode = plugin.getCurrentMode();
             if (mode == com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode.DREAM) {
                 sender.sendMessage("§cFailed to start. Dream mode requires at least §e1 runner§c and §e1 hunter§c.");
+            } else if (mode == com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode.TASK_DUEL) {
+                sender.sendMessage(
+                        "§cFailed to start. Task Master Duo requires at least §e1 runner§c and §e1 second-body player§c.");
             } else if (mode == com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode.TASK_RACE) {
                 sender.sendMessage("§cFailed to start. Task Race requires at least §e2 runners§c and no hunters.");
             } else {
@@ -330,6 +338,8 @@ public class SwapCommand implements CommandExecutor, TabCompleter {
         if (plugin.getCurrentMode() == com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode.DREAM) {
             sender.sendMessage("§eShared Hunter Body: §f" + plugin.getConfigManager().isSharedHunterControlEnabled());
             sender.sendMessage("§eLegacy Hunter Shuffle: §f" + plugin.getConfigManager().isHunterSwapEnabled());
+        } else if (plugin.isDualBodyTaskMode()) {
+            sender.sendMessage("§eTask Master Duo: §ftrue");
         }
         
         if (plugin.getGameManager().isGameRunning()) {
@@ -344,11 +354,11 @@ public class SwapCommand implements CommandExecutor, TabCompleter {
             List<Player> runners = plugin.getGameManager().getRunners();
             List<Player> hunters = plugin.getGameManager().getHunters();
 
-            if (plugin.usesSharedHunterControl()) {
+            if (plugin.usesSharedSecondBody()) {
                 Player activeHunter = plugin.getGameManager().getActiveHunter();
-                sender.sendMessage("§eActive Hunter: §f" + (activeHunter != null ? activeHunter.getName() : "None"));
+                sender.sendMessage("§eActive Second Body: §f" + (activeHunter != null ? activeHunter.getName() : "None"));
                 sender.sendMessage(
-                        "§eTime Until Next Hunter Swap: §f" + plugin.getGameManager().getTimeUntilNextHunterSwap()
+                        "§eTime Until Next Second-Body Swap: §f" + plugin.getGameManager().getTimeUntilNextHunterSwap()
                                 + "s");
             } else if (plugin.getCurrentMode() == com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode.DREAM
                     && plugin.getConfigManager().isHunterSwapEnabled()) {
@@ -358,8 +368,9 @@ public class SwapCommand implements CommandExecutor, TabCompleter {
             sender.sendMessage("§eRunners: §f" + runners.stream()
                     .map(Player::getName)
                     .collect(Collectors.joining(", ")));
-            
-            sender.sendMessage("§eHunters: §f" + hunters.stream()
+
+            String secondGroupLabel = plugin.isDualBodyTaskMode() ? "Second Body" : "Hunters";
+            sender.sendMessage("§e" + secondGroupLabel + ": §f" + hunters.stream()
                     .map(Player::getName)
                     .collect(Collectors.joining(", ")));
         }
@@ -683,7 +694,7 @@ public class SwapCommand implements CommandExecutor, TabCompleter {
                     completions.add("confirm");
                 }
             } else if (args[0].equalsIgnoreCase("mode") && args.length == 2) {
-                for (String opt : new String[]{"dream", "sapnap", "task", "taskrace"}) {
+                for (String opt : new String[]{"dream", "sapnap", "task", "taskduel", "taskrace"}) {
                     if (opt.startsWith(args[1].toLowerCase())) completions.add(opt);
                 }
                 if ("--force".startsWith(args[1].toLowerCase())) {
@@ -741,7 +752,7 @@ public class SwapCommand implements CommandExecutor, TabCompleter {
 
         String assignedTask = taskMode.getAssignedTask(player);
         if (assignedTask == null) {
-            sender.sendMessage("§cYou don't have a task assigned. Join the game as a runner first.");
+            sender.sendMessage("§cYou don't have a task assigned. Join the current task competition first.");
             return false;
         }
         

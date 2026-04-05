@@ -105,6 +105,30 @@ public class GameManager {
         return new ArrayList<>(participants.values());
     }
 
+    private List<Player> getTaskCompetitionParticipants() {
+        LinkedHashMap<UUID, Player> participants = new LinkedHashMap<>();
+        for (Player runner : runners) {
+            if (runner != null) {
+                participants.put(runner.getUniqueId(), runner);
+            }
+        }
+        if (plugin.isDualBodyTaskMode()) {
+            for (Player hunter : hunters) {
+                if (hunter != null) {
+                    participants.put(hunter.getUniqueId(), hunter);
+                }
+            }
+        }
+        return new ArrayList<>(participants.values());
+    }
+
+    private boolean isTaskCompetitionParticipant(Player player) {
+        if (player == null || !plugin.isTaskCompetitionMode()) {
+            return false;
+        }
+        return isRunner(player) || (plugin.isDualBodyTaskMode() && isHunter(player));
+    }
+
     public boolean isActiveRunner(Player player) {
         return player != null && activeRunner != null && player.getUniqueId().equals(activeRunner.getUniqueId());
     }
@@ -139,6 +163,11 @@ public class GameManager {
                                 ? "§cGame cannot start: Task Master mode uses only speedrunners. Remove any hunters before starting."
                                 : "§cGame cannot start: Assign at least one speedrunner.")
                         : "§cGame cannot start: Assign at least one speedrunner.";
+                case TASK_DUEL -> hasRunner
+                        ? (hasHunter
+                                ? "§cGame cannot start: Assign at least one player to each shared body for Task Master Duo."
+                                : "§cGame cannot start: Task Master Duo needs a second shared body. Assign at least one hunter slot player.")
+                        : "§cGame cannot start: Task Master Duo needs at least one speedrunner.";
                 case TASK_RACE -> hasRunner
                         ? (hasHunter
                                 ? "§cGame cannot start: Task Race uses only speedrunners. Remove any hunters before starting."
@@ -164,6 +193,7 @@ public class GameManager {
                         case DREAM -> "§b§lDream Swap starting in " + count;
                         case SAPNAP -> "§d§lSapnap speedrunner swap in " + count;
                         case TASK -> "§6§lTaskmaster starting in " + count;
+                        case TASK_DUEL -> "§6§lTaskmaster Duo starting in " + count;
                         case TASK_RACE -> "§6§lTask Race starting in " + count;
                     };
                     String subtitle = "§7Made by muj4b";
@@ -176,6 +206,7 @@ public class GameManager {
                         case DREAM -> "§b§lDream Swap GO!";
                         case SAPNAP -> "§d§lSapnap swap GO!";
                         case TASK -> "§6§lTaskmaster GO!";
+                        case TASK_DUEL -> "§6§lTaskmaster Duo GO!";
                         case TASK_RACE -> "§6§lTask Race GO!";
                     };
                     for (Player player : getOnlineGameParticipants()) {
@@ -187,7 +218,7 @@ public class GameManager {
                     activeRunnerIndex = 0;
                     activeHunterIndex = 0;
                     activeRunner = runners.get(activeRunnerIndex);
-                    activeHunter = plugin.usesSharedHunterControl() && !hunters.isEmpty()
+                    activeHunter = plugin.usesSharedSecondBody() && !hunters.isEmpty()
                             ? hunters.get(activeHunterIndex)
                             : null;
                     initializeSessionWorld();
@@ -210,7 +241,8 @@ public class GameManager {
                     if (plugin.usesSharedRunnerControl()) {
                         scheduleNextSwap();
                     }
-                    if (plugin.getCurrentMode() == com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode.DREAM) {
+                    if (plugin.getCurrentMode() == com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode.DREAM
+                            || plugin.isDualBodyTaskMode()) {
                         scheduleNextHunterSwap();
                     }
 
@@ -230,8 +262,9 @@ public class GameManager {
 
                     if (plugin.isTaskCompetitionMode()) {
                         try {
-                            plugin.getTaskManagerMode().beginRound(runners);
-                            plugin.getTaskManagerMode().assignAndAnnounceTasks(runners);
+                            List<Player> participants = getTaskCompetitionParticipants();
+                            plugin.getTaskManagerMode().beginRound(participants);
+                            plugin.getTaskManagerMode().assignAndAnnounceTasks(participants);
                         } catch (Throwable t) {
                             plugin.getLogger().warning("Task assignment failed: " + t.getMessage());
                         }
@@ -242,7 +275,8 @@ public class GameManager {
                         postStart.run();
                     }
 
-                    if (huntersAllowed(plugin.getCurrentMode()) && plugin.getConfigManager().isTrackerEnabled()) {
+                    if (plugin.getCurrentMode() == com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode.DREAM
+                            && plugin.getConfigManager().isTrackerEnabled()) {
                         plugin.getTrackerManager().startTracking();
                         if (plugin.usesSharedHunterControl()) {
                             if (activeHunter != null && activeHunter.isOnline()) {
@@ -304,6 +338,27 @@ public class GameManager {
             BukkitCompat.showTitle(player, titleStr, sub, 10, 100, 10);
         }
 
+        finalizeGameEnd(formatEndGameBroadcast(winner));
+    }
+
+    public void endTaskCompetitionRound(Player winner, String taskDescription) {
+        if (!gameRunning) {
+            return;
+        }
+
+        String winnerName = winner != null ? winner.getName() : "Unknown";
+        String description = taskDescription != null && !taskDescription.isBlank() ? taskDescription : "their secret task";
+
+        for (Player participant : getOnlineGameParticipants()) {
+            BukkitCompat.showTitle(participant, "§a§lTASK COMPLETE!",
+                    "§e" + winnerName + " §7completed: §f" + description, 10, 80, 16);
+            participant.sendMessage("§a[Task Manager] Winner: §f" + winnerName);
+        }
+
+        finalizeGameEnd("§a[Task Manager] Winner: §f" + winnerName);
+    }
+
+    private void finalizeGameEnd(String endMessage) {
         if (swapTask != null)
             swapTask.cancel();
         if (hunterSwapTask != null)
@@ -376,8 +431,7 @@ public class GameManager {
                 nextHunterSwapTime = 0L;
                 sessionWorldName = null;
 
-                if (plugin.getConfigManager().isBroadcastGameEvents()) {
-                    String endMessage = formatEndGameBroadcast(winner);
+                if (plugin.getConfigManager().isBroadcastGameEvents() && endMessage != null && !endMessage.isBlank()) {
                     for (Player participant : getOnlineGameParticipants()) {
                         participant.sendMessage(endMessage);
                     }
@@ -607,11 +661,11 @@ public class GameManager {
         if (gameRunning && plugin.isTaskCompetitionMode()
                 && plugin.getConfig().getBoolean("task_manager.end_when_one_left", false)) {
             int online = 0;
-            for (Player r : runners)
-                if (r.isOnline())
+            for (Player participant : getTaskCompetitionParticipants())
+                if (participant.isOnline())
                     online++;
             if (online <= 1) {
-                Msg.broadcast("§e[Task Manager] Ending: only one runner remains.");
+                Msg.broadcast("§e[Task Manager] Ending: only one participant remains.");
                 stopGame();
                 return;
             }
@@ -628,7 +682,7 @@ public class GameManager {
             return;
         }
 
-        if (isRunner(player)) {
+        if (isRunner(player) || isTaskCompetitionParticipant(player)) {
             runnerDisconnectAt.put(player.getUniqueId(), System.currentTimeMillis());
             // Persist runtime disconnect time for Task mode
             if (plugin.isTaskCompetitionMode()) {
@@ -641,15 +695,19 @@ public class GameManager {
                         plugin.getConfigManager().isPauseOnDisconnect())
                 : plugin.getConfigManager().isPauseOnDisconnect();
 
-        if (plugin.isTaskCompetitionMode() && isRunner(player)) {
+        if (plugin.isTaskCompetitionMode() && isTaskCompetitionParticipant(player)) {
             if (pauseOnDc) {
                 if (pauseGame()) {
                     pausedByDisconnect = true;
                 }
-            } else if (plugin.usesSharedRunnerControl() && player.equals(activeRunner)) {
-                performSwap();
             } else {
-                reselectSessionLeader();
+                if (plugin.usesSharedRunnerControl() && isRunner(player) && player.equals(activeRunner)) {
+                    performSwap();
+                } else if (plugin.usesSharedSecondBody() && isHunter(player) && isActiveHunter(player)) {
+                    performHunterSwap();
+                } else {
+                    reselectSessionLeader();
+                }
             }
         } else if (player.equals(activeRunner)) {
             if (pauseOnDc) {
@@ -659,7 +717,7 @@ public class GameManager {
             } else {
                 performSwap();
             }
-        } else if (plugin.usesSharedHunterControl() && isHunter(player) && isActiveHunter(player)) {
+        } else if (plugin.usesSharedSecondBody() && isHunter(player) && isActiveHunter(player)) {
             if (pauseOnDc) {
                 if (pauseGame()) {
                     pausedByDisconnect = true;
@@ -672,6 +730,7 @@ public class GameManager {
         savePlayerState(player);
         portalSwapRetries.remove(player.getUniqueId());
         ensureRunnerQueueCoherence();
+        ensureHunterQueueCoherence();
     }
 
     /** Handle player rejoin */
@@ -685,8 +744,7 @@ public class GameManager {
             // If they had an assignment, ensure they're in runners
             var tmm = plugin.getTaskManagerMode();
             if (tmm != null && tmm.getAssignedTask(player) != null) {
-                if (!isRunner(player)) {
-                    // Add back into runners at end of queue
+                if (!isRunner(player) && !isHunter(player)) {
                     runners.add(player);
                 }
                 // Remind their task
@@ -720,13 +778,14 @@ public class GameManager {
                 refreshActiveTrackerTargets();
             });
         }
-        if (plugin.usesSharedHunterControl() && isHunter(player)) {
+        if (plugin.usesSharedSecondBody() && isHunter(player)) {
             Bukkit.getScheduler().runTask(plugin, () -> {
                 if (!gameRunning || !player.isOnline()) {
                     return;
                 }
                 applyInactiveEffects();
-                if (isActiveHunter(player)) {
+                if (plugin.getCurrentMode() == com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode.DREAM
+                        && isActiveHunter(player)) {
                     plugin.getTrackerManager().giveTrackingCompass(player);
                 }
             });
@@ -758,8 +817,9 @@ public class GameManager {
                     if (elapsed >= graceSec * 1000L) {
                         UUID uuid = e.getKey();
                         if (remove) {
-                            // Remove from runners
+                            // Remove from active task participant lists
                             runners.removeIf(r -> r.getUniqueId().equals(uuid));
+                            hunters.removeIf(h -> h.getUniqueId().equals(uuid));
                             toRemove.add(uuid);
                         }
                         // If active runner, move on
@@ -769,6 +829,10 @@ public class GameManager {
                             } else {
                                 reselectSessionLeader();
                             }
+                        } else if (plugin.usesSharedSecondBody()
+                                && activeHunter != null
+                                && activeHunter.getUniqueId().equals(uuid)) {
+                            performHunterSwap();
                         }
                     }
                 }
@@ -781,12 +845,12 @@ public class GameManager {
                 if (gameRunning && plugin.getConfig().getBoolean("task_manager.end_when_one_left", false)
                         && plugin.isTaskCompetitionMode()) {
                     int online = 0;
-                    for (Player r : runners)
-                        if (r.isOnline()) {
+                    for (Player participant : getTaskCompetitionParticipants())
+                        if (participant.isOnline()) {
                             online++;
                         }
                     if (online <= 1) {
-                        Msg.broadcast("§e[Task Manager] Ending: only one runner remains.");
+                        Msg.broadcast("§e[Task Manager] Ending: only one participant remains.");
                         stopGame();
                         return;
                     }
@@ -875,7 +939,7 @@ public class GameManager {
     }
 
     public int getTimeUntilNextHunterSwap() {
-        if (!plugin.usesSharedHunterControl() || !gameRunning) {
+        if (!plugin.usesSharedSecondBody() || !gameRunning) {
             return 0;
         }
         return (int) ((nextHunterSwapTime - System.currentTimeMillis()) / 1000);
@@ -1085,15 +1149,7 @@ public class GameManager {
         }
     }
 
-    private void scheduleNextSwap() {
-        if (swapTask != null) {
-            swapTask.cancel();
-        }
-        if (!plugin.usesSharedRunnerControl()) {
-            nextSwapTime = System.currentTimeMillis();
-            return;
-        }
-
+    private long resolvePrimarySwapIntervalSeconds() {
         long intervalSeconds;
         if (plugin.getConfigManager().isSwapRandomized()) {
             double mean = plugin.getConfigManager().getSwapInterval();
@@ -1111,7 +1167,19 @@ public class GameManager {
             intervalSeconds = plugin.getConfigManager().getSwapInterval();
         }
 
-        intervalSeconds = Math.max(1, intervalSeconds);
+        return Math.max(1, intervalSeconds);
+    }
+
+    private void scheduleNextSwap() {
+        if (swapTask != null) {
+            swapTask.cancel();
+        }
+        if (!plugin.usesSharedRunnerControl()) {
+            nextSwapTime = System.currentTimeMillis();
+            return;
+        }
+
+        long intervalSeconds = resolvePrimarySwapIntervalSeconds();
 
         long intervalTicks = intervalSeconds * 20;
         nextSwapTime = System.currentTimeMillis() + (intervalSeconds * 1000);
@@ -1123,13 +1191,16 @@ public class GameManager {
             hunterSwapTask.cancel();
         }
 
-        if (plugin.getCurrentMode() != com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode.DREAM) {
+        if (plugin.getCurrentMode() != com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode.DREAM
+                && !plugin.isDualBodyTaskMode()) {
             nextHunterSwapTime = System.currentTimeMillis();
             return;
         }
 
         long intervalSeconds;
-        if (plugin.usesSharedHunterControl()) {
+        if (plugin.isDualBodyTaskMode()) {
+            intervalSeconds = resolvePrimarySwapIntervalSeconds();
+        } else if (plugin.usesSharedHunterControl()) {
             intervalSeconds = Math.max(1, plugin.getConfigManager().getSharedHunterControlInterval());
         } else if (plugin.getConfigManager().isHunterSwapEnabled()) {
             intervalSeconds = Math.max(1, plugin.getConfigManager().getHunterSwapInterval());
@@ -1203,21 +1274,21 @@ public class GameManager {
             boolean show;
             switch (String.valueOf(vis).toLowerCase()) {
                 case "always" -> show = true;
-                case "last_10" -> show = (isHunter && plugin.usesSharedHunterControl() ? hunterTimeLeft : timeLeft) <= 10;
+                case "last_10" -> show = (isHunter && plugin.usesSharedSecondBody() ? hunterTimeLeft : timeLeft) <= 10;
                 default -> show = false;
             }
 
             if (show) {
                 // For caged players, show queue position instead of timer
-                if (isCaged && ((isRunner && !isActive) || (isHunter && plugin.usesSharedHunterControl() && !isActiveHunter))) {
+                if (isCaged && ((isRunner && !isActive) || (isHunter && plugin.usesSharedSecondBody() && !isActiveHunter))) {
                     int queuePosition = isRunner
                             ? getQueuePosition(runners, activeRunner, player)
                             : getQueuePosition(hunters, activeHunter, player);
                     String msg = String.format("§6Queued (%d) - You're up next", queuePosition);
                     com.example.speedrunnerswap.utils.ActionBarUtil.sendActionBar(player, msg);
                 } else {
-                    int displayTime = isHunter && plugin.usesSharedHunterControl() ? hunterTimeLeft : timeLeft;
-                    String label = isHunter && plugin.usesSharedHunterControl() ? "Hunter body in" : "Swap in";
+                    int displayTime = isHunter && plugin.usesSharedSecondBody() ? hunterTimeLeft : timeLeft;
+                    String label = isHunter && plugin.usesSharedSecondBody() ? "Second body in" : "Swap in";
                     String msg = String.format("§e%s: §c%ds", label, Math.max(0, displayTime));
                     com.example.speedrunnerswap.utils.ActionBarUtil.sendActionBar(player, msg);
                 }
@@ -1328,7 +1399,7 @@ public class GameManager {
         String freezeMode = plugin.getConfigManager().getFreezeMode();
 
         applySharedControlEffects(runners, activeRunner, freezeMode);
-        if (plugin.usesSharedHunterControl()) {
+        if (plugin.usesSharedSecondBody()) {
             applySharedControlEffects(hunters, activeHunter, freezeMode);
         }
     }
@@ -1498,11 +1569,11 @@ public class GameManager {
         if (gameRunning && plugin.isTaskCompetitionMode()
                 && plugin.getConfig().getBoolean("task_manager.end_when_one_left", false)) {
             int online = 0;
-            for (Player r : runners)
-                if (r.isOnline())
+            for (Player participant : getTaskCompetitionParticipants())
+                if (participant.isOnline())
                     online++;
             if (online <= 1) {
-                Msg.broadcast("§e[Task Manager] Ending: only one runner remains.");
+                Msg.broadcast("§e[Task Manager] Ending: only one participant remains.");
                 stopGame();
                 return;
             }
@@ -1811,7 +1882,8 @@ public class GameManager {
             return;
         }
 
-        if (!plugin.usesSharedHunterControl()) {
+        if (plugin.getCurrentMode() == com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode.DREAM
+                && !plugin.usesSharedHunterControl()) {
             Collections.shuffle(hunters);
             plugin.getTrackerManager().updateAllHunterCompasses();
 
@@ -1851,6 +1923,13 @@ public class GameManager {
             Player previousHunter = activeHunter;
             boolean sameHunter = previousHunter != null && previousHunter.equals(nextHunter);
 
+            if (plugin.isDualBodyTaskMode() && previousHunter != null && !sameHunter) {
+                try {
+                    plugin.getTaskManagerMode().markFirstTurnCompleted(previousHunter);
+                } catch (Throwable ignored) {
+                }
+            }
+
             activeHunter = nextHunter;
             ensureHunterQueueCoherence();
 
@@ -1883,7 +1962,9 @@ public class GameManager {
             }
 
             applyInactiveEffects();
-            plugin.getTrackerManager().giveTrackingCompass(nextHunter);
+            if (plugin.getCurrentMode() == com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode.DREAM) {
+                plugin.getTrackerManager().giveTrackingCompass(nextHunter);
+            }
             scheduleNextHunterSwap();
 
             try {
@@ -2005,7 +2086,7 @@ public class GameManager {
             }
         }
         Player ah = getActiveHunter();
-        if (plugin.usesSharedHunterControl() && ah != null) {
+        if (plugin.usesSharedSecondBody() && ah != null) {
             try {
                 ah.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS, 60, 10, false, false));
             } catch (Throwable ignored) {
@@ -2034,7 +2115,7 @@ public class GameManager {
             startTitleUpdates();
             startCageEnforcement();
         }
-        if (plugin.usesSharedHunterControl()) {
+        if (plugin.usesSharedSecondBody()) {
             scheduleNextHunterSwap();
         }
         if (plugin.isTaskCompetitionMode()) {
@@ -2263,7 +2344,7 @@ public class GameManager {
             return null;
         }
         if (team == Team.HUNTER && !huntersAllowed(plugin.getCurrentMode())) {
-            return "Hunters can only be assigned in Dream mode.";
+            return "The second body can only be assigned in Dream mode or Task Master Duo.";
         }
         if (!plugin.getConfigManager().isMultiworldCompatibilityEnabled()
                 || !plugin.getConfigManager().isAssignmentRestrictedToSessionWorld()) {
@@ -2443,11 +2524,11 @@ public class GameManager {
     }
 
     private boolean huntersAllowed(SpeedrunnerSwap.SwapMode mode) {
-        return mode == SpeedrunnerSwap.SwapMode.DREAM;
+        return mode == SpeedrunnerSwap.SwapMode.DREAM || mode == SpeedrunnerSwap.SwapMode.TASK_DUEL;
     }
 
     private boolean huntersRequired(SpeedrunnerSwap.SwapMode mode) {
-        return mode == SpeedrunnerSwap.SwapMode.DREAM;
+        return mode == SpeedrunnerSwap.SwapMode.DREAM || mode == SpeedrunnerSwap.SwapMode.TASK_DUEL;
     }
 
     private int minimumRequiredRunners(SpeedrunnerSwap.SwapMode mode) {
@@ -2491,11 +2572,13 @@ public class GameManager {
     }
 
     private void updateTitles() {
-        if (!plugin.usesSharedRunnerControl()) {
+        if (!plugin.usesSharedRunnerControl() && !plugin.usesSharedSecondBody()) {
             return;
         }
         int timeLeft = getTimeUntilNextSwap();
+        int hunterTimeLeft = getTimeUntilNextHunterSwap();
         Player current = activeRunner;
+        Player currentHunter = activeHunter;
         boolean isSneak = current != null && current.isSneaking();
         boolean isSprint = current != null && current.isSprinting();
 
@@ -2504,15 +2587,19 @@ public class GameManager {
         boolean waitingLast10 = "last_10".equalsIgnoreCase(waitingVis);
 
         for (Player p : Bukkit.getOnlinePlayers()) {
-            if (!isRunner(p))
-                continue; // Only runners get titles
+            boolean runnerGroup = isRunner(p);
+            boolean secondBodyGroup = plugin.usesSharedSecondBody() && isHunter(p);
+            if (!runnerGroup && !secondBodyGroup)
+                continue;
 
-            boolean isActive = p.equals(current);
+            boolean isActive = runnerGroup ? p.equals(current) : p.equals(currentHunter);
             boolean isCaged = cagedPlayers.contains(p.getUniqueId());
+            int displayTime = runnerGroup ? timeLeft : hunterTimeLeft;
+            String label = runnerGroup ? "Swap in" : "Second body in";
 
             // For caged players, show large aesthetic title
             if (isCaged && !isActive) {
-                String t = String.format("§6§lSwap in: %ds", Math.max(0, timeLeft));
+                String t = String.format("§6§l%s: %ds", label, Math.max(0, displayTime));
                 String sub = String.format("§eSneaking: %s  §7|  §eRunning: %s", isSneak ? "Yes" : "No",
                         isSprint ? "Yes" : "No");
                 BukkitCompat.showTitle(p, t, sub, 0, 20, 0);
@@ -2520,11 +2607,11 @@ public class GameManager {
             }
 
             // For non-caged waiting runners, show smaller title
-            boolean shouldShow = !isActive && !isCaged && (waitingAlways || (waitingLast10 && timeLeft <= 10));
+            boolean shouldShow = !isActive && !isCaged && (waitingAlways || (waitingLast10 && displayTime <= 10));
             if (!shouldShow)
                 continue;
 
-            String t = String.format("§6§lSwap in: %ds", Math.max(0, timeLeft));
+            String t = String.format("§6§l%s: %ds", label, Math.max(0, displayTime));
             String sub = String.format("§eSneaking: %s  §7|  §eRunning: %s", isSneak ? "Yes" : "No",
                     isSprint ? "Yes" : "No");
             BukkitCompat.showTitle(p, t, sub, 0, 12, 0);
@@ -2831,6 +2918,9 @@ public class GameManager {
             return false;
         }
         if (plugin.isTaskCompetitionMode()) {
+            if (plugin.isDualBodyTaskMode() && !hasOnlinePlayer(hunters)) {
+                return false;
+            }
             return runnerDisconnectAt.isEmpty();
         }
         if (huntersRequired(plugin.getCurrentMode())) {
