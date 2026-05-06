@@ -1,0 +1,14 @@
+# Task Master task pool.
+#
+# The plugin seeds this file with the default objectives on first startup. After
+# that, edit this file directly to remove, disable, or retune tasks.
+#
+# Example entry:
+# - id: make_cake
+#   description: Craft and place a cake
+#   type: COMPLEX_TASK
+#   difficulty: EASY
+#   categories:
+#     - overworld
+#   enabled: true
+tasks: []

@@ -1,5 +1,16 @@
 # Changelog
 
+## 4.3.4
+- Fixed Task Master/Task Race runtime assignments so old saved task data can no longer pull unrelated joiners into a live round.
+- Late joiners now only get added when the setting is enabled and they join the active session world.
+- Rerolled tasks now keep a round-scoped assignment snapshot so completion announcements use the current rerolled task description.
+- `tasks.yml` is now created as the editable task pool. On first startup, the plugin seeds it with the default objectives so admins can remove, disable, or retune tasks outside the Java code.
+- Custom tasks created from the GUI now save into `tasks.yml` and can be removed from the same task-file-backed pool.
+- Difficulty filtering no longer silently falls back to every enabled task when the selected difficulty has no eligible tasks.
+- Default tasks now get difficulty/category metadata before being seeded into `tasks.yml`, making the Easy/Medium/Hard filter meaningful.
+- The GUI and `/swap tasks` commands now show eligible task counts and block live-round task pool changes to avoid breaking active assignments.
+- `/swap tasks reroll` now includes both Task Master Duo bodies instead of only the runner body.
+
 ## 4.3.3
 - Added `Task Master Duo`, a second shared-body task mode where two groups can swap inside separate bodies at the same time.
 - Added GUI/config/command support for selecting `Task Master Duo`, including its own stored default interval.

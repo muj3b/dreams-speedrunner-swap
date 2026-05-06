@@ -1743,6 +1743,7 @@ public final class GuiManager implements Listener {
 
         items.add(clickItem(15, () -> icon(Material.NETHERITE_SWORD, "§6§lTask Difficulty",
                 List.of("§7Current pool: §f" + (taskMode != null ? taskMode.getDifficultyFilter().name() : "MEDIUM"),
+                        "§7Eligible now: §a" + (taskMode != null ? taskMode.getCandidateCount() : 0),
                         "§eClick to cycle EASY → MEDIUM → HARD",
                         "§7Choose this before starting a new round")), ctxClick -> {
                     if (taskMode == null) {
@@ -1760,7 +1761,8 @@ public final class GuiManager implements Listener {
                         case HARD -> TaskDifficulty.EASY;
                     };
                     taskMode.setDifficultyFilter(next);
-                    Msg.send(ctxClick.player(), "§aTask difficulty set to §f" + next.name());
+                    Msg.send(ctxClick.player(), "§aTask difficulty set to §f" + next.name()
+                            + "§a. Eligible now: §f" + taskMode.getCandidateCount());
                     ctxClick.reopen();
                 }));
 
@@ -1864,6 +1866,9 @@ public final class GuiManager implements Listener {
                 List.of("§7Current pool: §f"
                         + (plugin.getTaskManagerMode() != null ? plugin.getTaskManagerMode().getDifficultyFilter().name()
                                 : "MEDIUM"),
+                        "§7Eligible now: §a"
+                                + (plugin.getTaskManagerMode() != null ? plugin.getTaskManagerMode().getCandidateCount()
+                                        : 0),
                         "§eClick to cycle EASY → MEDIUM → HARD")), ctxClick -> {
                     TaskManagerMode mode = plugin.getTaskManagerMode();
                     if (mode == null) {
@@ -1881,7 +1886,8 @@ public final class GuiManager implements Listener {
                         case HARD -> TaskDifficulty.EASY;
                     };
                     mode.setDifficultyFilter(next);
-                    Msg.send(ctxClick.player(), "§aTask difficulty set to §f" + next.name());
+                    Msg.send(ctxClick.player(), "§aTask difficulty set to §f" + next.name()
+                            + "§a. Eligible now: §f" + mode.getCandidateCount());
                     ctxClick.reopen();
                 }));
 
@@ -2129,23 +2135,36 @@ public final class GuiManager implements Listener {
         }
         final int page = pageIndex;
 
-        items.add(cycleItem(2, Material.NETHERITE_SWORD, "§6§lDifficulty",
-                () -> mode.getDifficultyFilter().name(), current -> {
-                    TaskDifficulty cur = mode.getDifficultyFilter();
-                    TaskDifficulty next = switch (cur) {
-                        case EASY -> TaskDifficulty.MEDIUM;
-                        case MEDIUM -> TaskDifficulty.HARD;
-                        case HARD -> TaskDifficulty.EASY;
-                    };
-                    mode.setDifficultyFilter(next);
-                    return next.name();
-                }, List.of("§7Filter used when assigning", "§7Cycles EASY → MEDIUM → HARD")));
+        items.add(clickItem(2, () -> icon(Material.NETHERITE_SWORD,
+                "§6§lDifficulty: §f" + mode.getDifficultyFilter().name(),
+                List.of("§7Filter used when assigning",
+                        "§7Eligible now: §a" + mode.getCandidateCount(),
+                        "§7Cycles EASY → MEDIUM → HARD")), ctxClick -> {
+                            if (plugin.getGameManager().isGameRunning()) {
+                                Msg.send(ctxClick.player(), "§cStop the current round before changing task difficulty.");
+                                return;
+                            }
+                            TaskDifficulty cur = mode.getDifficultyFilter();
+                            TaskDifficulty next = switch (cur) {
+                                case EASY -> TaskDifficulty.MEDIUM;
+                                case MEDIUM -> TaskDifficulty.HARD;
+                                case HARD -> TaskDifficulty.EASY;
+                            };
+                            mode.setDifficultyFilter(next);
+                            Msg.send(ctxClick.player(), "§aTask difficulty set to §f" + next.name()
+                                    + "§a. Eligible now: §f" + mode.getCandidateCount());
+                            open(ctxClick.player(), MenuKey.TASK_POOL, page, true);
+                        }));
 
         items.add(simpleItem(4, () -> icon(Material.PAPER, "§7Eligible Tasks",
                 List.of("§a" + mode.getCandidateCount() + " §7available for selection"))));
 
         items.add(clickItem(6, () -> icon(Material.ENDER_CHEST, "§e§lReload tasks.yml",
                 List.of("§7Re-read task definitions")), ctxClick -> {
+                    if (plugin.getGameManager().isGameRunning()) {
+                        Msg.send(ctxClick.player(), "§cStop the current round before reloading tasks.yml.");
+                        return;
+                    }
                     mode.reloadTasksFromFile();
                     Msg.send(ctxClick.player(), "§aReloaded tasks.yml.");
                     open(ctxClick.player(), MenuKey.TASK_POOL, page, true);
@@ -2171,8 +2190,12 @@ public final class GuiManager implements Listener {
             }
             lore.add("");
             lore.add(enabled ? "§aEnabled" : "§cDisabled");
-            lore.add("§7Click to toggle");
+            lore.add(plugin.getGameManager().isGameRunning() ? "§cStop the round to toggle" : "§7Click to toggle");
             items.add(clickItem(slot, () -> icon(mat, (enabled ? "§a" : "§c") + id, lore), ctxClick -> {
+                if (plugin.getGameManager().isGameRunning()) {
+                    Msg.send(ctxClick.player(), "§cStop the current round before changing the task pool.");
+                    return;
+                }
                 TaskDefinition cur = mode.getTask(id);
                 boolean next = cur == null || !cur.enabled();
                 mode.setTaskEnabled(id, next);

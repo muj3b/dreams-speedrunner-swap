@@ -346,6 +346,7 @@ task_manager:
     task_race_window_seconds: 60
   # Runtime state (do not edit manually unless you know what you're doing)
   runtime:
+    round_id: null
     assignments: {}
     disconnect_times: {}
 

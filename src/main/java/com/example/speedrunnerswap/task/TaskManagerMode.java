@@ -22,7 +22,10 @@ public class TaskManagerMode {
     final Map<String, UUID> lastBedExploderPerWorld = new HashMap<>();
     private final Map<UUID, Integer> rerollsUsed = new HashMap<>();
     private final Set<UUID> completedFirstTurn = new HashSet<>();
+    private final Map<UUID, AssignmentRecord> assignmentRecords = new HashMap<>();
     private long roundStartedAtMs = 0L;
+    private UUID activeRoundId;
+    private boolean registeringDefaults = false;
 
     // Task registry: id -> definition
     private final Map<String, TaskDefinition> registry = new LinkedHashMap<>();
@@ -41,8 +44,12 @@ public class TaskManagerMode {
             this.difficultyFilter = TaskDifficulty.valueOf(diff.toUpperCase());
         } catch (Throwable ignored) {
         }
-        // Load any persisted runtime assignments (if present)
-        loadAssignmentsFromConfig();
+        // Runtime task assignments are intentionally not loaded on startup. A server
+        // restart means there is no live in-memory round to safely rejoin.
+        clearAssignmentsFromConfig();
+    }
+
+    private record AssignmentRecord(String taskId, String description, UUID roundId) {
     }
 
     /** Heuristic category inference for built-in tasks to support gating. */
@@ -86,6 +93,7 @@ public class TaskManagerMode {
 
         if (resetExistingAssignments) {
             assignments.clear();
+            assignmentRecords.clear();
             sheepKilledWithIronShovel.clear();
             lastBedExploderPerWorld.clear();
             rerollsUsed.clear();
@@ -115,14 +123,17 @@ public class TaskManagerMode {
             }
             assignments.put(p.getUniqueId(), taskId);
             TaskDefinition def = registry.get(taskId);
+            rememberAssignment(p.getUniqueId(), def, taskId);
             announceTask(p, def);
         }
         saveAssignmentsToConfig();
     }
 
     private void handleEmptyTaskPool(List<Player> players) {
-        Msg.broadcast("§c[Task Manager] Cannot assign tasks — none are enabled. Round cancelled.");
-        plugin.getLogger().warning("Task Manager assignment aborted: no enabled tasks for current settings.");
+        Msg.broadcast("§c[Task Manager] Cannot assign tasks: no enabled §f" + difficultyFilter.name()
+                + "§c tasks are currently eligible. Round cancelled.");
+        plugin.getLogger().warning("Task Manager assignment aborted: no enabled tasks for difficulty "
+                + difficultyFilter.name() + " and current progression gates.");
 
         if (plugin.getGameManager() != null && plugin.getGameManager().isGameRunning()) {
             Bukkit.getScheduler().runTask(plugin, () -> plugin.getGameManager().stopGame());
@@ -130,20 +141,13 @@ public class TaskManagerMode {
 
         for (Player p : players) {
             if (p != null && p.isOnline()) {
-                p.sendMessage("§eEnable tasks in /swap gui → Task Manager before starting this mode.");
+                p.sendMessage("§eEnable tasks or pick another difficulty in /swap gui → Task Manager.");
             }
         }
     }
 
     private List<String> getAssignableTaskIds() {
-        List<String> candidates = getCandidateTaskIds();
-        if (!candidates.isEmpty()) {
-            return candidates;
-        }
-        return registry.values().stream()
-                .filter(TaskDefinition::enabled)
-                .map(TaskDefinition::id)
-                .toList();
+        return getCandidateTaskIds();
     }
 
     private String pickTaskForPlayer(UUID playerId, List<String> shuffledCandidates, int fallbackIndex) {
@@ -205,8 +209,11 @@ public class TaskManagerMode {
         if (taskId == null)
             return; // not assigned
         sheepKilledWithIronShovel.remove(p.getUniqueId());
+        AssignmentRecord record = assignmentRecords.get(p.getUniqueId());
         TaskDefinition completedTask = registry.get(taskId);
-        String description = completedTask != null ? completedTask.description() : taskId;
+        String description = record != null && record.description() != null && !record.description().isBlank()
+                ? record.description()
+                : completedTask != null ? completedTask.description() : taskId;
         Bukkit.getScheduler().runTask(plugin, () -> {
             try {
                 plugin.getGameManager().endTaskCompetitionRound(p, description);
@@ -220,6 +227,11 @@ public class TaskManagerMode {
     }
 
     public void beginRound(List<Player> players) {
+        activeRoundId = UUID.randomUUID();
+        assignments.clear();
+        assignmentRecords.clear();
+        sheepKilledWithIronShovel.clear();
+        lastBedExploderPerWorld.clear();
         roundStartedAtMs = System.currentTimeMillis();
         rerollsUsed.clear();
         completedFirstTurn.clear();
@@ -340,11 +352,21 @@ public class TaskManagerMode {
         assignments.put(player.getUniqueId(), taskId);
         rerollsUsed.merge(player.getUniqueId(), 1, Integer::sum);
         sheepKilledWithIronShovel.remove(player.getUniqueId());
-        saveAssignmentsToConfig();
 
         TaskDefinition definition = registry.get(taskId);
+        rememberAssignment(player.getUniqueId(), definition, taskId);
+        saveAssignmentsToConfig();
         announceTask(player, definition);
         return definition;
+    }
+
+    private void rememberAssignment(UUID playerId, TaskDefinition definition, String fallbackTaskId) {
+        if (playerId == null) {
+            return;
+        }
+        String taskId = definition != null ? definition.id() : fallbackTaskId;
+        String description = definition != null ? definition.description() : fallbackTaskId;
+        assignmentRecords.put(playerId, new AssignmentRecord(taskId, description, activeRoundId));
     }
 
     /** Broadcast the current assignments to the whole server. */
@@ -367,8 +389,15 @@ public class TaskManagerMode {
     public void saveAssignmentsToConfig() {
         try {
             Map<String, Object> map = new LinkedHashMap<>();
+            plugin.getConfig().set("task_manager.runtime.round_id", activeRoundId != null ? activeRoundId.toString() : null);
             for (var e : assignments.entrySet()) {
-                map.put(e.getKey().toString(), e.getValue());
+                AssignmentRecord record = assignmentRecords.get(e.getKey());
+                Map<String, Object> value = new LinkedHashMap<>();
+                value.put("task", e.getValue());
+                if (record != null) {
+                    value.put("description", record.description());
+                }
+                map.put(e.getKey().toString(), value);
             }
             plugin.getConfig().set("task_manager.runtime.assignments", map);
             plugin.saveConfig();
@@ -381,13 +410,37 @@ public class TaskManagerMode {
             Object raw = plugin.getConfig().get("task_manager.runtime.assignments");
             if (raw instanceof Map<?, ?> m) {
                 assignments.clear();
+                assignmentRecords.clear();
+                String rawRoundId = plugin.getConfig().getString("task_manager.runtime.round_id");
+                UUID loadedRoundId = null;
+                if (rawRoundId != null && !rawRoundId.isBlank()) {
+                    try {
+                        loadedRoundId = UUID.fromString(rawRoundId);
+                    } catch (IllegalArgumentException ignored) {
+                    }
+                }
+                activeRoundId = loadedRoundId;
                 for (var e : m.entrySet()) {
                     String k = String.valueOf(e.getKey());
-                    String v = String.valueOf(e.getValue());
+                    String v;
+                    String description = null;
+                    if (e.getValue() instanceof Map<?, ?> valueMap) {
+                        v = String.valueOf(valueMap.get("task"));
+                        Object rawDescription = valueMap.get("description");
+                        description = rawDescription != null ? String.valueOf(rawDescription) : null;
+                    } else {
+                        v = String.valueOf(e.getValue());
+                    }
                     try {
                         UUID uuid = UUID.fromString(k);
-                        if (isTask(v))
+                        if (isTask(v)) {
                             assignments.put(uuid, v);
+                            TaskDefinition definition = registry.get(v);
+                            assignmentRecords.put(uuid, new AssignmentRecord(v,
+                                    description != null ? description
+                                            : definition != null ? definition.description() : v,
+                                    activeRoundId));
+                        }
                     } catch (IllegalArgumentException ignored) {
                     }
                 }
@@ -428,21 +481,27 @@ public class TaskManagerMode {
         // First attempt to load from tasks.yml if available
         boolean loadedFromFile = loadFromTasksYml();
         // If none loaded, optionally include built-in defaults
-        if (!loadedFromFile && plugin.getConfig().getBoolean("task_manager.include_default_tasks", true)) {
+        boolean includeDefaults = plugin.getConfig().getBoolean("task_manager.include_default_tasks", true);
+        if (!loadedFromFile && includeDefaults) {
             registerDefaults();
+            writeCurrentRegistryToTasksYmlIfEmpty();
         }
         // Also load custom tasks from config for backward compatibility
         loadCustomTasks();
         // Ensure we have at least some tasks
-        if (registry.isEmpty()) {
+        if (registry.isEmpty() && includeDefaults) {
             plugin.getLogger().warning("No tasks loaded! Loading default tasks as fallback.");
             registerDefaults();
+            writeCurrentRegistryToTasksYmlIfEmpty();
+        } else if (registry.isEmpty()) {
+            plugin.getLogger().warning("No tasks loaded because default tasks are disabled and tasks.yml is empty.");
         }
         // Post-process to infer categories for gating if not provided
         postProcessDefinitions();
         sheepKilledWithIronShovel.clear();
         lastBedExploderPerWorld.clear();
         assignments.clear();
+        assignmentRecords.clear();
         resetProgressGates();
     }
 
@@ -487,24 +546,18 @@ public class TaskManagerMode {
         if (difficulty == null)
             difficulty = TaskDifficulty.MEDIUM;
 
-        // Add to registry
-        register(new TaskDefinition(id, description, TaskType.COMPLEX_TASK, difficulty));
+        // Add to registry and tasks.yml so admins can edit/remove it like any other task.
+        TaskDefinition definition = new TaskDefinition(id, description, TaskType.COMPLEX_TASK, List.of(), difficulty,
+                List.of("custom", "overworld"), true);
+        register(definition);
         customTaskIds.add(id);
 
-        // Save to config
-        List<?> rawList = plugin.getConfig().getList("task_manager.custom_tasks");
-        List<Object> customTasks = new ArrayList<>();
-        if (rawList != null)
-            customTasks.addAll(rawList);
-
-        Map<String, Object> taskMap = new HashMap<>();
-        taskMap.put("id", id);
-        taskMap.put("description", description);
-        taskMap.put("difficulty", difficulty.name());
-        customTasks.add(taskMap);
-
-        plugin.getConfig().set("task_manager.custom_tasks", customTasks);
-        plugin.saveConfig();
+        try {
+            if (plugin.getTaskConfigManager() != null) {
+                plugin.getTaskConfigManager().upsertTask(definition);
+            }
+        } catch (Throwable ignored) {
+        }
     }
 
     /** Backward compatibility overload */
@@ -514,34 +567,39 @@ public class TaskManagerMode {
 
     /** Remove a custom task and save to config */
     public boolean removeCustomTask(String id) {
-        // Check if it's a custom task (not built-in)
-        var customTasks = plugin.getConfig().getList("task_manager.custom_tasks");
-        if (customTasks == null)
-            return false;
-
         boolean removed = false;
-        Iterator<?> iter = customTasks.iterator();
-        while (iter.hasNext()) {
-            Object obj = iter.next();
-            if (obj instanceof Map) {
-                @SuppressWarnings("unchecked")
-                Map<String, Object> taskMap = (Map<String, Object>) obj;
-                if (id.equals(taskMap.get("id"))) {
-                    iter.remove();
-                    removed = true;
-                    break;
+
+        try {
+            TaskConfigManager tcfg = plugin.getTaskConfigManager();
+            if (tcfg != null) {
+                removed = tcfg.removeTask(id);
+            }
+        } catch (Throwable ignored) {
+        }
+
+        var customTasks = plugin.getConfig().getList("task_manager.custom_tasks");
+        if (customTasks != null) {
+            Iterator<?> iter = customTasks.iterator();
+            while (iter.hasNext()) {
+                Object obj = iter.next();
+                if (obj instanceof Map) {
+                    @SuppressWarnings("unchecked")
+                    Map<String, Object> taskMap = (Map<String, Object>) obj;
+                    if (id.equals(taskMap.get("id"))) {
+                        iter.remove();
+                        removed = true;
+                        break;
+                    }
                 }
             }
+            plugin.getConfig().set("task_manager.custom_tasks", customTasks);
+            plugin.saveConfig();
         }
 
         if (removed) {
             // Remove from registry
             registry.remove(id);
             customTaskIds.remove(id);
-
-            // Save config
-            plugin.getConfig().set("task_manager.custom_tasks", customTasks);
-            plugin.saveConfig();
 
             // Reload tasks to ensure consistency
             loadTasks();
@@ -575,7 +633,9 @@ public class TaskManagerMode {
     }
 
     private void registerDefaults() {
-        // 100 CHALLENGING tasks inspired by the user's examples - no easy tasks!
+        // Seed catalog used only when tasks.yml is missing or empty.
+        registeringDefaults = true;
+        try {
 
         // === ULTRA CHALLENGING MULTI-STEP TASKS (15) ===
         register(new TaskDefinition("die_on_bedrock_fall",
@@ -922,10 +982,35 @@ public class TaskManagerMode {
         register(new TaskDefinition("survive_50_hearts_damage", "Take 50 hearts of damage total without dying",
                 TaskType.COMPLEX_TASK));
         register(new TaskDefinition("place_1000_blocks", "Place 1000 blocks", TaskType.COMPLEX_TASK));
+        } finally {
+            registeringDefaults = false;
+        }
     }
 
     private void register(TaskDefinition def) {
-        registry.put(def.id(), def);
+        if (def == null || def.id() == null || def.id().isBlank()) {
+            return;
+        }
+        registry.put(def.id(), registeringDefaults ? normalizeDefaultTask(def) : def);
+    }
+
+    private TaskDefinition normalizeDefaultTask(TaskDefinition def) {
+        return new TaskDefinition(def.id(), def.description(), def.type(), def.params(),
+                TaskMetadata.inferDefaultDifficulty(def.id(), def.description()),
+                TaskMetadata.inferDefaultCategories(def), def.enabled());
+    }
+
+    private void writeCurrentRegistryToTasksYmlIfEmpty() {
+        try {
+            TaskConfigManager tcfg = plugin.getTaskConfigManager();
+            if (tcfg == null || !tcfg.isTaskListEmpty()) {
+                return;
+            }
+            tcfg.saveTasks(new ArrayList<>(registry.values()));
+            plugin.getLogger().info("Seeded tasks.yml with default Task Master tasks.");
+        } catch (Throwable t) {
+            plugin.getLogger().warning("Failed to seed tasks.yml: " + t.getMessage());
+        }
     }
 
     /**
@@ -975,6 +1060,9 @@ public class TaskManagerMode {
                 boolean enabled = Boolean
                         .parseBoolean(String.valueOf(m.containsKey("enabled") ? m.get("enabled") : "true"));
                 register(new TaskDefinition(id, desc, type, params, diff, cats, enabled));
+                if (cats.stream().anyMatch(s -> s.equalsIgnoreCase("custom"))) {
+                    customTaskIds.add(id);
+                }
                 count++;
             }
             return count > 0;
@@ -1052,22 +1140,7 @@ public class TaskManagerMode {
         try {
             var tcfg = plugin.getTaskConfigManager();
             if (tcfg != null) {
-                var cfg = tcfg.getConfig();
-                java.util.List<?> list = cfg.getList("tasks");
-                if (list != null) {
-                    for (int i = 0; i < list.size(); i++) {
-                        Object o = list.get(i);
-                        if (o instanceof java.util.Map<?, ?>) {
-                            @SuppressWarnings("unchecked")
-                            java.util.Map<String, Object> mm = (java.util.Map<String, Object>) o;
-                            if (id.equals(String.valueOf(mm.get("id")))) {
-                                mm.put("enabled", enabled);
-                            }
-                        }
-                    }
-                    cfg.set("tasks", list);
-                    tcfg.saveConfig();
-                }
+                tcfg.upsertTask(registry.get(id));
             }
         } catch (Throwable ignored) {
         }
@@ -1083,6 +1156,37 @@ public class TaskManagerMode {
     /** Expose a read-only view of task definitions for admin commands. */
     public java.util.Map<String, TaskDefinition> getAllDefinitions() {
         return java.util.Collections.unmodifiableMap(registry);
+    }
+
+    public void clearRoundState() {
+        clearRoundState(true);
+    }
+
+    private void clearRoundState(boolean save) {
+        assignments.clear();
+        assignmentRecords.clear();
+        sheepKilledWithIronShovel.clear();
+        lastBedExploderPerWorld.clear();
+        rerollsUsed.clear();
+        completedFirstTurn.clear();
+        activeRoundId = null;
+        roundStartedAtMs = 0L;
+        if (save) {
+            clearAssignmentsFromConfig();
+        }
+    }
+
+    public boolean hasActiveAssignment(UUID playerId) {
+        return playerId != null && assignments.containsKey(playerId) && assignmentRecords.containsKey(playerId);
+    }
+
+    public void clearAssignmentsFromConfig() {
+        try {
+            plugin.getConfig().set("task_manager.runtime.round_id", null);
+            plugin.getConfig().set("task_manager.runtime.assignments", new LinkedHashMap<>());
+            plugin.saveConfig();
+        } catch (Throwable ignored) {
+        }
     }
 
 }

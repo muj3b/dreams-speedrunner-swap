@@ -564,6 +564,10 @@ public class SwapCommand implements CommandExecutor, TabCompleter {
             }
             case "enable":
             case "disable": {
+                if (plugin.getGameManager().isGameRunning()) {
+                    sender.sendMessage("§cStop the current round before changing the task pool.");
+                    return false;
+                }
                 if (rest.length < 2) { sender.sendMessage("§cUsage: /swap tasks "+sub+" <id>"); return false; }
                 String id = rest[1];
                 var tmm = plugin.getTaskManagerMode();
@@ -574,6 +578,10 @@ public class SwapCommand implements CommandExecutor, TabCompleter {
                 return true;
             }
             case "difficulty": {
+                if (plugin.getGameManager().isGameRunning()) {
+                    sender.sendMessage("§cStop the current round before changing task difficulty.");
+                    return false;
+                }
                 if (rest.length < 2) { sender.sendMessage("§cUsage: /swap tasks difficulty <easy|medium|hard>"); return false; }
                 String lvl = rest[1].toLowerCase();
                 com.example.speedrunnerswap.task.TaskDifficulty d;
@@ -585,7 +593,7 @@ public class SwapCommand implements CommandExecutor, TabCompleter {
                 var tmm = plugin.getTaskManagerMode();
                 if (tmm == null) { sender.sendMessage("§cTask Manager not initialized."); return false; }
                 tmm.setDifficultyFilter(d);
-                sender.sendMessage("§aTask difficulty filter set to §f"+d.name());
+                sender.sendMessage("§aTask difficulty filter set to §f"+d.name()+"§a. Eligible now: §f"+tmm.getCandidateCount());
                 return true;
             }
             case "reroll": {
@@ -599,14 +607,16 @@ public class SwapCommand implements CommandExecutor, TabCompleter {
                 }
                 var tmm = plugin.getTaskManagerMode();
                 if (tmm == null) { sender.sendMessage("§cTask Manager not initialized."); return false; }
-                // Build runner list from selected team assignments
-                java.util.List<Player> selectedRunners = new java.util.ArrayList<>(plugin.getGameManager().getRunners());
-                if (selectedRunners.isEmpty()) {
-                    sender.sendMessage("§cNo selected runners found. Use the Team Selector first.");
+                java.util.List<Player> participants = new java.util.ArrayList<>(plugin.getGameManager().getRunners());
+                if (plugin.isDualBodyTaskMode()) {
+                    participants.addAll(plugin.getGameManager().getHunters());
+                }
+                if (participants.isEmpty()) {
+                    sender.sendMessage("§cNo selected task players found. Use the Team Selector first.");
                     return false;
                 }
-                tmm.assignAndAnnounceTasks(selectedRunners);
-                sender.sendMessage("§aRerolled tasks for §f"+selectedRunners.size()+"§a selected runners.");
+                tmm.assignAndAnnounceTasks(participants);
+                sender.sendMessage("§aRerolled tasks for §f"+participants.size()+"§a selected task players.");
                 return true;
             }
             case "endwhenoneleft": {
@@ -621,6 +631,10 @@ public class SwapCommand implements CommandExecutor, TabCompleter {
                 return true;
             }
             case "reload": {
+                if (plugin.getGameManager().isGameRunning()) {
+                    sender.sendMessage("§cStop the current round before reloading tasks.yml.");
+                    return false;
+                }
                 var tmm = plugin.getTaskManagerMode();
                 if (tmm == null) { sender.sendMessage("§cTask Manager not initialized."); return false; }
                 try { plugin.getTaskConfigManager().reloadConfig(); } catch (Throwable ignored) {}

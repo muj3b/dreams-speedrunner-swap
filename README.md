@@ -268,7 +268,7 @@ Dream mode can now optionally give hunters their own shared body too. That means
 | **🏹 Shared Hunter Body** | Optional Dream-mode hunter queue so runners and hunters can each share a separate body |
 | **🛡️ Safe Swap System** | Prevents swapping into dangerous situations |
 | **🎤 Voice Chat Integration** | Auto-mute inactive players via Simple Voice Chat support |
-| **📚 Task Pool Manager** | Enable/disable every objective, adjust difficulty filters, and reload `tasks.yml` live |
+| **📚 Task Pool Manager** | Enable/disable every objective, adjust difficulty filters, and reload the editable `tasks.yml` task pool between rounds |
 
 ---
 
@@ -300,9 +300,9 @@ Dream mode can now optionally give hunters their own shared body too. That means
 | `/swap tasks list` | Prints all registered Task Master objectives with their enabled state and difficulty. |
 | `/swap tasks enable|disable <id>` | Toggle individual tasks from chat (same functionality is available in the GUI Task Pool). |
 | `/swap tasks difficulty <easy|medium|hard>` | Chooses the Task Master difficulty filter. |
-| `/swap tasks reroll` | Assigns fresh secret tasks to the currently selected runners (only before the round starts). |
+| `/swap tasks reroll` | Assigns fresh secret tasks to the currently selected task players, including both bodies in Task Master Duo (only before the round starts). |
 | `/swap tasks endwhenoneleft <on|off|toggle>` | Controls the “end when one runner remains” rule. |
-| `/swap tasks reload` | Reloads `tasks.yml` without restarting the server. |
+| `/swap tasks reload` | Reloads `tasks.yml` between rounds without restarting the server. |
 | `/swap complete [confirm]` | Shows your current secret task or, with `confirm`, manually completes it (and ends the game). |
 | `/swap complete reroll confirm` | Spends your configurable one-time task reroll when the current round rules allow it. |
 | `/swap creator` · `/swap help` | Plugin credits and in-game help. |
@@ -343,7 +343,7 @@ The plugin ships with a comprehensive `config.yml`, but every option can be adju
 1. Open `/swap gui` → **Task Master**.
 2. **Task Settings** now exposes the round difficulty plus player-reroll rules.
 3. **Custom Tasks** lets you add new objectives (ID + description) and remove existing ones.
-4. **Task Pool** provides page-based toggles to enable/disable any built-in or custom task, adjust the difficulty filter, and reload `tasks.yml` live.
+4. **Task Pool** provides page-based toggles to enable/disable any built-in or custom task, adjust the difficulty filter, and reload `tasks.yml` between rounds.
 
 ### Command Workflow
 - `/swap tasks list` – review all definitions.
@@ -352,6 +352,8 @@ The plugin ships with a comprehensive `config.yml`, but every option can be adju
 - `/swap tasks reroll` – reassign secret tasks prior to a round.
 - `/swap complete reroll confirm` – let a player spend their opening-round reroll.
 - `/swap tasks reload` – re-read `tasks.yml` after editing.
+
+Default objectives are seeded into `plugins/SpeedrunnerSwap/tasks.yml` on first startup. Remove a task from that file, set `enabled: false`, or change its `difficulty` to control exactly what can be assigned.
 
 ### Design Tips
 - Aim for goals that take 10–30 minutes so races stay competitive.

@@ -49,6 +49,7 @@ public class GameManager {
     private long taskGameRemainingMs;
     private final Map<UUID, PlayerState> playerStates;
     private final Set<UUID> restorableParticipantIds = new HashSet<>();
+    private final Set<UUID> activeTaskParticipantIds = new HashSet<>();
     private final Map<UUID, Long> runnerDisconnectAt = new HashMap<>();
     // Shared cage management per-world (one cage in each world)
     private final java.util.Map<org.bukkit.World, java.util.List<org.bukkit.block.BlockState>> sharedCageBlocks = new java.util.HashMap<>();
@@ -264,6 +265,12 @@ public class GameManager {
                     if (plugin.isTaskCompetitionMode()) {
                         try {
                             List<Player> participants = getTaskCompetitionParticipants();
+                            activeTaskParticipantIds.clear();
+                            for (Player participant : participants) {
+                                if (participant != null) {
+                                    activeTaskParticipantIds.add(participant.getUniqueId());
+                                }
+                            }
                             plugin.getTaskManagerMode().beginRound(participants);
                             plugin.getTaskManagerMode().assignAndAnnounceTasks(participants);
                         } catch (Throwable t) {
@@ -362,6 +369,13 @@ public class GameManager {
     }
 
     private void finalizeGameEnd(String endMessage) {
+        activeTaskParticipantIds.clear();
+        try {
+            if (plugin.getTaskManagerMode() != null) {
+                plugin.getTaskManagerMode().clearRoundState();
+            }
+        } catch (Throwable ignored) {
+        }
         if (swapTask != null)
             swapTask.cancel();
         if (hunterSwapTask != null)
@@ -744,11 +758,13 @@ public class GameManager {
         runnerDisconnectAt.remove(player.getUniqueId());
         clearRuntimeDisconnectTime(player.getUniqueId());
         if (plugin.isTaskCompetitionMode()) {
-            // If they had an assignment, ensure they're in runners
             var tmm = plugin.getTaskManagerMode();
-            if (tmm != null && tmm.getAssignedTask(player) != null) {
+            UUID playerId = player.getUniqueId();
+            boolean knownRoundParticipant = activeTaskParticipantIds.contains(playerId)
+                    && tmm != null && tmm.hasActiveAssignment(playerId);
+            if (knownRoundParticipant) {
                 if (!isRunner(player) && !isHunter(player)) {
-                    runners.add(player);
+                    addReturningTaskParticipant(player);
                 }
                 // Remind their task
                 var def = tmm.getTask(tmm.getAssignedTask(player));
@@ -756,11 +772,13 @@ public class GameManager {
                     player.sendMessage("§6[Task Manager] Your task:");
                     player.sendMessage("§e → " + def.description());
                 }
-            } else if (plugin.getConfig().getBoolean("task_manager.allow_late_joiners", false)) {
+            } else if (plugin.getConfig().getBoolean("task_manager.allow_late_joiners", false)
+                    && isInSessionWorld(player)) {
                 // Late joiner allowed: add as runner and optionally assign a task if pool
                 // available
                 if (!isRunner(player)) {
                     runners.add(player);
+                    activeTaskParticipantIds.add(playerId);
                 }
                 if (tmm != null && tmm.getAssignedTask(player) == null) {
                     tmm.assignAdditionalTasks(java.util.List.of(player));
@@ -799,6 +817,24 @@ public class GameManager {
         if (plugin.getConfigManager().isTrackerEnabled()) {
             plugin.getTrackerManager().startTracking();
         }
+    }
+
+    private void addReturningTaskParticipant(Player player) {
+        if (player == null) {
+            return;
+        }
+        if (plugin.isDualBodyTaskMode() && plugin.getConfigManager().getHunterNames().contains(player.getName())) {
+            hunters.add(player);
+        } else {
+            runners.add(player);
+        }
+    }
+
+    private boolean isInSessionWorld(Player player) {
+        if (player == null || sessionWorldName == null || player.getWorld() == null) {
+            return false;
+        }
+        return sessionWorldName.equals(player.getWorld().getName());
     }
 
     private void startRunnerTimeoutWatcher() {
@@ -2885,13 +2921,15 @@ public class GameManager {
         replaceTeamReferenceByUuid(hunters, uuid, player);
 
         String playerName = player.getName();
-        if (plugin.getConfigManager().getRunnerNames().contains(playerName)
-                && !containsPlayerByUuid(runners, uuid)) {
-            runners.add(player);
-        }
-        if (plugin.getConfigManager().getHunterNames().contains(playerName)
-                && !containsPlayerByUuid(hunters, uuid)) {
-            hunters.add(player);
+        if (!plugin.isTaskCompetitionMode() || activeTaskParticipantIds.contains(uuid)) {
+            if (plugin.getConfigManager().getRunnerNames().contains(playerName)
+                    && !containsPlayerByUuid(runners, uuid)) {
+                runners.add(player);
+            }
+            if (plugin.getConfigManager().getHunterNames().contains(playerName)
+                    && !containsPlayerByUuid(hunters, uuid)) {
+                hunters.add(player);
+            }
         }
 
         if (activeRunner != null && uuid.equals(activeRunner.getUniqueId())) {

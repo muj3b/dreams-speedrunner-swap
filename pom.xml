@@ -6,7 +6,7 @@
 
     <groupId>com.example</groupId>
     <artifactId>speedrunnerswap</artifactId>
-    <version>4.3.3</version>
+    <version>4.3.4</version>
 
     <name>SpeedrunnerSwap</name>
 
@@ -65,6 +65,12 @@
             <artifactId>paper-api</artifactId>
             <version>1.21.8-R0.1-SNAPSHOT</version>
             <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>junit</groupId>
+            <artifactId>junit</artifactId>
+            <version>4.13.2</version>
+            <scope>test</scope>
         </dependency>
         <!-- Adding latest Guice version to fix deprecated warning -->
         <!-- No shaded runtime deps required by plugin code -->
