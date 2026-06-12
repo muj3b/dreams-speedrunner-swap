@@ -229,8 +229,9 @@ public class EventListeners implements Listener {
     public void onPlayerDeath(PlayerDeathEvent event) {
         Player player = event.getEntity();
 
-        // Suppress death messages during active games to maintain mystery
-        if (plugin.getGameManager().isGameRunning()) {
+        // Optionally suppress vanilla death messages during active games to maintain mystery.
+        if (plugin.getGameManager().isGameRunning()
+                && plugin.getConfig().getBoolean("broadcasts.suppress_death_messages_during_games", true)) {
             // Try Spigot API first: setDeathMessage(String)
             try {
                 java.lang.reflect.Method m = event.getClass().getMethod("setDeathMessage", String.class);
@@ -640,8 +641,9 @@ public class EventListeners implements Listener {
 
     @EventHandler(priority = EventPriority.HIGHEST)
     public void onPlayerAdvancementDone(org.bukkit.event.player.PlayerAdvancementDoneEvent event) {
-        // Suppress advancement messages during active games to maintain mystery
-        if (plugin.getGameManager().isGameRunning()) {
+        // Optionally suppress vanilla advancement messages during active games to maintain mystery.
+        if (plugin.getGameManager().isGameRunning()
+                && plugin.getConfig().getBoolean("broadcasts.suppress_advancements_during_games", true)) {
             event.message(null);
         }
     }

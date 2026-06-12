@@ -332,6 +332,7 @@ The plugin ships with a comprehensive `config.yml`, but every option can be adju
 | **🎙 Voice Chat** | `voice_chat.*` | Simple Voice Chat integration toggles. |
 | **🎒 Kits** | `kits.*` & `kits.yml` | Enable runner/hunter kits and quick testing buttons. |
 | **🎯 Task Master** | `task_manager.*` | Pause behaviour, reconnection grace, max duration, include defaults, difficulty filter, player reroll rules, per-task enable/disable, custom task creator, task pool management, assignments viewer. |
+| **📣 Vanilla Messages** | `broadcasts.suppress_death_messages_during_games`, `broadcasts.suppress_advancements_during_games` | Choose whether vanilla death messages and advancement messages show while a game is running. |
 
 > 📝 **Tip:** Use `/swap gui` (or the `/swap` hotkey in the tab completions) to reach any of these menus instantly—every slider, toggle, and button writes back to `config.yml` (or `tasks.yml` / `kits.yml`) for persistence.
 

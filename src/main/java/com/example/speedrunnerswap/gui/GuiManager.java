@@ -2333,6 +2333,12 @@ public final class GuiManager implements Listener {
                 "§7Announce start/stop"));
         items.add(toggleConfigItem(15, Material.PAPER, "§e§lTeam Changes", "broadcasts.team_changes", true,
                 "§7Announce team assignment changes"));
+        items.add(toggleConfigItem(20, Material.SKELETON_SKULL, "§e§lHide Death Messages",
+                "broadcasts.suppress_death_messages_during_games", true,
+                "§7Hide vanilla death messages during games"));
+        items.add(toggleConfigItem(22, Material.KNOWLEDGE_BOOK, "§e§lHide Advancements",
+                "broadcasts.suppress_advancements_during_games", true,
+                "§7Hide vanilla advancement messages during games"));
         return new MenuScreen("§e§lBroadcast Settings", 27, items);
     }
 

@@ -1,5 +1,11 @@
 # Changelog
 
+## 4.3.5
+- Added config controls for showing or hiding vanilla death messages during active plugin games.
+- Added config controls for showing or hiding vanilla advancement messages during active plugin games.
+- Added both controls to the Broadcast Settings GUI.
+- Existing behavior is preserved by default: death and advancement messages stay hidden during games unless the server owner turns those options off.
+
 ## 4.3.4
 - Fixed Task Master/Task Race runtime assignments so old saved task data can no longer pull unrelated joiners into a live round.
 - Late joiners now only get added when the setting is enabled and they join the active session world.

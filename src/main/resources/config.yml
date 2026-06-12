@@ -157,6 +157,10 @@ broadcasts:
   game_events: true
   # Whether to broadcast team changes
   team_changes: true
+  # Hide vanilla death messages while a plugin game is running
+  suppress_death_messages_during_games: true
+  # Hide vanilla advancement messages while a plugin game is running
+  suppress_advancements_during_games: true
 
 # End game messaging (titles/subtitles/broadcast)
 # Credits/support lines are intentionally not configurable.
