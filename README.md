@@ -268,7 +268,7 @@ Dream mode can now optionally give hunters their own shared body too. That means
 | **🏹 Shared Hunter Body** | Optional Dream-mode hunter queue so runners and hunters can each share a separate body |
 | **🛡️ Safe Swap System** | Prevents swapping into dangerous situations |
 | **🎤 Voice Chat Integration** | Auto-mute inactive players via Simple Voice Chat support |
-| **📚 Task Pool Manager** | Enable/disable every objective, adjust difficulty filters, and reload the editable `tasks.yml` task pool between rounds |
+| **📚 Task Pool Manager** | Enable/disable every objective, adjust difficulty filters, and reload `tasks.yml` live |
 
 ---
 
@@ -300,9 +300,9 @@ Dream mode can now optionally give hunters their own shared body too. That means
 | `/swap tasks list` | Prints all registered Task Master objectives with their enabled state and difficulty. |
 | `/swap tasks enable|disable <id>` | Toggle individual tasks from chat (same functionality is available in the GUI Task Pool). |
 | `/swap tasks difficulty <easy|medium|hard>` | Chooses the Task Master difficulty filter. |
-| `/swap tasks reroll` | Assigns fresh secret tasks to the currently selected task players, including both bodies in Task Master Duo (only before the round starts). |
+| `/swap tasks reroll` | Assigns fresh secret tasks to the currently selected runners (only before the round starts). |
 | `/swap tasks endwhenoneleft <on|off|toggle>` | Controls the “end when one runner remains” rule. |
-| `/swap tasks reload` | Reloads `tasks.yml` between rounds without restarting the server. |
+| `/swap tasks reload` | Reloads `tasks.yml` without restarting the server. |
 | `/swap complete [confirm]` | Shows your current secret task or, with `confirm`, manually completes it (and ends the game). |
 | `/swap complete reroll confirm` | Spends your configurable one-time task reroll when the current round rules allow it. |
 | `/swap creator` · `/swap help` | Plugin credits and in-game help. |
@@ -332,7 +332,6 @@ The plugin ships with a comprehensive `config.yml`, but every option can be adju
 | **🎙 Voice Chat** | `voice_chat.*` | Simple Voice Chat integration toggles. |
 | **🎒 Kits** | `kits.*` & `kits.yml` | Enable runner/hunter kits and quick testing buttons. |
 | **🎯 Task Master** | `task_manager.*` | Pause behaviour, reconnection grace, max duration, include defaults, difficulty filter, player reroll rules, per-task enable/disable, custom task creator, task pool management, assignments viewer. |
-| **📣 Vanilla Messages** | `broadcasts.suppress_death_messages_during_games`, `broadcasts.suppress_advancements_during_games` | Choose whether vanilla death messages and advancement messages show while a game is running. |
 
 > 📝 **Tip:** Use `/swap gui` (or the `/swap` hotkey in the tab completions) to reach any of these menus instantly—every slider, toggle, and button writes back to `config.yml` (or `tasks.yml` / `kits.yml`) for persistence.
 
@@ -344,7 +343,7 @@ The plugin ships with a comprehensive `config.yml`, but every option can be adju
 1. Open `/swap gui` → **Task Master**.
 2. **Task Settings** now exposes the round difficulty plus player-reroll rules.
 3. **Custom Tasks** lets you add new objectives (ID + description) and remove existing ones.
-4. **Task Pool** provides page-based toggles to enable/disable any built-in or custom task, adjust the difficulty filter, and reload `tasks.yml` between rounds.
+4. **Task Pool** provides page-based toggles to enable/disable any built-in or custom task, adjust the difficulty filter, and reload `tasks.yml` live.
 
 ### Command Workflow
 - `/swap tasks list` – review all definitions.
@@ -354,13 +353,38 @@ The plugin ships with a comprehensive `config.yml`, but every option can be adju
 - `/swap complete reroll confirm` – let a player spend their opening-round reroll.
 - `/swap tasks reload` – re-read `tasks.yml` after editing.
 
-Default objectives are seeded into `plugins/SpeedrunnerSwap/tasks.yml` on first startup. Remove a task from that file, set `enabled: false`, or change its `difficulty` to control exactly what can be assigned.
-
 ### Design Tips
 - Aim for goals that take 10–30 minutes so races stay competitive.
 - Use exact numbers (e.g. *collect 32 ender pearls*) to avoid ambiguity.
 - Mix tasks that encourage sabotage with those that reward cooperation.
-- Keep descriptions concise—the GUI shows the entire text to players.
+- Keep descriptions concise, the GUI shows the entire text to players.
+
+## 🌟 Community Creator Showcase
+
+### 🎥 Videos Made With Speedrunner Swap + Task Master
+
+> **A huge thank you to every creator who has featured, played, or made a video using the plugin! ❤️ Check out their videos below and show them some support!**
+
+|                                                                                                                             |                                                                                                                              |
+| :-------------------------------------------------------------------------------------------------------------------------: | :--------------------------------------------------------------------------------------------------------------------------: |
+| [![Creator Video](https://img.youtube.com/vi/ZIazl5qIs0k/hqdefault.jpg)](https://www.youtube.com/watch?v=ZIazl5qIs0k&t=38s) | [![Creator Video](https://img.youtube.com/vi/7jdgkXWRtfY/hqdefault.jpg)](https://www.youtube.com/watch?v=7jdgkXWRtfY&t=230s) |
+|                         **[▶️ Watch on YouTube](https://www.youtube.com/watch?v=ZIazl5qIs0k&t=38s)**                        |                         **[▶️ Watch on YouTube](https://www.youtube.com/watch?v=7jdgkXWRtfY&t=230s)**                        |
+|    [![Creator Video](https://img.youtube.com/vi/8yuIJDaC_Po/hqdefault.jpg)](https://www.youtube.com/watch?v=8yuIJDaC_Po)    |     [![Creator Video](https://img.youtube.com/vi/jhhVrgFN1G4/hqdefault.jpg)](https://www.youtube.com/watch?v=jhhVrgFN1G4)    |
+|                            **[▶️ Watch on YouTube](https://www.youtube.com/watch?v=8yuIJDaC_Po)**                           |                            **[▶️ Watch on YouTube](https://www.youtube.com/watch?v=jhhVrgFN1G4)**                            |
+|    [![Creator Video](https://img.youtube.com/vi/j8lmICOn9w8/hqdefault.jpg)](https://www.youtube.com/watch?v=j8lmICOn9w8)    |     [![Creator Video](https://img.youtube.com/vi/znRJMLGnhFg/hqdefault.jpg)](https://www.youtube.com/watch?v=znRJMLGnhFg)    |
+|                            **[▶️ Watch on YouTube](https://www.youtube.com/watch?v=j8lmICOn9w8)**                           |                            **[▶️ Watch on YouTube](https://www.youtube.com/watch?v=znRJMLGnhFg)**                            |
+|    [![Creator Video](https://img.youtube.com/vi/Pqh0d3lz6Fc/hqdefault.jpg)](https://www.youtube.com/watch?v=Pqh0d3lz6Fc)    |     [![Creator Video](https://img.youtube.com/vi/sCTRVGCFDUI/hqdefault.jpg)](https://www.youtube.com/watch?v=sCTRVGCFDUI)    |
+|                            **[▶️ Watch on YouTube](https://www.youtube.com/watch?v=Pqh0d3lz6Fc)**                           |                            **[▶️ Watch on YouTube](https://www.youtube.com/watch?v=sCTRVGCFDUI)**                            |
+|    [![Creator Video](https://img.youtube.com/vi/C9iI_FYG1YE/hqdefault.jpg)](https://www.youtube.com/watch?v=C9iI_FYG1YE)    |     [![Creator Video](https://img.youtube.com/vi/ODE0nb0c24s/hqdefault.jpg)](https://www.youtube.com/watch?v=ODE0nb0c24s)    |
+|                            **[▶️ Watch on YouTube](https://www.youtube.com/watch?v=C9iI_FYG1YE)**                           |                            **[▶️ Watch on YouTube](https://www.youtube.com/watch?v=ODE0nb0c24s)**                            |
+|    [![Creator Video](https://img.youtube.com/vi/x8asWE2tq3M/hqdefault.jpg)](https://www.youtube.com/watch?v=x8asWE2tq3M)    |     [![Creator Video](https://img.youtube.com/vi/rzVqw495QFs/hqdefault.jpg)](https://www.youtube.com/watch?v=rzVqw495QFs)    |
+|                            **[▶️ Watch on YouTube](https://www.youtube.com/watch?v=x8asWE2tq3M)**                           |                            **[▶️ Watch on YouTube](https://www.youtube.com/watch?v=rzVqw495QFs)**                            |
+
+### 📺 Featured on Bilibili
+
+**[▶️ Watch on Bilibili](https://www.bilibili.com/video/BV1KRuR64Ej4)**
+
+> 🎬 **Made a video using the plugin?** Share it in the Discord, you might be featured here!
 
 ---
 
@@ -372,7 +396,7 @@ Default objectives are seeded into `plugins/SpeedrunnerSwap/tasks.yml` on first 
 
 **Developed by muj3b**
 
-[![Donate](https://img.shields.io/badge/💖_Donate-Support_Development-ff69b4?style=for-the-badge)](https://donate.stripe.com/8x29AT0H58K03judnR0Ba01)
+[![Donate](https://img.shields.io/badge/💖_Donate-Support_Development-ff69b4?style=for-the-badge)](https://ko-fi.com/muj4b)
 
 ---
 
