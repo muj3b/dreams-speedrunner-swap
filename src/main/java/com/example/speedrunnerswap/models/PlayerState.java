@@ -41,6 +41,7 @@ public class PlayerState {
     private final int heldItemSlot;
     private final int freezeTicks;
     private final org.bukkit.util.Vector velocity;
+    private final Location respawnLocation;
     private Team selectedTeam;
 
     public int getFireTicks() {
@@ -125,7 +126,7 @@ public class PlayerState {
                       double absorptionAmount, Entity vehicle, boolean inVehicle, int ticksLived,
                       double lastDamage, int noDamageTicks, boolean gliding, float walkSpeed,
                       float flySpeed, int portalCooldown, int heldItemSlot, int freezeTicks,
-                      org.bukkit.util.Vector velocity) {
+                      org.bukkit.util.Vector velocity, Location respawnLocation) {
         this.inventory = inventory;
         this.armor = armor;
         this.offhand = offhand;
@@ -158,6 +159,7 @@ public class PlayerState {
         this.heldItemSlot = heldItemSlot;
         this.freezeTicks = freezeTicks;
         this.velocity = velocity.clone();
+        this.respawnLocation = respawnLocation == null ? null : respawnLocation.clone();
         this.selectedTeam = Team.NONE; // Default to NONE if not provided
     }
 
@@ -172,6 +174,7 @@ public class PlayerState {
     public int getHeldItemSlot() { return heldItemSlot; }
     public int getFreezeTicks() { return freezeTicks; }
     public org.bukkit.util.Vector getVelocity() { return velocity.clone(); }
+    public Location getRespawnLocation() { return respawnLocation == null ? null : respawnLocation.clone(); }
 
     public ItemStack[] getArmor() {
         return armor;

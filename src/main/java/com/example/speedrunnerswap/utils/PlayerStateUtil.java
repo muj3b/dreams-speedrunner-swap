@@ -49,7 +49,8 @@ public class PlayerStateUtil {
                 player.getPortalCooldown(),
                 player.getInventory().getHeldItemSlot(),
                 player.getFreezeTicks(),
-                player.getVelocity()
+                player.getVelocity(),
+                player.getRespawnLocation()
         );
     }
 

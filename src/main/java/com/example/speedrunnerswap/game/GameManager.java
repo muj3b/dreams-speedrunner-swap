@@ -1066,23 +1066,8 @@ public class GameManager {
 
         restorePlayerState(player);
 
-        PotionEffectType eff;
-        if ((eff = BukkitCompat.resolvePotionEffect("blindness")) != null)
-            player.removePotionEffect(eff);
-        if ((eff = BukkitCompat.resolvePotionEffect("darkness")) != null)
-            player.removePotionEffect(eff);
-        if ((eff = BukkitCompat.resolvePotionEffect("weakness")) != null)
-            player.removePotionEffect(eff);
-        if ((eff = BukkitCompat.resolvePotionEffect("slow_falling")) != null)
-            player.removePotionEffect(eff);
-        if ((eff = BukkitCompat.resolvePotionEffect("slowness")) != null)
-            player.removePotionEffect(eff);
-        if ((eff = BukkitCompat.resolvePotionEffect("jump_boost")) != null)
-            player.removePotionEffect(eff);
-
-        if (player.getGameMode() == GameMode.SPECTATOR && isRunner(player)) {
-            player.setGameMode(GameMode.SURVIVAL);
-        }
+        // Restoring the snapshot already replaces waiting effects and game mode.
+        // Do not remove legitimate pre-round effects after restoring them.
         for (Player viewer : Bukkit.getOnlinePlayers()) {
             try {
                 viewer.showPlayer(plugin, player);
@@ -1124,6 +1109,7 @@ public class GameManager {
                 player.setInvulnerable(false);
 
                 PlayerStateUtil.applyPlayerState(player, state);
+                player.setRespawnLocation(state.getRespawnLocation(), true);
 
                 Location target = null;
                 boolean forceGlobalSpawn = plugin.getConfigManager().isForceGlobalSpawn();

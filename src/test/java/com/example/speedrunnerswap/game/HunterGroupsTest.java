@@ -309,4 +309,59 @@ public class HunterGroupsTest {
         a.getLocation().getBlock().setType(Material.AIR);
         server.getScheduler().performTicks(21); assertTrue(game.isActiveHunter(b));
     }
+
+    @Test public void threeControllersPerBodyCompleteFullIndependentCycles() {
+        PlayerMock e=player("Eve"), f=player("Frank");
+        game.setHunters(List.of(a,b,c,d,e,f));
+        game.getHunterGroups().configure("A",List.of("Alice","Bob","Eve"));
+        game.getHunterGroups().configure("B",List.of("Charlie","Dave","Frank"));
+        start();
+        a.getInventory().setItem(0,new ItemStack(Material.DIAMOND,7));
+        c.getInventory().setItem(0,new ItemStack(Material.EMERALD,11));
+        for (int cycle=0;cycle<3;cycle++) {
+            for (PlayerMock[] expected:List.of(new PlayerMock[]{b,d},new PlayerMock[]{e,f},new PlayerMock[]{a,c})) {
+                game.getHunterGroups().swapAll();
+                assertTrue(game.isActiveHunter(expected[0])); assertTrue(game.isActiveHunter(expected[1]));
+                assertEquals(Material.DIAMOND,expected[0].getInventory().getItem(0).getType());
+                assertEquals(Material.EMERALD,expected[1].getInventory().getItem(0).getType());
+                assertEquals(2,game.getHunterGroups().activePlayers().size());
+                assertEquals(runner,game.getActiveRunner());
+            }
+        }
+    }
+
+    @Test public void bodySpawnTransfersButOriginalSpawnAndEffectsReturnOnStop() {
+        Location original=new Location(a.getWorld(),20,70,20);
+        Location bodySpawn=new Location(a.getWorld(),40,70,40);
+        a.setRespawnLocation(original,true);
+        a.addPotionEffect(new org.bukkit.potion.PotionEffect(org.bukkit.potion.PotionEffectType.JUMP_BOOST,1200,2));
+        start(); a.setRespawnLocation(bodySpawn,true);
+        game.getHunterGroups().swapAll();
+        assertEquals(bodySpawn,b.getRespawnLocation());
+        assertNull(d.getRespawnLocation());
+        game.stopGame();
+        assertEquals(original,a.getRespawnLocation());
+        assertNull(b.getRespawnLocation());
+        assertEquals(2,a.getPotionEffect(org.bukkit.potion.PotionEffectType.JUMP_BOOST).getAmplifier());
+    }
+
+    @Test public void deadControllerDisconnectCannotResumeUntilRespawn() {
+        start(); a.setHealth(0); a.disconnect();
+        assertTrue(game.isGamePaused());
+        a.reconnect(); server.getScheduler().performTicks(2);
+        assertTrue(game.isGamePaused()); assertFalse(game.resumeGame());
+        a.respawn(); server.getScheduler().performTicks(2);
+        assertFalse(game.isGamePaused());
+        server.getScheduler().performTicks(201); assertTrue(game.isActiveHunter(b));
+    }
+
+    @Test public void pluginDisableCancelsAllBodiesAndRestoresPlayers() {
+        a.getInventory().setItem(0,new ItemStack(Material.GOLD_INGOT,3));
+        start(); game.getHunterGroups().swapAll();
+        server.getPluginManager().disablePlugin(plugin);
+        assertFalse(game.isGameRunning()); assertTrue(game.getHunterGroups().activePlayers().isEmpty());
+        assertEquals(Material.GOLD_INGOT,a.getInventory().getItem(0).getType());
+        server.getScheduler().performTicks(500);
+        assertFalse(game.isGameRunning());
+    }
 }

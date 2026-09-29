@@ -6,6 +6,8 @@
 - Added assignment/start validation, countdown/setup locking, disconnect recovery, respawn-safe handoffs, cancelled-teleport protection, independent pause/resume timers, and synchronous stop/disable cleanup.
 - Fixed the single-runner swap loop, waiting-hunter cage enforcement, inventory snapshot aliasing, and open-container handoff duplication risks. Transfers now include held slot, velocity, freeze ticks, and respawn point.
 - Preserve initial participant snapshots through swaps/disconnects and defer dead-player restoration until respawn.
+- Restore each participant's original respawn point on round cleanup and preserve their pre-round potion effects instead of stripping them after restoration.
+- Final Java 21 clean build: 34 automated tests passed, including two independent three-controller hunter groups, death/disconnect recovery, shutdown cleanup, menu configuration, and existing-mode regressions.
 - Target Paper 1.21.11 / Java 21; version 26 is not targeted. CI now runs the automated code-level regression suite rather than skipping tests. No Minecraft client testing was performed for this release.
 
 ## 4.3.5
