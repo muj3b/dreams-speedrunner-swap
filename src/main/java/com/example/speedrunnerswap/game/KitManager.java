@@ -72,8 +72,10 @@ public class KitManager {
             try {
                 if (itemString == null) continue;
                 String[] parts = itemString.trim().split("\\s+");
-                Material material = Material.valueOf(parts[0].toUpperCase());
+                Material material = Material.matchMaterial(parts[0]);
+                if (material == null || !material.isItem() || material.isAir()) throw new IllegalArgumentException("Unsupported item");
                 int amount = parts.length > 1 ? Integer.parseInt(parts[1]) : 1;
+                if (amount < 1 || amount > material.getMaxStackSize()) throw new IllegalArgumentException("Invalid stack amount");
                 items.add(new ItemStack(material, amount));
             } catch (Exception e) {
                 logger.warning("Invalid item in kit: " + itemString);
@@ -87,17 +89,14 @@ public class KitManager {
         ConfigurationSection armorSection = section.getConfigurationSection("armor");
         if (armorSection == null) return armor;
 
-        try {
-            String boots = armorSection.getString("boots");
-            if (boots != null) armor[0] = new ItemStack(Material.valueOf(boots.toUpperCase()));
-            String leggings = armorSection.getString("leggings");
-            if (leggings != null) armor[1] = new ItemStack(Material.valueOf(leggings.toUpperCase()));
-            String chestplate = armorSection.getString("chestplate");
-            if (chestplate != null) armor[2] = new ItemStack(Material.valueOf(chestplate.toUpperCase()));
-            String helmet = armorSection.getString("helmet");
-            if (helmet != null) armor[3] = new ItemStack(Material.valueOf(helmet.toUpperCase()));
-        } catch (IllegalArgumentException e) {
-            logger.warning("Invalid armor material in kit: " + e.getMessage());
+        String[] slots = {"boots", "leggings", "chestplate", "helmet"};
+        for (int i = 0; i < slots.length; i++) {
+            String name = armorSection.getString(slots[i]);
+            if (name == null) continue;
+            Material material = Material.matchMaterial(name);
+            if (material == null || !material.isItem() || material.isAir()) {
+                logger.warning("Unsupported armor material in kit " + slots[i] + ": " + name);
+            } else armor[i] = new ItemStack(material);
         }
         return armor;
     }

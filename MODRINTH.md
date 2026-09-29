@@ -16,7 +16,7 @@ SpeedrunnerSwap recreates the exciting "Speedrunner Swap VS Hunters" challenge f
 - **Safe Swaps**: Protection from dangerous blocks like void/lava
 - **Intuitive GUIs**: Team selector, settings menu, main menu
 - **Complete State Syncing**: Inventory, armor, health, effects, location, and more
-- **Voice Chat Integration**: Works with Simple Voice Chat plugin
+- **Independent Hunter Groups**: One permanent runner can face separate hunter bodies, each rotating its own members and state
 
 ## Commands & Permissions
 
@@ -47,14 +47,15 @@ The plugin is highly configurable through `config.yml`:
 - Tracker settings
 - GUI customization
 - Broadcast options
-- Voice chat integration
+- Voice chat settings are placeholders; Simple Voice Chat auto-muting is not implemented
 
 ## Requirements
 
-- Java 21
-- Paper 1.21.11 (4.3.6 targets this API, not Minecraft 26)
+- Java 21 for Paper 1.21.x; Java 25 for Paper 26.x
+- Version 4.3.7 targets published Paper 1.21.x through 26.3 in one JAR
+- Code-only verification: 42 tests on matching 1.21.11, 26.1.2, and 26.2 mocks; packaged-JAR linkage checks on 15 APIs. Paper 26.3 build 135 is beta and API-only verified. No Minecraft playtest or third-party plugin verification is claimed. See [compatibility details](https://github.com/muj3b/dreams-speedrunner-swap/blob/main/COMPATIBILITY.md).
 
 ## Links
 
-- [GitHub Repository](https://github.com/muj3b/minecraft-speedrunner-swap-plugin)
-- [Issue Tracker](https://github.com/muj3b/minecraft-speedrunner-swap-plugin/issues)
+- [GitHub Repository](https://github.com/muj3b/dreams-speedrunner-swap)
+- [Issue Tracker](https://github.com/muj3b/dreams-speedrunner-swap/issues)

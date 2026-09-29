@@ -17,8 +17,8 @@ public final class ChatTitleCompat {
     public static void showTitle(Player player, String title, String subtitle, long fadeInMs, long stayMs, long fadeOutMs) {
         try {
             Title t = Title.title(
-                    Component.text(title).color(NamedTextColor.GOLD).decorate(TextDecoration.BOLD),
-                    Component.text(subtitle).color(NamedTextColor.YELLOW),
+                    TextUtil.component(title).colorIfAbsent(NamedTextColor.GOLD).decorate(TextDecoration.BOLD),
+                    TextUtil.component(subtitle).colorIfAbsent(NamedTextColor.YELLOW),
                     Title.Times.times(Duration.ofMillis(fadeInMs), Duration.ofMillis(stayMs), Duration.ofMillis(fadeOutMs))
             );
             player.showTitle(t);
@@ -43,7 +43,7 @@ public final class ChatTitleCompat {
 
     public static void sendClickableUrl(Player player, String prefix, String url) {
         try {
-            Component msg = Component.text(prefix)
+            Component msg = TextUtil.component(prefix)
                     .append(Component.text(url, NamedTextColor.LIGHT_PURPLE, TextDecoration.BOLD)
                             .hoverEvent(HoverEvent.showText(Component.text("Open donation page", NamedTextColor.GOLD)))
                             .clickEvent(ClickEvent.openUrl(url)));

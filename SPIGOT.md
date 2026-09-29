@@ -1,4 +1,4 @@
-# SpeedrunnerSwap — Dream-style Swap VS Hunters (Paper 1.21.11)
+# SpeedrunnerSwap — Dream-style Swap VS Hunters (Paper 1.21.x–26.3)
 
 ## Description
 
@@ -30,7 +30,7 @@ This plugin provides a complete, ready-to-use implementation with intuitive GUIs
 - **Intuitive GUIs**: Team selector, settings menu, main menu
 - **Command System**: Start, stop, pause, resume, and more
 - **Chat Isolation**: Inactive runners can't communicate
-- **Voice Chat Integration**: Works with Simple Voice Chat plugin
+- **Voice Chat Settings**: Placeholder only; Simple Voice Chat auto-muting is not implemented
 
 ## Commands
 
@@ -59,13 +59,14 @@ This plugin provides a complete, ready-to-use implementation with intuitive GUIs
 
 ## Requirements
 
-- Java 21
-- Paper 1.21.11 (4.3.6 targets this API, not Minecraft 26)
+- Java 21 for Paper 1.21.x; Java 25 for Paper 26.x
+- Version 4.3.7 targets published Paper 1.21.x through 26.3 in one JAR (Paper required, not Spigot)
+- Code-only verification: 42 tests on matching 1.21.11, 26.1.2, and 26.2 mocks; packaged-JAR linkage checks on 15 APIs. Paper 26.3 build 135 is beta and API-only verified. No Minecraft playtest or third-party plugin verification is claimed. See [compatibility details](https://github.com/muj3b/dreams-speedrunner-swap/blob/main/COMPATIBILITY.md).
 
 ## Support
 
 If you encounter any issues or have suggestions, please report them on our GitHub repository.
 
-GitHub: https://github.com/muj3b/minecraft-speedrunner-swap-plugin
+GitHub: https://github.com/muj3b/dreams-speedrunner-swap
 
 Enjoy the challenge!

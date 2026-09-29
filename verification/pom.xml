@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <groupId>com.example</groupId><artifactId>speedrunnerswap-api-verification</artifactId><version>4.3.7</version>
+    <properties>
+        <maven.compiler.release>21</maven.compiler.release>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <paper.version>1.21-R0.1-20240810.100446-132</paper.version>
+        <plugin.jar>${project.basedir}/../target/speedrunnerswap-4.3.7.jar</plugin.jar>
+    </properties>
+    <repositories><repository><id>papermc</id><url>https://repo.papermc.io/repository/maven-public/</url></repository></repositories>
+    <dependencies>
+        <dependency><groupId>junit</groupId><artifactId>junit</artifactId><version>4.13.2</version><scope>test</scope></dependency>
+        <dependency><groupId>org.ow2.asm</groupId><artifactId>asm</artifactId><version>9.9.1</version></dependency>
+        <dependency><groupId>io.papermc.paper</groupId><artifactId>paper-api</artifactId><version>${paper.version}</version></dependency>
+    </dependencies>
+    <build><directory>${project.basedir}/target/${paper.version}</directory><plugins>
+        <plugin><groupId>org.apache.maven.plugins</groupId><artifactId>maven-surefire-plugin</artifactId><version>3.5.4</version></plugin>
+        <plugin><groupId>org.apache.maven.plugins</groupId><artifactId>maven-compiler-plugin</artifactId><version>3.14.1</version></plugin>
+        <plugin>
+            <groupId>org.codehaus.mojo</groupId><artifactId>exec-maven-plugin</artifactId><version>3.6.3</version>
+            <executions><execution><phase>verify</phase><goals><goal>java</goal></goals></execution></executions>
+            <configuration>
+                <mainClass>verification.ApiLinkageCheck</mainClass>
+                <arguments><argument>${plugin.jar}</argument><argument>${paper.version}</argument></arguments>
+            </configuration>
+        </plugin>
+    </plugins></build>
+</project>

@@ -80,6 +80,8 @@ freeze_mode: CAGE
 
 # Limbo configuration
 limbo:
+  # Optional world_key (e.g. minecraft:overworld) takes priority over the legacy name.
+  # Set automatically when choosing limbo in the GUI; remove it to switch by name.
   world: "world"
   x: 0.5
   y: 200.0
@@ -87,6 +89,7 @@ limbo:
 
 # Global spawn handling for post-game resets
 spawn:
+  # Optional world_key is saved when setting spawn; legacy world names still work.
   force_global: true
   world: "world"
   x: 0.5

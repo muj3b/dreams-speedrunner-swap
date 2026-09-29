@@ -26,3 +26,26 @@ jobs:
             ${{ runner.os }}-m2-
       - name: Build with Maven
         run: mvn --batch-mode clean verify
+      - name: Set up JDK 25 for Minecraft 26 checks
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 25
+      - name: Test unchanged release classes on matching 26.x mocks
+        run: bash verification/check-behavior-26.sh
+      - name: Check release JAR against every pinned Paper API
+        run: bash verification/check-apis.sh
+      - name: Upload release JAR
+        uses: actions/upload-artifact@v4
+        with:
+          name: SpeedrunnerSwap-4.3.7
+          path: target/speedrunnerswap-4.3.7.jar
+      - name: Upload test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: verification-reports
+          path: |
+            target/surefire-reports/
+            target/reports-*/
+            verification/target/**/surefire-reports/

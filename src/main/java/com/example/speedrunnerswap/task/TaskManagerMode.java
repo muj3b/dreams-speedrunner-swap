@@ -30,6 +30,7 @@ public class TaskManagerMode {
     // Task registry: id -> definition
     private final Map<String, TaskDefinition> registry = new LinkedHashMap<>();
     private final Set<String> customTaskIds = new HashSet<>();
+    private final Set<String> unavailableMaterialTaskIds = new HashSet<>();
     // Difficulty filter and progression gates
     private TaskDifficulty difficultyFilter = TaskDifficulty.MEDIUM;
     private boolean netherReached = false;
@@ -478,6 +479,7 @@ public class TaskManagerMode {
     private void loadTasks() {
         registry.clear();
         customTaskIds.clear();
+        unavailableMaterialTaskIds.clear();
         // First attempt to load from tasks.yml if available
         boolean loadedFromFile = loadFromTasksYml();
         // If none loaded, optionally include built-in defaults
@@ -991,6 +993,25 @@ public class TaskManagerMode {
         if (def == null || def.id() == null || def.id().isBlank()) {
             return;
         }
+        // Only generic material tasks have a material-only suffix. Complex objectives
+        // (e.g. craft_full_iron_armor) retain their existing/manual completion behavior.
+        String prefix = switch (def.type()) {
+            case CRAFT_ITEM -> "craft_";
+            case MINE_BLOCK -> "mine_";
+            case PLACE_BLOCK -> "place_";
+            case CONSUME_ITEM -> "eat_";
+            case FISH_ITEM -> "fish_";
+            default -> null;
+        };
+        unavailableMaterialTaskIds.remove(def.id());
+        if (prefix != null && def.id().startsWith(prefix)) {
+            org.bukkit.Material material = org.bukkit.Material.matchMaterial(def.id().substring(prefix.length()));
+            boolean blockTask = def.type() == TaskType.MINE_BLOCK || def.type() == TaskType.PLACE_BLOCK;
+            if (material == null || material.isAir() || (blockTask ? !material.isBlock() : !material.isItem())) {
+                plugin.getLogger().warning("Task " + def.id() + " is unavailable on this server: unsupported material. Keeping its saved definition.");
+                unavailableMaterialTaskIds.add(def.id());
+            }
+        }
         registry.put(def.id(), registeringDefaults ? normalizeDefaultTask(def) : def);
     }
 
@@ -1107,7 +1128,7 @@ public class TaskManagerMode {
     public java.util.List<String> getCandidateTaskIds() {
         java.util.List<String> out = new java.util.ArrayList<>();
         for (TaskDefinition d : registry.values()) {
-            if (!d.enabled())
+            if (!d.enabled() || unavailableMaterialTaskIds.contains(d.id()))
                 continue;
             if (d.difficulty() != null && d.difficulty().ordinal() != difficultyFilter.ordinal()) {
                 // Exact-match filter for now per request (E/M/H buckets)

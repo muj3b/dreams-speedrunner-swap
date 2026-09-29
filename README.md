@@ -8,7 +8,7 @@
 
 <div align="center">
 
-![Minecraft](https://img.shields.io/badge/Minecraft-1.21.11-28A745?style=for-the-badge&logo=minecraft)
+![Minecraft](https://img.shields.io/badge/Paper-1.21.x–26.3-28A745?style=for-the-badge&logo=minecraft)
 ![API](https://img.shields.io/badge/API-Paper-2875D7?style=for-the-badge)
 ![Game Modes](https://img.shields.io/badge/Game_Modes-5_in_1-8A2BE2?style=for-the-badge)
 ![Task Master](https://img.shields.io/badge/Task_Master-BETA-FF6B35?style=for-the-badge)
@@ -18,7 +18,7 @@
 
 > **Experience Dream's legendary challenges in one powerful plugin! Play the classic Speedrunners vs Hunters, the cooperative Multi-Runner Control Swap, the shared-body Task Master sabotage mode, Task Master Duo, or the no-swap Task Race mode. Dream mode supports multiple independent shared hunter bodies.**
 
-Version **4.3.6** targets **Paper 1.21.11 and Java 21**. This release does not target Minecraft 26.x or claim compatibility with older server APIs. [Paper's Java requirements](https://docs.papermc.io/paper/getting-started/) and the [1.21.11 API](https://jd.papermc.io/paper/1.21.11/) are the compatibility references.
+Version **4.3.7** targets published **Paper 1.21.x through 26.3** with one JAR. Use **Java 21 for 1.21.x** and **Java 25 for 26.x**. The release JAR passes linkage checks against 15 pinned APIs; behavioral tests run on matching 1.21.11, 26.1.2, and 26.2 mocks. **Paper 26.3 build 135 is beta and has API-only verification, not a gameplay test.** See [compatibility, exact versions, and upgrade notes](COMPATIBILITY.md). This is not a claim of support for future releases, Spigot, Folia, Fabric, or Bedrock.
 
 ---
 
@@ -91,7 +91,7 @@ With `swap.pause_on_disconnect: true`, losing an active controller pauses all ti
 
 ### Build and code-level verification
 
-Run `mvn clean verify` with JDK 21. The plugin JAR is `target/speedrunnerswap-4.3.6.jar`. JUnit/MockBukkit tests cover real plugin loading, timers, state transfer, configuration, commands, menu events, disconnects, deaths, cleanup, and compatibility paths. Test libraries are not included in the plugin JAR. These are automated code-level checks, **not a Minecraft client/playtest or verification of third-party plugin interactions**.
+Run `mvn clean verify` with JDK 21. The plugin JAR is `target/speedrunnerswap-4.3.7.jar`. Then use JDK 25 to run `bash verification/check-behavior-26.sh` and `bash verification/check-apis.sh`. JUnit/MockBukkit tests load the plugin into a simulated server and cover timers, state transfer, configuration, commands, menu events, disconnects, deaths, cleanup, and compatibility paths. Test libraries are not included in the plugin JAR. These are automated code-level checks, **not a Minecraft client/playtest or verification of third-party plugin interactions**. See [the full verification procedure](COMPATIBILITY.md#repeatable-code-only-verification).
 
 ### 🎲 100+ Unique Tasks Included!
 
@@ -292,7 +292,7 @@ Run `mvn clean verify` with JDK 21. The plugin JAR is `target/speedrunnerswap-4.
 | **🔄 Customizable Swaps** | Set intervals, randomization, grace periods, and jitter |
 | **🏹 Shared Hunter Body** | Optional Dream-mode hunter queue so runners and hunters can each share a separate body |
 | **🛡️ Safe Swap System** | Prevents swapping into dangerous situations |
-| **🎤 Voice Chat Integration** | Auto-mute inactive players via Simple Voice Chat support |
+| **🎤 Voice Chat Settings** | Placeholder hooks only; Simple Voice Chat auto-muting is not implemented |
 | **📚 Task Pool Manager** | Enable/disable every objective, adjust difficulty filters, and reload `tasks.yml` live |
 
 ---
@@ -354,7 +354,7 @@ The plugin ships with a comprehensive `config.yml`, but every option can be adju
 | **🛡 Last Stand & Sudden Death** | `last_stand.*`, `sudden_death.*` | Configure runner clutch buffs and sudden-death arena, timers, and effects. |
 | **📊 Statistics & UI** | `stats.*`, `ui.update_ticks.*`, `timer_visibility.*` | Enable tracking, broadcast cadence, timer visibility, action bar/title update rates. |
 | **✨ Particle Trail** | `particle_trail.*` | Toggle runner particle trail, tick interval, particle id, and RGB colour (new GUI controls). |
-| **🎙 Voice Chat** | `voice_chat.*` | Simple Voice Chat integration toggles. |
+| **🎙 Voice Chat** | `voice_chat.*` | Reserved settings; no working Simple Voice Chat mute integration yet. |
 | **🎒 Kits** | `kits.*` & `kits.yml` | Enable runner/hunter kits and quick testing buttons. |
 | **🎯 Task Master** | `task_manager.*` | Pause behaviour, reconnection grace, max duration, include defaults, difficulty filter, player reroll rules, per-task enable/disable, custom task creator, task pool management, assignments viewer. |
 

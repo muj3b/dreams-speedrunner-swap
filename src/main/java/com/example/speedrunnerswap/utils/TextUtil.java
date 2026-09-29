@@ -6,6 +6,12 @@ package com.example.speedrunnerswap.utils;
 public final class TextUtil {
     private TextUtil() {}
 
+    /** Decode legacy section colors instead of showing the formatting codes literally. */
+    public static net.kyori.adventure.text.Component component(String text) {
+        return net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer.legacySection()
+                .deserialize(text == null ? "" : text);
+    }
+
     /**
      * Strip Minecraft legacy color codes from a string.
      * Supports both section sign (§) and ampersand (&) variants.

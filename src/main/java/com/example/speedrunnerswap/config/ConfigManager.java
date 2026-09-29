@@ -336,7 +336,7 @@ public class ConfigManager {
      */
     public org.bukkit.Location getSpawnLocation() {
         String worldName = config.getString("spawn.world", "world");
-        org.bukkit.World world = plugin.getServer().getWorld(worldName);
+        org.bukkit.World world = com.example.speedrunnerswap.utils.WorldCompat.resolve(config.getString("spawn.world_key"), worldName);
         if (world == null) {
             world = plugin.getServer().getWorlds().get(0); // Fallback to default world
             plugin.getLogger()
@@ -366,6 +366,7 @@ public class ConfigManager {
             return;
         }
         config.set("spawn.world", location.getWorld().getName());
+        config.set("spawn.world_key", location.getWorld().getKey().toString());
         config.set("spawn.x", location.getX());
         config.set("spawn.y", location.getY());
         config.set("spawn.z", location.getZ());
@@ -487,7 +488,7 @@ public class ConfigManager {
 
     public Location getLimboLocation() {
         String worldName = config.getString("limbo.world", "world");
-        World world = plugin.getServer().getWorld(worldName);
+        World world = com.example.speedrunnerswap.utils.WorldCompat.resolve(config.getString("limbo.world_key"), worldName);
         if (world == null) {
             world = plugin.getServer().getWorlds().get(0);
             plugin.getLogger()

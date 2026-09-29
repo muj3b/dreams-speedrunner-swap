@@ -25,7 +25,7 @@ public final class GuiCompat {
     public static Inventory createInventory(InventoryHolder holder, int size, String title) {
         InventoryHolder effective = (holder != null) ? holder : DEFAULT_HOLDER;
         try {
-            return Bukkit.createInventory(effective, size, Component.text(title));
+            return Bukkit.createInventory(effective, size, TextUtil.component(title));
         } catch (Throwable t) {
             // Fallback to legacy title if Component API is unavailable
             return createInventoryLegacy(effective, size, title);
@@ -40,7 +40,7 @@ public final class GuiCompat {
 
     public static void setDisplayName(ItemMeta meta, String name) {
         try {
-            meta.displayName(Component.text(name));
+            meta.displayName(TextUtil.component(name));
         } catch (Throwable t) {
             setDisplayNameLegacy(meta, name);
         }
@@ -60,7 +60,7 @@ public final class GuiCompat {
     public static void setLore(ItemMeta meta, List<String> legacyLore) {
         try {
             List<Component> list = new ArrayList<>();
-            for (String s : legacyLore) list.add(Component.text(s));
+            for (String s : legacyLore) list.add(TextUtil.component(s));
             meta.lore(list);
         } catch (Throwable t) {
             setLoreLegacy(meta, legacyLore);

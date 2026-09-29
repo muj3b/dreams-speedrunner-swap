@@ -1,7 +1,7 @@
 name: SpeedrunnerSwap
 version: '${project.version}'
 main: com.example.speedrunnerswap.SpeedrunnerSwap
-api-version: '1.21.11'
+api-version: '1.21'
 authors: [muj4b]
 description: |
   Dream-style challenge plugin with shared-body swap modes, optional shared hunter control, secret-task competitions, Task Master Duo, and a no-swap Task Race mode.

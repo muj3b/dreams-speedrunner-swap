@@ -6,12 +6,18 @@
 
     <groupId>com.example</groupId>
     <artifactId>speedrunnerswap</artifactId>
-    <version>4.3.6</version>
+    <version>4.3.7</version>
 
     <name>SpeedrunnerSwap</name>
 
     <properties>
         <java.version>21</java.version>
+        <paper.version>1.21-R0.1-20240810.100446-132</paper.version>
+        <test.paper.version>1.21.11-R0.1-20260511.115010-91</test.paper.version>
+        <mockbukkit.artifact>mockbukkit-v1.21</mockbukkit.artifact>
+        <mockbukkit.version>4.116.3</mockbukkit.version>
+        <junit.platform.version>6.0.3</junit.platform.version>
+        <test.reportsDirectory>${project.build.directory}/surefire-reports</test.reportsDirectory>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     </properties>
 
@@ -21,6 +27,22 @@
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-surefire-plugin</artifactId>
                 <version>3.5.4</version>
+                <configuration>
+                    <reportsDirectory>${test.reportsDirectory}</reportsDirectory>
+                    <!-- Compile against the oldest API; execute mocks against their matching API. -->
+                    <classpathDependencyExcludes>
+                        <classpathDependencyExclude>io.papermc.paper:*</classpathDependencyExclude>
+                        <classpathDependencyExclude>net.kyori:*</classpathDependencyExclude>
+                        <classpathDependencyExclude>com.google.code.gson:*</classpathDependencyExclude>
+                    </classpathDependencyExcludes>
+                    <additionalClasspathDependencies>
+                        <additionalClasspathDependency>
+                            <groupId>io.papermc.paper</groupId>
+                            <artifactId>paper-api</artifactId>
+                            <version>${test.paper.version}</version>
+                        </additionalClasspathDependency>
+                    </additionalClasspathDependencies>
+                </configuration>
             </plugin>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
@@ -67,20 +89,20 @@
     <dependencies>
         <dependency>
             <groupId>org.mockbukkit.mockbukkit</groupId>
-            <artifactId>mockbukkit-v1.21</artifactId>
-            <version>4.116.3</version>
+            <artifactId>${mockbukkit.artifact}</artifactId>
+            <version>${mockbukkit.version}</version>
             <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>org.junit.vintage</groupId>
             <artifactId>junit-vintage-engine</artifactId>
-            <version>6.0.3</version>
+            <version>${junit.platform.version}</version>
             <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>io.papermc.paper</groupId>
             <artifactId>paper-api</artifactId>
-            <version>1.21.11-R0.1-SNAPSHOT</version>
+            <version>${paper.version}</version>
             <scope>provided</scope>
         </dependency>
         <dependency>
@@ -89,7 +111,17 @@
             <version>4.13.2</version>
             <scope>test</scope>
         </dependency>
-        <!-- Adding latest Guice version to fix deprecated warning -->
         <!-- No shaded runtime deps required by plugin code -->
     </dependencies>
+    <profiles>
+        <profile>
+            <id>test-26</id>
+            <properties>
+                <test.paper.version>26.2.build.129-stable</test.paper.version>
+                <mockbukkit.artifact>mockbukkit-v26.2</mockbukkit.artifact>
+                <mockbukkit.version>4.116.1</mockbukkit.version>
+                <junit.platform.version>6.1.3</junit.platform.version>
+            </properties>
+        </profile>
+    </profiles>
 </project>

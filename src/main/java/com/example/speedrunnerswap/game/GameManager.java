@@ -62,6 +62,7 @@ public class GameManager {
     private boolean pausedByDisconnect = false;
     private Location sharedRunnerSpawn;
     private String sessionWorldName;
+    private String sessionWorldKey;
     private boolean spawnSyncInFlight;
 
     private static final long TASK_INTRO_DELAY_TICKS = 8L * 20L;
@@ -467,6 +468,7 @@ public class GameManager {
                 nextSwapTime = 0L;
                 nextHunterSwapTime = 0L;
                 sessionWorldName = null;
+                sessionWorldKey = null;
 
                 if (plugin.getConfigManager().isBroadcastGameEvents() && endMessage != null && !endMessage.isBlank()) {
                     for (Player participant : getOnlineGameParticipants()) {
@@ -862,7 +864,8 @@ public class GameManager {
         if (player == null || sessionWorldName == null || player.getWorld() == null) {
             return false;
         }
-        return sessionWorldName.equals(player.getWorld().getName());
+        World session = com.example.speedrunnerswap.utils.WorldCompat.resolve(sessionWorldKey, sessionWorldName);
+        return session != null && session.getUID().equals(player.getWorld().getUID());
     }
 
     private void startRunnerTimeoutWatcher() {
@@ -2364,7 +2367,7 @@ public class GameManager {
 
     public World getSessionWorld() {
         if (sessionWorldName != null) {
-            World persisted = Bukkit.getWorld(sessionWorldName);
+            World persisted = com.example.speedrunnerswap.utils.WorldCompat.resolve(sessionWorldKey, sessionWorldName);
             if (persisted != null) {
                 return persisted;
             }
@@ -2414,11 +2417,13 @@ public class GameManager {
     private void initializeSessionWorld() {
         if (!plugin.getConfigManager().isMultiworldCompatibilityEnabled()) {
             sessionWorldName = null;
+            sessionWorldKey = null;
             return;
         }
         World sessionWorld = resolveSessionWorld(activeRunner);
         if (sessionWorld != null) {
             sessionWorldName = sessionWorld.getName();
+            sessionWorldKey = sessionWorld.getKey().toString();
         }
     }
 
@@ -2444,6 +2449,7 @@ public class GameManager {
             return;
         }
         sessionWorldName = world.getName();
+        sessionWorldKey = world.getKey().toString();
     }
 
     private World resolveSessionWorld(Player player) {
@@ -2455,7 +2461,7 @@ public class GameManager {
             return sharedRunnerSpawn.getWorld();
         }
         if (sessionWorldName != null) {
-            World persisted = Bukkit.getWorld(sessionWorldName);
+            World persisted = com.example.speedrunnerswap.utils.WorldCompat.resolve(sessionWorldKey, sessionWorldName);
             if (persisted != null) {
                 return persisted;
             }
@@ -2463,17 +2469,20 @@ public class GameManager {
         World fromPlayer = resolvePreferredNormalWorld(player);
         if (fromPlayer != null) {
             sessionWorldName = fromPlayer.getName();
+            sessionWorldKey = fromPlayer.getKey().toString();
             return fromPlayer;
         }
         World fromActive = resolvePreferredNormalWorld(activeRunner);
         if (fromActive != null) {
             sessionWorldName = fromActive.getName();
+            sessionWorldKey = fromActive.getKey().toString();
             return fromActive;
         }
         for (Player runner : runners) {
             World runnerWorld = resolvePreferredNormalWorld(runner);
             if (runnerWorld != null) {
                 sessionWorldName = runnerWorld.getName();
+                sessionWorldKey = runnerWorld.getKey().toString();
                 return runnerWorld;
             }
         }
@@ -2481,6 +2490,7 @@ public class GameManager {
             World hunterWorld = resolvePreferredNormalWorld(hunter);
             if (hunterWorld != null) {
                 sessionWorldName = hunterWorld.getName();
+                sessionWorldKey = hunterWorld.getKey().toString();
                 return hunterWorld;
             }
         }

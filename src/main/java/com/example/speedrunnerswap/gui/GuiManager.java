@@ -1038,6 +1038,7 @@ public final class GuiManager implements Listener {
         }, ctxClick -> {
             org.bukkit.Location loc = ctxClick.player().getLocation();
             plugin.getConfig().set("limbo.world", loc.getWorld() != null ? loc.getWorld().getName() : "world");
+            plugin.getConfig().set("limbo.world_key", loc.getWorld() != null ? loc.getWorld().getKey().toString() : null);
             plugin.getConfig().set("limbo.x", loc.getX());
             plugin.getConfig().set("limbo.y", loc.getY());
             plugin.getConfig().set("limbo.z", loc.getZ());
@@ -1154,9 +1155,7 @@ public final class GuiManager implements Listener {
         items.add(backButton(0, "§7§lBack", MenuKey.POWERUPS_ROOT, null, this::openPowerUpsMenu));
 
         int slot = 9;
-        @SuppressWarnings("deprecation")
-        PotionEffectType[] effectTypes = PotionEffectType.values();
-        for (PotionEffectType type : effectTypes) {
+        for (PotionEffectType type : org.bukkit.Registry.EFFECT) {
             if (type == null || type.getKey() == null)
                 continue;
             String id = type.getKey().getKey().toUpperCase(Locale.ROOT);

@@ -17,7 +17,7 @@ public final class BukkitCompat {
     /**
      * Resolve the max health attribute across versions.
      *
-     * Newer APIs use GENERIC_MAX_HEALTH, older builds used MAX_HEALTH.
+     * Older APIs use GENERIC_MAX_HEALTH, newer builds use MAX_HEALTH.
      * We resolve by name at runtime to avoid compile-time breakage and
      * provide a safe numeric fallback if the attribute instance is missing.
      */
@@ -29,7 +29,7 @@ public final class BukkitCompat {
                 return inst.getValue();
             }
         }
-        // Final fallback: assume vanilla default 20.0 hearts if attribute missing
+        // Final fallback: assume vanilla default 20.0 health points if attribute missing
         // (still bounded by current health usages where applied).
         return 20.0D;
     }
@@ -76,6 +76,13 @@ public final class BukkitCompat {
         // Prefer modern getByKey via NamespacedKey (handled below).
         // Then, as a legacy fallback, try getByName via reflection to avoid
         // compile-time deprecation warnings on 1.21+.
+
+        // Registry lookup survives removal of legacy PotionEffectType lookup methods.
+        org.bukkit.NamespacedKey resolvedKey = org.bukkit.NamespacedKey.fromString(
+                key.contains(":") ? key : "minecraft:" + key);
+        if (resolvedKey == null) return null;
+        PotionEffectType registered = org.bukkit.Registry.EFFECT.get(resolvedKey);
+        if (registered != null) return registered;
 
         // Try namespaced-key resolver if available at runtime
         try {
@@ -132,9 +139,8 @@ public final class BukkitCompat {
             Class<?> titleCls = Class.forName("net.kyori.adventure.title.Title");
             Class<?> timesCls = Class.forName("net.kyori.adventure.title.Title$Times");
 
-            java.lang.reflect.Method text = compCls.getMethod("text", String.class);
-            Object main = text.invoke(null, title);
-            Object sub = text.invoke(null, subtitle);
+            Object main = TextUtil.component(title);
+            Object sub = TextUtil.component(subtitle);
 
             Class<?> durationCls = Class.forName("java.time.Duration");
             java.lang.reflect.Method ofMillis = durationCls.getMethod("ofMillis", long.class);
