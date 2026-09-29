@@ -61,7 +61,7 @@ This plugin provides a complete, ready-to-use implementation with intuitive GUIs
 
 - Java 21 for Paper 1.21.x; Java 25 for Paper 26.x
 - Version 4.3.7 targets published Paper 1.21.x through 26.3 in one JAR (Paper required, not Spigot)
-- Code-only verification: 42 tests on matching 1.21.11, 26.1.2, and 26.2 mocks; packaged-JAR linkage checks on 15 APIs. Paper 26.3 build 135 is beta and API-only verified. No Minecraft playtest or third-party plugin verification is claimed. See [compatibility details](https://github.com/muj3b/dreams-speedrunner-swap/blob/main/COMPATIBILITY.md).
+- Code-only verification: 43 tests on matching 1.21.11, 26.1.2, and 26.2 mocks; packaged-JAR linkage checks on 15 APIs. Paper 26.3 build 135 is beta and API-only verified. No Minecraft playtest or third-party plugin verification is claimed. See [compatibility details](https://github.com/muj3b/dreams-speedrunner-swap/blob/main/COMPATIBILITY.md).
 
 ## Support
 

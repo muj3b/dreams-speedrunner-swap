@@ -1000,7 +1000,7 @@ public class TaskManagerMode {
             case MINE_BLOCK -> "mine_";
             case PLACE_BLOCK -> "place_";
             case CONSUME_ITEM -> "eat_";
-            case FISH_ITEM -> "fish_";
+            // Fishing uses the fish_any wildcard, not a material suffix.
             default -> null;
         };
         unavailableMaterialTaskIds.remove(def.id());

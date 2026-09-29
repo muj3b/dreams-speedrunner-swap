@@ -93,6 +93,14 @@ public class CompatibilityTest {
         var armor=plugin.getKitManager().loadKitArmor(config);
         assertNull(armor[0]);assertEquals(Material.DIAMOND_HELMET,armor[3].getType());
     }
+    @Test public void fishingWildcardIsNotTreatedAsAnUnavailableMaterial() {
+        var config = plugin.getTaskConfigManager();
+        config.getConfig().set("tasks", List.of(java.util.Map.of(
+                "id", "fish_any", "type", "FISH_ITEM", "enabled", true)));
+        config.saveConfig();
+        plugin.getTaskManagerMode().reloadTasksFromFile();
+        assertTrue(plugin.getTaskManagerMode().getCandidateTaskIds().contains("fish_any"));
+    }
     @Test public void unavailableTaskMaterialsAreExcludedWithoutRewritingSavedDefinitions() {
         var config = plugin.getTaskConfigManager();
         config.getConfig().set("tasks", List.of(

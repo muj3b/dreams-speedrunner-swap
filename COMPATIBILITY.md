@@ -1,20 +1,23 @@
 # SpeedrunnerSwap 4.3.7 compatibility
 
-Verified September 28, 2026. One release JAR, compiled against the oldest supported
+Verified September 29, 2026. One release JAR, compiled against the oldest supported
 Paper API with Java 21 bytecode. Tests and API libraries are not bundled in it.
 
 ## Supported targets and evidence
 
 | Target | Server Java | Verification |
 | --- | --- | --- |
-| Published Paper 1.21.x releases, listed below | 21 | Packaged-JAR linkage on every listed API; 42 behavioral tests on matching 1.21.11 MockBukkit |
+| Published Paper 1.21.x releases, listed below | 21 | Packaged-JAR linkage on every listed API; 43 behavioral tests on matching 1.21.11 MockBukkit |
 | Paper 26.1.1 | 25 | Packaged-JAR linkage (the pinned API is alpha) |
-| Paper 26.1.2 and 26.2 | 25 | Packaged-JAR linkage plus 42 behavioral tests on each matching MockBukkit version |
+| Paper 26.1.2 and 26.2 | 25 | Packaged-JAR linkage plus 43 behavioral tests on each matching MockBukkit version |
 | Paper 26.3 build 135 beta | 25 | Packaged-JAR linkage only; no matching MockBukkit release available |
 
 The 15 targets are **1.21, 1.21.1, 1.21.3, 1.21.4, 1.21.5, 1.21.6, 1.21.7,
 1.21.8, 1.21.9, 1.21.10, 1.21.11, 26.1.1, 26.1.2, 26.2, and 26.3**.
 Exact immutable Maven coordinates are in [verification/api-versions.txt](verification/api-versions.txt).
+The September 29 follow-up also checked the final JAR against `26.3.build.139-beta`;
+it passed the same linkage checks. This additional check does not replace the
+pinned CI matrix or change the API-only verification limit for 26.3.
 The live Paper project listing did not include 1.21.2 or 26.1 server releases, so
 those are not invented matrix entries. “1.21+” does not promise future releases.
 Spigot, Folia, Fabric, Forge, and Bedrock are not supported targets.
@@ -89,10 +92,11 @@ contents, and plugin API floor. Five fault-injection tests check that the verifi
 rejects missing members/types and static/interface mismatches and accepts inheritance.
 It does not replace the JVM verifier or check all possible runtime access semantics.
 
-The 42 behavioral tests cover group independence, handoffs, deaths/disconnects,
+The 43 behavioral tests cover group independence, handoffs, deaths/disconnects,
 pause/resume, command/menu configuration, cleanup, previous modes, task metadata,
 world-key/config preservation, colors, potion aliases, health attributes, invalid
-kits, and unsupported material task filtering. Reports are under
+kits, unsupported material task filtering, and preservation of the `fish_any`
+fishing wildcard. Reports are under
 `target/surefire-reports`, `target/reports-26.1.2`, and `target/reports-26.2`.
 CI repeats this procedure and uploads the release JAR and reports after successful
 checks. API/verifier reports are under `verification/target`.

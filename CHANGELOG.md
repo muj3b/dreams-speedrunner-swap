@@ -2,11 +2,12 @@
 
 ## 4.3.7
 
+- Fixed a follow-up regression where material validation excluded the supported `fish_any` fishing objective; added a dedicated regression test.
 - Added one-JAR compatibility targeting published Paper 1.21.x through 26.3, compiled with Java 21 against the oldest API. Paper 26.x servers require Java 25.
 - Preserved independent hunter groups and existing configuration; added stable world-key lookup for spawn, limbo, and session worlds with legacy-name fallback.
 - Updated potion registry handling and fixed legacy colors in Adventure menus, titles, and action bars across Adventure 4/5.
 - Added namespaced kit materials, isolated invalid item/armor handling, and warnings/filtering for generic material tasks unavailable on the current server without overwriting saved definitions.
-- Added repeatable cross-version checks to CI: 42 behavioral tests per matching 1.21.11, 26.1.2, and 26.2 mock; packaged-JAR linkage checks against 15 pinned APIs; five verifier self-tests.
+- Added repeatable cross-version checks to CI: 43 behavioral tests per matching 1.21.11, 26.1.2, and 26.2 mock; packaged-JAR linkage checks against 15 pinned APIs; five verifier self-tests.
 - Corrected docs: Simple Voice Chat auto-muting remains an unimplemented placeholder.
 - **Verification scope:** code-only, no Minecraft client/server playtest. Paper 26.3 build 135 is beta and API-only verified because no matching MockBukkit release is available. See [exact compatibility evidence and upgrade notes](COMPATIBILITY.md).
 
