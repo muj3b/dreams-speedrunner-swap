@@ -866,6 +866,7 @@ public class ConfigManager {
     }
 
     public void setSharedHunterControlEnabled(boolean enabled) {
+        if (plugin.getGameManager() != null && plugin.getGameManager().isSetupLocked()) return;
         config.set("swap.shared_hunter_control.enabled", enabled);
         saveConfig();
     }

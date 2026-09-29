@@ -8,15 +8,17 @@
 
 <div align="center">
 
-![Minecraft](https://img.shields.io/badge/Minecraft-1.21.x%2B-28A745?style=for-the-badge&logo=minecraft)
-![API](https://img.shields.io/badge/API-Paper%2FSpigot-2875D7?style=for-the-badge)
+![Minecraft](https://img.shields.io/badge/Minecraft-1.21.11-28A745?style=for-the-badge&logo=minecraft)
+![API](https://img.shields.io/badge/API-Paper-2875D7?style=for-the-badge)
 ![Game Modes](https://img.shields.io/badge/Game_Modes-5_in_1-8A2BE2?style=for-the-badge)
 ![Task Master](https://img.shields.io/badge/Task_Master-BETA-FF6B35?style=for-the-badge)
 ![Tasks](https://img.shields.io/badge/100%2B_Tasks-Included-FFC107?style=for-the-badge)
 
 </div>
 
-> **Experience Dream's legendary challenges in one powerful plugin! Play the classic Speedrunners vs Hunters, the cooperative Multi-Runner Control Swap, the shared-body Task Master sabotage mode, the new Task Master Duo two-body sabotage variant, or the no-swap Task Race mode where everyone plays at once. Dream mode can also run with a second shared hunter body for team-vs-team body swapping.**
+> **Experience Dream's legendary challenges in one powerful plugin! Play the classic Speedrunners vs Hunters, the cooperative Multi-Runner Control Swap, the shared-body Task Master sabotage mode, Task Master Duo, or the no-swap Task Race mode. Dream mode supports multiple independent shared hunter bodies.**
+
+Version **4.3.6** targets **Paper 1.21.11 and Java 21**. This release does not target Minecraft 26.x or claim compatibility with older server APIs. [Paper's Java requirements](https://docs.papermc.io/paper/getting-started/) and the [1.21.11 API](https://jd.papermc.io/paper/1.21.11/) are the compatibility references.
 
 ---
 
@@ -64,9 +66,32 @@ Task Race uses the same secret task pool, but removes the shared-body swap loop 
 
 Task Master Duo keeps the shared-body chaos, but splits the round into two active bodies instead of one. One group shares body A, another group shares body B, and both bodies rotate on the same interval while trying to finish their secret tasks first. That means you still get the sabotage, deception, and swap pressure from classic Task Master, but now another shared body is in the world interfering with you at the same time.
 
-## 🏹 NEW: Shared Hunter Body Option
+## 🏹 Shared Hunter Groups
 
-Dream mode can now optionally give hunters their own shared body too. That means one runner body and one hunter body can exist at the same time, each rotating between the players assigned to that side. If you want classic manhunt, leave it off. If you want Dream/George sharing the runner and Sapnap/Bad sharing the hunter, enable it from the swap settings GUI or `config.yml`.
+Dream mode can run a permanent runner against two or more shared hunter bodies. Each hunter group has its own controller queue, state, respawn point, and timer. Only one member of each group plays at a time; waiting members use the configured freeze mode. Inventory, armor, offhand, selected slot, location, health, hunger, XP, effects, and motion pass to the next controller **within that group**, never to another hunter group.
+
+Example: one runner and four hunters split into two independent bodies (replace names with online players):
+
+```text
+/swap mode dream
+/swap setrunners Runner
+/swap sethunters Alice Bob Charlie Dave
+/swap huntergroups set A Alice Bob
+/swap huntergroups set B Charlie Dave
+/swap huntergroups interval A 60
+/swap huntergroups interval B 60
+/swap start
+```
+
+Both groups can use the same interval or different intervals. A group may contain one or more players. Assigning a group enables shared hunter control. Use `/swap huntergroups gui` or **Settings → Hunter Groups** to cycle player assignments, edit timers, and remove groups; `/swap huntergroups list` shows the saved configuration. Right-click a player to unassign; shift-click the remove button to delete a group. Group names accept 1–24 letters, numbers, hyphens, or underscores.
+
+Every selected hunter must belong to exactly one nonempty group. Missing/offline members, duplicate memberships, and incomplete assignments prevent starting. Stop the round before editing teams/groups. Definitions persist in `swap.shared_hunter_control.groups`; deleting all groups restores the original one-shared-hunter-body behavior. Disable shared hunter control for classic independent hunters. Task Master Duo keeps its existing two-body behavior and does not use these groups.
+
+With `swap.pause_on_disconnect: true`, losing an active controller pauses all timers until the missing controllers return. With it disabled, the affected body hands off to its next available member; if none are online it waits with saved state. Death defers the handoff until respawn, so death drops are not duplicated. A cancelled teleport leaves the old controller in charge. Pause preserves each group's remaining timer. Round stop cancels the timers and uses the existing participant-restoration/global-spawn policy.
+
+### Build and code-level verification
+
+Run `mvn clean verify` with JDK 21. The plugin JAR is `target/speedrunnerswap-4.3.6.jar`. JUnit/MockBukkit tests cover real plugin loading, timers, state transfer, configuration, commands, menu events, disconnects, deaths, cleanup, and compatibility paths. Test libraries are not included in the plugin JAR. These are automated code-level checks, **not a Minecraft client/playtest or verification of third-party plugin interactions**.
 
 ### 🎲 100+ Unique Tasks Included!
 

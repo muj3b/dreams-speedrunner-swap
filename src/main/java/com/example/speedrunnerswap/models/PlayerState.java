@@ -38,6 +38,9 @@ public class PlayerState {
     private final float walkSpeed;
     private final float flySpeed;
     private final int portalCooldown;
+    private final int heldItemSlot;
+    private final int freezeTicks;
+    private final org.bukkit.util.Vector velocity;
     private Team selectedTeam;
 
     public int getFireTicks() {
@@ -121,7 +124,8 @@ public class PlayerState {
                       boolean allowFlight, boolean flying, Collection<PotionEffect> activePotionEffects,
                       double absorptionAmount, Entity vehicle, boolean inVehicle, int ticksLived,
                       double lastDamage, int noDamageTicks, boolean gliding, float walkSpeed,
-                      float flySpeed, int portalCooldown) {
+                      float flySpeed, int portalCooldown, int heldItemSlot, int freezeTicks,
+                      org.bukkit.util.Vector velocity) {
         this.inventory = inventory;
         this.armor = armor;
         this.offhand = offhand;
@@ -151,6 +155,9 @@ public class PlayerState {
         this.walkSpeed = walkSpeed;
         this.flySpeed = flySpeed;
         this.portalCooldown = portalCooldown;
+        this.heldItemSlot = heldItemSlot;
+        this.freezeTicks = freezeTicks;
+        this.velocity = velocity.clone();
         this.selectedTeam = Team.NONE; // Default to NONE if not provided
     }
 
@@ -161,6 +168,10 @@ public class PlayerState {
     public ItemStack[] getInventory() {
         return inventory;
     }
+
+    public int getHeldItemSlot() { return heldItemSlot; }
+    public int getFreezeTicks() { return freezeTicks; }
+    public org.bukkit.util.Vector getVelocity() { return velocity.clone(); }
 
     public ItemStack[] getArmor() {
         return armor;

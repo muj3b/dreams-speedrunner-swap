@@ -78,7 +78,6 @@ public class VoiceChatIntegration {
         }
         
         Player activeRunner = plugin.getGameManager().getActiveRunner();
-        Player activeHunter = plugin.getGameManager().getActiveHunter();
         
         for (Player runner : plugin.getGameManager().getRunners()) {
             if (!plugin.usesSharedRunnerControl() || runner.equals(activeRunner)) {
@@ -89,7 +88,7 @@ public class VoiceChatIntegration {
         }
 
         for (Player hunter : plugin.getGameManager().getHunters()) {
-            if (!plugin.usesSharedSecondBody() || hunter.equals(activeHunter)) {
+            if (!plugin.usesSharedSecondBody() || plugin.getGameManager().isActiveHunter(hunter)) {
                 unmutePlayer(hunter);
             } else {
                 mutePlayer(hunter);

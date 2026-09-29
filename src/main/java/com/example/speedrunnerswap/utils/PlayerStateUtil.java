@@ -18,8 +18,8 @@ public class PlayerStateUtil {
      */
     public static com.example.speedrunnerswap.models.PlayerState capturePlayerState(Player player) {
         return new PlayerState(
-                player.getInventory().getContents().clone(),
-                player.getInventory().getArmorContents().clone(),
+                cloneItems(player.getInventory().getContents()),
+                cloneItems(player.getInventory().getArmorContents()),
                 player.getInventory().getItemInOffHand().clone(),
                 player.getLocation().clone(),
                 player.getHealth(),
@@ -46,7 +46,10 @@ public class PlayerStateUtil {
                 player.isGliding(),
                 player.getWalkSpeed(),
                 player.getFlySpeed(),
-                player.getPortalCooldown()
+                player.getPortalCooldown(),
+                player.getInventory().getHeldItemSlot(),
+                player.getFreezeTicks(),
+                player.getVelocity()
         );
     }
 
@@ -56,18 +59,28 @@ public class PlayerStateUtil {
      * @param state The state to apply
      */
     public static void applyPlayerState(Player player, com.example.speedrunnerswap.models.PlayerState state) {
+        applyPlayerState(player, state, true);
+    }
+
+    public static void applyPlayerState(Player player, PlayerState state, boolean teleport) {
         if (player == null || state == null) return;
 
         // Inventory & offhand
         player.getInventory().clear();
-        player.getInventory().setContents(state.getInventory());
-        player.getInventory().setArmorContents(state.getArmor());
-        player.getInventory().setItemInOffHand(state.getOffhand());
+        player.getInventory().setContents(cloneItems(state.getInventory()));
+        player.getInventory().setArmorContents(cloneItems(state.getArmor()));
+        player.getInventory().setItemInOffHand(state.getOffhand() == null ? null : state.getOffhand().clone());
+        player.getInventory().setHeldItemSlot(state.getHeldItemSlot());
 
         // Location
-        if (state.getLocation() != null) {
+        if (teleport && state.getLocation() != null) {
             try { player.teleport(state.getLocation()); } catch (Throwable ignored) {}
         }
+
+        // Effects can change max health, so restore them before clamping health.
+        for (org.bukkit.potion.PotionEffect effect : player.getActivePotionEffects()) player.removePotionEffect(effect.getType());
+        if (state.getActivePotionEffects() != null)
+            for (org.bukkit.potion.PotionEffect effect : state.getActivePotionEffects()) player.addPotionEffect(effect);
 
         // Vital stats (clamp)
         double max = com.example.speedrunnerswap.utils.BukkitCompat.getMaxHealthValue(player);
@@ -85,30 +98,29 @@ public class PlayerStateUtil {
 
         // Environment
         player.setFireTicks(state.getFireTicks());
+        player.setFreezeTicks(state.getFreezeTicks());
         try { player.setMaximumAir(state.getMaximumAir()); } catch (Throwable ignored) {}
         try { player.setRemainingAir(state.getRemainingAir()); } catch (Throwable ignored) {}
 
         // Mode & motion
         if (state.getGameMode() != null) player.setGameMode(state.getGameMode());
         player.setFallDistance(state.getFallDistance());
+        player.setVelocity(state.getVelocity());
         try { player.setAllowFlight(state.isAllowFlight()); } catch (Throwable ignored) {}
         try { player.setFlying(state.isFlying()); } catch (Throwable ignored) {}
 
-        // Effects
-        try {
-            for (org.bukkit.potion.PotionEffect e : player.getActivePotionEffects()) player.removePotionEffect(e.getType());
-            if (state.getActivePotionEffects() != null) {
-                for (org.bukkit.potion.PotionEffect e : state.getActivePotionEffects()) player.addPotionEffect(e);
-            }
-        } catch (Throwable ignored) {}
-
         // Misc
         try { player.setAbsorptionAmount(state.getAbsorptionAmount()); } catch (Throwable ignored) {}
-        try { if (state.isGliding()) player.setGliding(true); } catch (Throwable ignored) {}
+        try { player.setGliding(state.isGliding()); } catch (Throwable ignored) {}
         try { player.setTicksLived(state.getTicksLived()); } catch (Throwable ignored) {}
         try { player.setNoDamageTicks(state.getNoDamageTicks()); } catch (Throwable ignored) {}
         try { player.setWalkSpeed(state.getWalkSpeed()); } catch (Throwable ignored) {}
         try { player.setFlySpeed(state.getFlySpeed()); } catch (Throwable ignored) {}
         try { player.setPortalCooldown(state.getPortalCooldown()); } catch (Throwable ignored) {}
+    }
+
+    private static org.bukkit.inventory.ItemStack[] cloneItems(org.bukkit.inventory.ItemStack[] items) {
+        return java.util.Arrays.stream(items).map(item -> item == null ? null : item.clone())
+                .toArray(org.bukkit.inventory.ItemStack[]::new);
     }
 }

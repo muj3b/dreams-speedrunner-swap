@@ -114,6 +114,7 @@ public final class GuiManager implements Listener {
     public void openTeamSelector(Player player) {
         open(player, MenuKey.TEAM_MANAGEMENT, null, false);
     }
+    public void openHunterGroups(Player player) { open(player, MenuKey.HUNTER_GROUPS, 0, false); }
 
     public void openSettingsMenu(Player player) {
         open(player, MenuKey.SETTINGS_HOME, null, false);
@@ -239,6 +240,14 @@ public final class GuiManager implements Listener {
             return;
 
         event.setCancelled(true);
+        if (!player.hasPermission("speedrunnerswap.admin")) {
+            player.sendMessage("§cAdmin permission required for this menu."); return;
+        }
+        if (event.getRawSlot() != 0 && plugin.getGameManager().isSetupLocked() && (session.request.key() == MenuKey.TEAM_MANAGEMENT
+                || session.request.key() == MenuKey.SETTINGS_SWAP || session.request.key() == MenuKey.HUNTER_GROUPS
+                || session.request.key() == MenuKey.HUNTER_GROUP_SETTINGS)) {
+            player.sendMessage("§cStop the round before changing teams or swap settings."); return;
+        }
         ItemStack current = event.getCurrentItem();
         if (current == null || current.getType() == Material.AIR)
             return;
@@ -291,6 +300,8 @@ public final class GuiManager implements Listener {
         builders.put(MenuKey.TEAM_MANAGEMENT, this::buildTeamMenu);
         builders.put(MenuKey.SETTINGS_HOME, this::buildSettingsHome);
         builders.put(MenuKey.SETTINGS_SWAP, this::buildSwapSettings);
+        builders.put(MenuKey.HUNTER_GROUPS, this::buildHunterGroups);
+        builders.put(MenuKey.HUNTER_GROUP_SETTINGS, this::buildHunterGroupSettings);
         builders.put(MenuKey.SETTINGS_SAFETY, this::buildSafetySettings);
         builders.put(MenuKey.SETTINGS_HUNTER, this::buildHunterSettings);
         builders.put(MenuKey.POWERUPS_ROOT, this::buildPowerUpsRoot);
@@ -773,6 +784,8 @@ public final class GuiManager implements Listener {
                 "§7Edit safe-swap blacklist"));
         items.add(navigateItem(30, Material.ENDER_PEARL, "§b§lMultiworld", MenuKey.SETTINGS_MULTIWORLD,
                 "§7Multiverse and respawn compatibility"));
+        items.add(navigateItem(31, Material.CROSSBOW, "§c§lHunter Groups", MenuKey.HUNTER_GROUPS,
+                "Assign independent shared hunter bodies", 0));
 
         return new MenuScreen(plugin.getConfigManager().getGuiSettingsTitle(), 54, items);
     }
@@ -824,7 +837,7 @@ public final class GuiManager implements Listener {
         items.add(toggleItem(17, Material.WITHER_SKELETON_SKULL, "§e§lShared Hunter Body",
                 cfg::isSharedHunterControlEnabled,
                 value -> cfg.setSharedHunterControlEnabled(value),
-                "§7Dream mode only: hunters share one body"));
+                "§7Dream: one shared body per configured group"));
 
         items.add(adjustItem(18, Material.CROSSBOW, "§6§lShared Hunter Interval",
                 cfg::getSharedHunterControlInterval,
@@ -2474,6 +2487,70 @@ public final class GuiManager implements Listener {
     // -----------------------------------------------------------------
     // Helper item factories
 
+    private MenuScreen buildHunterGroups(MenuContext ctx) {
+        var groups = plugin.getGameManager().getHunterGroups();
+        List<MenuItem> items = new ArrayList<>();
+        items.add(backButton(0, "§7Back", MenuKey.SETTINGS_HOME, null, this::openSettingsMenu));
+        int page = ctx.request().data() instanceof Integer n ? n : 0;
+        List<Player> hunters = plugin.getGameManager().getHunters();
+        List<String> names = new ArrayList<>(groups.definitions().keySet());
+        for (String name : List.of("A", "B")) if (!names.contains(name)) names.add(name);
+        items.add(clickItem(1, () -> icon(Material.ANVIL, "§aAdd hunter group", List.of("Creates the next numbered body")), click -> {
+            if (plugin.getGameManager().isSetupLocked()) { click.player().sendMessage("§cStop the round first."); return; }
+            int n = 1; while (groups.definitions().containsKey("Group" + n)) n++;
+            plugin.getConfig().set("swap.shared_hunter_control.groups.Group" + n + ".players", List.of());
+            plugin.saveConfig(); click.reopen();
+        }));
+        int slot = 9;
+        for (Player hunter : hunters.stream().skip(page * 27L).limit(27).toList()) {
+            String assigned = groups.definitions().entrySet().stream().filter(e -> e.getValue().stream().anyMatch(hunter.getName()::equalsIgnoreCase))
+                .map(Map.Entry::getKey).findFirst().orElse("Unassigned");
+            items.add(clickItem(slot++, () -> icon(Material.PLAYER_HEAD, "§e" + hunter.getName(),
+                List.of("§fGroup: " + assigned, "§7Click to cycle groups; right-click to unassign")), click -> {
+                if (plugin.getGameManager().isSetupLocked()) { click.player().sendMessage("§cStop the round first."); return; }
+                for (var entry : groups.definitions().entrySet()) {
+                    List<String> members = new ArrayList<>(entry.getValue()); members.removeIf(hunter.getName()::equalsIgnoreCase);
+                    plugin.getConfig().set("swap.shared_hunter_control.groups." + entry.getKey() + ".players", members);
+                }
+                if (click.click() != ClickType.RIGHT) {
+                    String target = names.get((names.indexOf(assigned) + 1) % names.size());
+                    List<String> members = new ArrayList<>(groups.definitions().getOrDefault(target, List.of()));
+                    members.add(hunter.getName()); groups.configure(target, members);
+                }
+                plugin.saveConfig(); click.reopen();
+            }));
+        }
+        items.add(simpleItem(4, () -> icon(Material.BOOK, "§eHunter groups", List.of(
+            "§7Select hunters in the team menu first.", "§7Each group controls one independent body.",
+            "§7/swap huntergroups interval A 60", "§7/swap huntergroups remove A", "§7Empty groups prevent starting a match."))));
+        int groupSlot = 36;
+        for (String name : names.stream().skip(page * 9L).limit(9).toList()) {
+            items.add(navigateItem(groupSlot++, Material.CLOCK, "§eGroup " + name, MenuKey.HUNTER_GROUP_SETTINGS,
+                "Interval, members and removal", name));
+        }
+        if (page > 0) items.add(navigateItem(45, Material.ARROW, "Previous", MenuKey.HUNTER_GROUPS, "Previous hunters", page - 1));
+        if (hunters.size() > (page + 1) * 27 || names.size() > (page + 1) * 9) items.add(navigateItem(53, Material.ARROW, "Next", MenuKey.HUNTER_GROUPS, "Next hunters/groups", page + 1));
+        return new MenuScreen("Hunter Groups", 54, items);
+    }
+
+    private MenuScreen buildHunterGroupSettings(MenuContext ctx) {
+        String name = String.valueOf(ctx.request().data());
+        var groups = plugin.getGameManager().getHunterGroups();
+        List<MenuItem> items = new ArrayList<>();
+        items.add(backButton(0, "§7Back", MenuKey.HUNTER_GROUPS, 0, this::openHunterGroups));
+        items.add(simpleItem(13, () -> icon(Material.PLAYER_HEAD, "§eGroup " + name,
+            groups.definitions().getOrDefault(name, List.of("Assign players from the previous screen")))));
+        if (groups.definitions().containsKey(name)) {
+            items.add(adjustItem(11, Material.CLOCK, "§eSwap interval", () -> groups.interval(name),
+                seconds -> groups.setInterval(name, seconds), 5, 30, 1, 3600, "Seconds between turns for this body"));
+            items.add(clickItem(15, () -> icon(Material.BARRIER, "§cRemove group", List.of("Shift-click to confirm removal")), click -> {
+                if (!click.shift()) { click.player().sendMessage("§eShift-click to confirm."); return; }
+                groups.remove(name); openHunterGroups(click.player());
+            }));
+        }
+        return new MenuScreen("Hunter " + name, 27, items);
+    }
+
     private MenuItem simpleItem(int slot, Supplier<ItemStack> icon) {
         return new MenuItem("static-" + slot, slot, ctx -> icon.get(), null);
     }
@@ -2659,6 +2736,8 @@ public final class GuiManager implements Listener {
         TEAM_MANAGEMENT,
         SETTINGS_HOME,
         SETTINGS_SWAP,
+        HUNTER_GROUPS,
+        HUNTER_GROUP_SETTINGS,
         SETTINGS_SAFETY,
         SETTINGS_HUNTER,
         POWERUPS_ROOT,

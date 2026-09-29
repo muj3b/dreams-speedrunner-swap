@@ -1,4 +1,4 @@
-# SpeedrunnerSwap — Dream-style Swap VS Hunters (Paper/Spigot 1.21+)
+# SpeedrunnerSwap — Dream-style Swap VS Hunters (Paper 1.21.11)
 
 ## Description
 
@@ -59,8 +59,8 @@ This plugin provides a complete, ready-to-use implementation with intuitive GUIs
 
 ## Requirements
 
-- Java 17 or higher
-- Paper/Spigot 1.21+
+- Java 21
+- Paper 1.21.11 (4.3.6 targets this API, not Minecraft 26)
 
 ## Support
 

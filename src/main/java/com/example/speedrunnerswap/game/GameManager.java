@@ -10,8 +10,6 @@ import org.bukkit.*;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.EnderDragon;
 import org.bukkit.entity.Player;
-import org.bukkit.event.inventory.InventoryType;
-import org.bukkit.inventory.InventoryView;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
@@ -27,6 +25,9 @@ import java.util.concurrent.ThreadLocalRandom;
 
 public class GameManager {
     private final SpeedrunnerSwap plugin;
+    private final HunterGroupManager hunterGroups;
+    private BukkitTask startCountdown;
+    private boolean ending;
     private boolean gameRunning;
     private boolean gamePaused;
     private Player activeRunner;
@@ -63,25 +64,13 @@ public class GameManager {
     private String sessionWorldName;
     private boolean spawnSyncInFlight;
 
-    private static final EnumSet<InventoryType> RETURN_CONTAINERS = EnumSet.of(
-            InventoryType.CRAFTING,
-            InventoryType.WORKBENCH,
-            InventoryType.SMITHING,
-            InventoryType.CARTOGRAPHY,
-            InventoryType.GRINDSTONE,
-            InventoryType.STONECUTTER,
-            InventoryType.LOOM,
-            InventoryType.ANVIL,
-            InventoryType.ENCHANTING,
-            InventoryType.MERCHANT,
-            InventoryType.BEACON);
-
     private static final long TASK_INTRO_DELAY_TICKS = 8L * 20L;
     private static final int RESPAWN_SEARCH_RADIUS = 6;
     private static final int RESPAWN_VERTICAL_RANGE = 8;
 
     public GameManager(SpeedrunnerSwap plugin) {
         this.plugin = plugin;
+        this.hunterGroups = new HunterGroupManager(plugin);
         this.gameRunning = false;
         this.gamePaused = false;
         this.activeRunnerIndex = 0;
@@ -135,13 +124,32 @@ public class GameManager {
     }
 
     public boolean isActiveHunter(Player player) {
+        if (plugin.usesSharedHunterControl()) return hunterGroups.isActive(player);
         return player != null && activeHunter != null && player.getUniqueId().equals(activeHunter.getUniqueId());
+    }
+
+    public HunterGroupManager getHunterGroups() { return hunterGroups; }
+    public void prepareHunterHandoff(Player p) { reclaimOpenContainerItems(p); }
+    public boolean isSetupLocked() { return gameRunning || startCountdown != null || ending; }
+    public void pauseForHunterDisconnect() { if (pauseGame()) pausedByDisconnect = true; }
+    public void resumeAfterHunterReconnect() { if (pausedByDisconnect && canResumeAfterDisconnectPause()) resumeGame(); }
+    public void releaseHunterController(Player p) {
+        cagedPlayers.remove(p.getUniqueId());
+        for (PotionEffect effect : p.getActivePotionEffects()) p.removePotionEffect(effect.getType());
+        p.setGameMode(GameMode.SURVIVAL);
+        p.setFlying(false);
+        p.setAllowFlight(false);
+        for (Player viewer : Bukkit.getOnlinePlayers()) viewer.showPlayer(plugin, p);
+    }
+    public void applyHunterGroupRestrictions() {
+        for (Player p : hunters) if (p.isOnline() && !hunterGroups.isActive(p))
+            applySharedControlEffects(List.of(p), null, plugin.getConfigManager().getFreezeMode());
     }
 
     // shuffleQueue() is implemented later in this class
 
     public boolean startGame() {
-        if (gameRunning) {
+        if (isSetupLocked()) {
             return false;
         }
 
@@ -180,11 +188,15 @@ public class GameManager {
             return false;
         }
 
+        if (plugin.usesSharedHunterControl()) {
+            String error = hunterGroups.validate(hunters);
+            if (error != null) { Msg.broadcast("§c" + error); return false; }
+        }
         // Capture mode for countdown presentation
         final SpeedrunnerSwap.SwapMode countdownMode = plugin.getCurrentMode();
 
         // Countdown
-        new BukkitRunnable() {
+        startCountdown = new BukkitRunnable() {
             int count = 3;
 
             @Override
@@ -203,6 +215,11 @@ public class GameManager {
                     }
                     count--;
                 } else {
+                    if (!canStartGame() || (plugin.usesSharedHunterControl() && hunterGroups.validate(hunters) != null)) {
+                        this.cancel(); startCountdown = null;
+                        Msg.broadcast("§cStart cancelled: participants changed during the countdown.");
+                        return;
+                    }
                     String goTitle = switch (countdownMode) {
                         case DREAM -> "§b§lDream Swap GO!";
                         case SAPNAP -> "§d§lSapnap swap GO!";
@@ -214,6 +231,7 @@ public class GameManager {
                         BukkitCompat.showTitle(player, goTitle, "§7Made by muj4b", 10, 60, 10);
                     }
                     this.cancel();
+                    startCountdown = null;
                     gameRunning = true;
                     gamePaused = false;
                     activeRunnerIndex = 0;
@@ -223,8 +241,7 @@ public class GameManager {
                             ? hunters.get(activeHunterIndex)
                             : null;
                     initializeSessionWorld();
-                    playerStates.clear();
-                    restorableParticipantIds.clear();
+                    // Retain pending restorations for offline participants from previous rounds.
                     saveAllPlayerStates();
                     portalSwapRetries.clear();
                     swapInProgress = false;
@@ -243,6 +260,7 @@ public class GameManager {
                     if (plugin.usesSharedRunnerControl()) {
                         scheduleNextSwap();
                     }
+                    if (plugin.usesSharedHunterControl()) hunterGroups.start(hunters);
                     if (plugin.getCurrentMode() == com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode.DREAM
                             || plugin.isDualBodyTaskMode()) {
                         scheduleNextHunterSwap();
@@ -287,9 +305,8 @@ public class GameManager {
                             && plugin.getConfigManager().isTrackerEnabled()) {
                         plugin.getTrackerManager().startTracking();
                         if (plugin.usesSharedHunterControl()) {
-                            if (activeHunter != null && activeHunter.isOnline()) {
-                                plugin.getTrackerManager().giveTrackingCompass(activeHunter);
-                            }
+                            for (Player hunter : hunterGroups.activePlayers())
+                                plugin.getTrackerManager().giveTrackingCompass(hunter);
                         } else {
                             for (Player hunter : hunters) {
                                 if (hunter.isOnline()) {
@@ -369,6 +386,9 @@ public class GameManager {
     }
 
     private void finalizeGameEnd(String endMessage) {
+        if (ending) return;
+        ending = true;
+        hunterGroups.stop();
         activeTaskParticipantIds.clear();
         try {
             if (plugin.getTaskManagerMode() != null) {
@@ -409,9 +429,7 @@ public class GameManager {
         } catch (Exception ignored) {
         }
 
-        new BukkitRunnable() {
-            @Override
-            public void run() {
+        {
                 // Optionally preserve final runner progress for all runners (configurable)
                 if (plugin.getConfig().getBoolean("swap.preserve_runner_progress_on_end", false)) {
                     try {
@@ -428,6 +446,7 @@ public class GameManager {
                 }
 
                 cleanupAllCages();
+                gameRunning = false;
                 restoreAllPlayerStates();
 
                 // Reset voice chat mute status so all players can talk again
@@ -439,6 +458,7 @@ public class GameManager {
                 }
 
                 gameRunning = false;
+                ending = false;
                 gamePaused = false;
                 activeRunner = null;
                 activeHunter = null;
@@ -455,8 +475,7 @@ public class GameManager {
                 }
 
                 broadcastDonationMessage(getOnlineGameParticipants());
-            }
-        }.runTaskLater(plugin, 200L);
+        }
     }
 
     private String formatEndGameBroadcast(Team winner) {
@@ -508,6 +527,7 @@ public class GameManager {
 
     /** Stop the game without declaring a winner */
     public void stopGame() {
+        if (startCountdown != null) { startCountdown.cancel(); startCountdown = null; }
         endGame(null);
     }
 
@@ -518,6 +538,7 @@ public class GameManager {
      * @return true if the player is a hunter
      */
     public boolean isHunter(Player player) {
+        if (plugin.usesSharedHunterControl() && hunterGroups.contains(player)) return true;
         return player != null && containsPlayerByUuid(hunters, player.getUniqueId());
     }
 
@@ -550,6 +571,7 @@ public class GameManager {
     }
 
     public Player getActiveHunter() {
+        if (plugin.usesSharedHunterControl()) return hunterGroups.activePlayers().stream().findFirst().orElse(null);
         return activeHunter;
     }
 
@@ -634,6 +656,7 @@ public class GameManager {
      * Update teams after player join/leave
      */
     public void updateTeams() {
+        if (gameRunning && plugin.usesSharedHunterControl()) return; // UUID memberships survive reconnects.
         List<Player> newRunners = new ArrayList<>();
         List<Player> newHunters = new ArrayList<>();
 
@@ -698,6 +721,10 @@ public class GameManager {
         if (!gameRunning) {
             return;
         }
+        if (plugin.usesSharedHunterControl() && hunterGroups.contains(player)) {
+            hunterGroups.quit(player);
+            return;
+        }
 
         if (isRunner(player) || isTaskCompetitionParticipant(player)) {
             runnerDisconnectAt.put(player.getUniqueId(), System.currentTimeMillis());
@@ -755,6 +782,7 @@ public class GameManager {
         if (!gameRunning)
             return;
         synchronizeRejoinedPlayer(player);
+        if (plugin.usesSharedHunterControl()) hunterGroups.join(player);
         runnerDisconnectAt.remove(player.getUniqueId());
         clearRuntimeDisconnectTime(player.getUniqueId());
         if (plugin.isTaskCompetitionMode()) {
@@ -997,6 +1025,7 @@ public class GameManager {
             }
         }
         for (Player participant : participants.values()) {
+            playerStates.remove(participant.getUniqueId());
             savePlayerState(participant);
         }
     }
@@ -1008,7 +1037,7 @@ public class GameManager {
 
         reclaimOpenContainerItems(player);
         PlayerState state = PlayerStateUtil.capturePlayerState(player);
-        playerStates.put(player.getUniqueId(), state);
+        playerStates.putIfAbsent(player.getUniqueId(), state);
         restorableParticipantIds.add(player.getUniqueId());
     }
 
@@ -1016,7 +1045,7 @@ public class GameManager {
         Set<UUID> restored = new HashSet<>();
         for (UUID participantId : new HashSet<>(restorableParticipantIds)) {
             Player player = Bukkit.getPlayer(participantId);
-            if (player == null || !player.isOnline()) {
+            if (player == null || !player.isOnline() || player.isDead()) {
                 continue;
             }
 
@@ -1063,7 +1092,7 @@ public class GameManager {
     }
 
     public void restorePendingStateIfNeeded(Player player) {
-        if (player == null || gameRunning) {
+        if (player == null || player.isDead() || (gameRunning && (isRunner(player) || isHunter(player)))) {
             return;
         }
         UUID uuid = player.getUniqueId();
@@ -1128,45 +1157,9 @@ public class GameManager {
         if (player == null || !player.isOnline()) {
             return;
         }
-        try {
-            InventoryView view = player.getOpenInventory();
-            if (view == null) {
-                return;
-            }
-
-            InventoryType type = view.getType();
-            if (!RETURN_CONTAINERS.contains(type)) {
-                return;
-            }
-
-            // Handle item on cursor first
-            ItemStack cursor = view.getCursor();
-            if (cursor != null && !cursor.getType().isAir()) {
-                ItemStack cursorClone = cursor.clone();
-                view.setCursor(null);
-                Map<Integer, ItemStack> overflow = player.getInventory().addItem(cursorClone);
-                if (!overflow.isEmpty()) {
-                    overflow.values()
-                            .forEach(stack -> player.getWorld().dropItemNaturally(player.getLocation(), stack));
-                }
-            }
-
-            org.bukkit.inventory.Inventory top = view.getTopInventory();
-            for (int i = 0; i < top.getSize(); i++) {
-                ItemStack stack = top.getItem(i);
-                if (stack == null || stack.getType().isAir()) {
-                    continue;
-                }
-                ItemStack clone = stack.clone();
-                top.setItem(i, null);
-                Map<Integer, ItemStack> overflow = player.getInventory().addItem(clone);
-                if (!overflow.isEmpty()) {
-                    overflow.values().forEach(item -> player.getWorld().dropItemNaturally(player.getLocation(), item));
-                }
-            }
-            player.updateInventory();
-        } catch (Throwable ignored) {
-        }
+        // Vanilla returns cursor and personal crafting inputs on close. Copying the
+        // top inventory would also steal container contents or duplicate recipe outputs.
+        player.closeInventory();
     }
 
     private void loadTeams() {
@@ -1213,7 +1206,7 @@ public class GameManager {
         if (swapTask != null) {
             swapTask.cancel();
         }
-        if (!plugin.usesSharedRunnerControl()) {
+        if (!plugin.usesSharedRunnerControl() || runners.size() < 2) {
             nextSwapTime = System.currentTimeMillis();
             return;
         }
@@ -1226,6 +1219,7 @@ public class GameManager {
     }
 
     private void scheduleNextHunterSwap() {
+        if (plugin.usesSharedHunterControl()) return; // Each body owns its timer.
         if (hunterSwapTask != null) {
             hunterSwapTask.cancel();
         }
@@ -1299,6 +1293,7 @@ public class GameManager {
             boolean isActive = isActiveRunner(player);
             boolean isActiveHunter = isActiveHunter(player);
             boolean isCaged = cagedPlayers.contains(player.getUniqueId());
+            if (isHunter && plugin.usesSharedHunterControl()) hunterTimeLeft = hunterGroups.seconds(player);
 
             String vis;
             if (isRunner) {
@@ -1322,13 +1317,17 @@ public class GameManager {
                 if (isCaged && ((isRunner && !isActive) || (isHunter && plugin.usesSharedSecondBody() && !isActiveHunter))) {
                     int queuePosition = isRunner
                             ? getQueuePosition(runners, activeRunner, player)
-                            : getQueuePosition(hunters, activeHunter, player);
-                    String msg = String.format("§6Queued (%d) - You're up next", queuePosition);
+                            : plugin.usesSharedHunterControl()
+                                ? getQueuePosition(hunterGroups.membersFor(player), hunterGroups.activeFor(player), player)
+                                : getQueuePosition(hunters, activeHunter, player);
+                    String msg = String.format("§6Queue position: %d%s", queuePosition, queuePosition == 1 ? " - You're up next" : "");
                     com.example.speedrunnerswap.utils.ActionBarUtil.sendActionBar(player, msg);
                 } else {
                     int displayTime = isHunter && plugin.usesSharedSecondBody() ? hunterTimeLeft : timeLeft;
-                    String label = isHunter && plugin.usesSharedSecondBody() ? "Second body in" : "Swap in";
-                    String msg = String.format("§e%s: §c%ds", label, Math.max(0, displayTime));
+                    String label = isHunter && plugin.usesSharedHunterControl() ? "Hunter " + hunterGroups.label(player) + " in"
+                        : isHunter && plugin.usesSharedSecondBody() ? "Second body in" : "Swap in";
+                    String msg = isRunner && runners.size() == 1 ? "§ePermanent runner"
+                            : String.format("§e%s: §c%ds", label, Math.max(0, displayTime));
                     com.example.speedrunnerswap.utils.ActionBarUtil.sendActionBar(player, msg);
                 }
             } else {
@@ -1342,15 +1341,15 @@ public class GameManager {
             if (!isHunter(player))
                 return 0;
 
-        int position = 1;
-        for (Player participant : group) {
-            if (participant.equals(player))
-                break;
-            if (participant.isOnline() && !participant.equals(active)) {
-                position++;
-            }
+        if (group.isEmpty() || player.equals(active)) return 0;
+        int position = 0;
+        int start = group.indexOf(active);
+        for (int offset = 1; offset <= group.size(); offset++) {
+            Player participant = group.get(Math.floorMod(start + offset, group.size()));
+            if (participant.isOnline() && !participant.equals(active)) position++;
+            if (participant.equals(player)) return position;
         }
-        return position;
+        return 0;
     }
 
     private Location prepareSafeSpawn(Location base, World fallbackWorld) {
@@ -1438,7 +1437,9 @@ public class GameManager {
         String freezeMode = plugin.getConfigManager().getFreezeMode();
 
         applySharedControlEffects(runners, activeRunner, freezeMode);
-        if (plugin.usesSharedSecondBody()) {
+        if (plugin.usesSharedHunterControl()) {
+            applyHunterGroupRestrictions();
+        } else if (plugin.usesSharedSecondBody()) {
             applySharedControlEffects(hunters, activeHunter, freezeMode);
         }
     }
@@ -1601,6 +1602,8 @@ public class GameManager {
     }
 
     private void performSwap() {
+        if (ending) return;
+        if (runners.size() == 1 && !plugin.isTaskCompetitionMode()) return;
         if (!plugin.usesSharedRunnerControl()) {
             return;
         }
@@ -1865,6 +1868,7 @@ public class GameManager {
     }
 
     private void ensureHunterQueueCoherence() {
+        if (plugin.usesSharedHunterControl()) return;
         List<Player> cleaned = new ArrayList<>();
         java.util.Set<java.util.UUID> seen = new java.util.HashSet<>();
 
@@ -1917,6 +1921,8 @@ public class GameManager {
     }
 
     private void performHunterSwap() {
+        if (ending) return;
+        if (plugin.usesSharedHunterControl()) { hunterGroups.swapAll(); return; }
         if (!gameRunning || gamePaused || hunters.size() < 2) {
             return;
         }
@@ -2095,6 +2101,7 @@ public class GameManager {
             return false;
         }
         gamePaused = true;
+        if (plugin.usesSharedHunterControl()) hunterGroups.pause();
         pausedByDisconnect = false;
         if (swapTask != null) {
             swapTask.cancel();
@@ -2125,7 +2132,7 @@ public class GameManager {
             }
         }
         Player ah = getActiveHunter();
-        if (plugin.usesSharedSecondBody() && ah != null) {
+        if (plugin.usesSharedSecondBody() && !plugin.usesSharedHunterControl() && ah != null) {
             try {
                 ah.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS, 60, 10, false, false));
             } catch (Throwable ignored) {
@@ -2145,7 +2152,9 @@ public class GameManager {
         if (!gameRunning || !gamePaused) {
             return false;
         }
+        if (ending || (plugin.usesSharedHunterControl() && !hunterGroups.ready())) return false;
         gamePaused = false;
+        if (plugin.usesSharedHunterControl()) hunterGroups.resume();
         pausedByDisconnect = false;
         reselectSessionLeader();
         if (plugin.usesSharedRunnerControl()) {
@@ -2201,6 +2210,7 @@ public class GameManager {
 
     /** Replace runners list and update config team names */
     public void setRunners(java.util.List<Player> players) {
+        if (isSetupLocked()) return;
         java.util.LinkedHashSet<Player> unique = new java.util.LinkedHashSet<>(players);
         java.util.List<String> names = new java.util.ArrayList<>();
         for (Player p : unique)
@@ -2347,6 +2357,7 @@ public class GameManager {
 
     /** Replace hunters list and update config team names */
     public void setHunters(java.util.List<Player> players) {
+        if (isSetupLocked()) return;
         java.util.LinkedHashSet<Player> unique = new java.util.LinkedHashSet<>(players);
         java.util.List<String> names = new java.util.ArrayList<>();
         for (Player p : unique)
@@ -2376,6 +2387,7 @@ public class GameManager {
     }
 
     public String getAssignmentRestrictionReason(Player target, Team team, World referenceWorld) {
+        if (isSetupLocked()) return "Stop the round before changing teams.";
         if (target == null) {
             return "No player selected.";
         }
@@ -2517,6 +2529,7 @@ public class GameManager {
     }
 
     public boolean assignPlayerToTeam(Player target, Team team, World referenceWorld) {
+        if (isSetupLocked()) return false;
         if (target == null)
             return false;
 
@@ -2631,10 +2644,10 @@ public class GameManager {
             if (!runnerGroup && !secondBodyGroup)
                 continue;
 
-            boolean isActive = runnerGroup ? p.equals(current) : p.equals(currentHunter);
+            boolean isActive = runnerGroup ? p.equals(current) : isActiveHunter(p);
             boolean isCaged = cagedPlayers.contains(p.getUniqueId());
-            int displayTime = runnerGroup ? timeLeft : hunterTimeLeft;
-            String label = runnerGroup ? "Swap in" : "Second body in";
+            int displayTime = runnerGroup ? timeLeft : plugin.usesSharedHunterControl() ? hunterGroups.seconds(p) : hunterTimeLeft;
+            String label = runnerGroup ? "Swap in" : plugin.usesSharedHunterControl() ? "Hunter " + hunterGroups.label(p) + " in" : "Second body in";
 
             // For caged players, show large aesthetic title
             if (isCaged && !isActive) {
@@ -2868,8 +2881,10 @@ public class GameManager {
             if (!"CAGE".equalsIgnoreCase(plugin.getConfigManager().getFreezeMode()))
                 return;
             // Ensure a cage exists in each runner's current world and enforce
-            for (Player r : runners) {
-                if (r.equals(activeRunner))
+            List<Player> waiting = new ArrayList<>(runners);
+            if (plugin.usesSharedSecondBody()) waiting.addAll(hunters);
+            for (Player r : waiting) {
+                if (isActiveRunner(r) || isActiveHunter(r))
                     continue;
                 if (!r.isOnline())
                     continue;
@@ -2958,6 +2973,7 @@ public class GameManager {
         if (!hasOnlinePlayer(runners)) {
             return false;
         }
+        if (plugin.usesSharedHunterControl() && !hunterGroups.ready()) return false;
         if (plugin.isTaskCompetitionMode()) {
             if (plugin.isDualBodyTaskMode() && !hasOnlinePlayer(hunters)) {
                 return false;

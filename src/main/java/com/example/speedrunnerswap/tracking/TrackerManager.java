@@ -101,6 +101,8 @@ public class TrackerManager {
         if (hunter == null || !hunter.isOnline()) {
             return;
         }
+        if (plugin.getGameManager().isGameRunning() && plugin.usesSharedHunterControl()
+                && !plugin.getGameManager().isActiveHunter(hunter)) return;
         if (plugin.getCurrentMode() != com.example.speedrunnerswap.SpeedrunnerSwap.SwapMode.DREAM) {
             return;
         }
@@ -215,11 +217,7 @@ public class TrackerManager {
 
     private java.util.List<Player> getTrackedHunters() {
         if (plugin.usesSharedHunterControl()) {
-            Player activeHunter = plugin.getGameManager().getActiveHunter();
-            if (activeHunter == null) {
-                return java.util.Collections.emptyList();
-            }
-            return java.util.Collections.singletonList(activeHunter);
+            return plugin.getGameManager().getHunterGroups().activePlayers();
         }
         return plugin.getGameManager().getHunters();
     }

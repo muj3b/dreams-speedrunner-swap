@@ -228,6 +228,8 @@ public class EventListeners implements Listener {
     @EventHandler(priority = EventPriority.HIGHEST)
     public void onPlayerDeath(PlayerDeathEvent event) {
         Player player = event.getEntity();
+        if (plugin.getGameManager().isGameRunning() && plugin.usesSharedHunterControl())
+            plugin.getGameManager().getHunterGroups().died(player);
 
         // Optionally suppress vanilla death messages during active games to maintain mystery.
         if (plugin.getGameManager().isGameRunning()
@@ -318,6 +320,18 @@ public class EventListeners implements Listener {
     @EventHandler
     public void onPlayerRespawn(PlayerRespawnEvent event) {
         Player player = event.getPlayer();
+        if (!plugin.getGameManager().isGameRunning()) {
+            plugin.getServer().getScheduler().runTask(plugin, () -> plugin.getGameManager().restorePendingStateIfNeeded(player));
+            return;
+        }
+        if (plugin.getGameManager().isGameRunning() && plugin.usesSharedHunterControl()
+                && plugin.getGameManager().isHunter(player)) {
+            plugin.getServer().getScheduler().runTask(plugin, () -> {
+                if (plugin.getGameManager().isGameRunning() && player.isOnline())
+                    plugin.getGameManager().getHunterGroups().respawned(player);
+            });
+            return;
+        }
 
         if (plugin.getGameManager().isRunner(player)) {
             if (plugin.isParallelTaskMode() && (event.isBedSpawn() || event.isAnchorSpawn())) {
@@ -404,7 +418,7 @@ public class EventListeners implements Listener {
         } else if (plugin.usesSharedSecondBody()
                 && plugin.getGameManager().isHunter(victim)
                 && !plugin.getGameManager().isActiveHunter(victim)) {
-            if ("CAGE".equalsIgnoreCase(plugin.getConfigManager().getFreezeMode())) {
+            if (plugin.usesSharedHunterControl() || "CAGE".equalsIgnoreCase(plugin.getConfigManager().getFreezeMode())) {
                 event.setCancelled(true);
             }
         }

@@ -34,14 +34,20 @@ swap:
     clamp: true
   # Grace period after swaps (in ticks, 20 ticks = 1 second)
   grace_period_ticks: 40
-  # Auto-pause if a runner disconnects
+  # Auto-pause if a runner or active shared hunter disconnects
   pause_on_disconnect: true
   # If true, apply the final active runner's state to all runners when ending the game
   preserve_runner_progress_on_end: false
-  # Optional second shared body for Dream mode hunters
+  # Optional independent shared bodies for Dream mode hunter groups
   shared_hunter_control:
     enabled: false
     interval: 60
+    # Empty preserves the original single shared hunter body.
+    # Every selected hunter must belong to exactly one group when groups are set.
+    # /swap huntergroups set A Alice Bob
+    # /swap huntergroups set B Charlie Dave
+    # Each group can have its own interval via /swap huntergroups interval A 60.
+    groups: {}
   # Legacy full-team hunter shuffle (ignored while shared_hunter_control is enabled)
   hunter_swap:
     enabled: false

@@ -22,7 +22,7 @@ import com.example.speedrunnerswap.utils.BukkitCompat;
 // Removed unused Bukkit import
 import org.bukkit.plugin.java.JavaPlugin;
 
-public final class SpeedrunnerSwap extends JavaPlugin {
+public class SpeedrunnerSwap extends JavaPlugin {
 
     private static SpeedrunnerSwap instance;
     public static final String DONATION_URL = "https://donate.stripe.com/8x29AT0H58K03judnR0Ba01";
@@ -125,13 +125,10 @@ public final class SpeedrunnerSwap extends JavaPlugin {
 
     @Override
     public void onDisable() {
-        // Stop the game if it's running
-        if (gameManager.isGameRunning()) {
-            gameManager.stopGame();
-        }
+        if (gameManager != null) gameManager.stopGame();
 
         // Save config
-        configManager.saveConfig();
+        if (configManager != null) configManager.saveConfig();
 
         // Log shutdown
         getLogger().info("SpeedrunnerSwap disabled");
@@ -294,6 +291,7 @@ public final class SpeedrunnerSwap extends JavaPlugin {
     }
 
     public void setCurrentMode(SwapMode mode) {
+        if (gameManager != null && gameManager.isSetupLocked()) return;
         if (mode == null)
             mode = SwapMode.DREAM;
         this.currentMode = mode;

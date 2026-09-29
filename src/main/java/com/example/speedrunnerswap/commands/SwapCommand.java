@@ -70,7 +70,7 @@ public class SwapCommand implements CommandExecutor, TabCompleter {
         sender.sendMessage("§e/swap interval <seconds> §7Set base swap interval");
         sender.sendMessage("§e/swap randomize <on|off> §7Toggle randomized swaps");
         sender.sendMessage("§e/swap mode <dream|sapnap|task|taskduel|taskrace> §7Set mode");
-        sender.sendMessage("§7Dream mode can optionally use a shared hunter body from the GUI/config.");
+        sender.sendMessage("§e/swap huntergroups list|set|remove|interval|gui §7Configure independent hunter bodies");
         sender.sendMessage("§7Task Master Duo is the two-shared-bodies task variant.");
         sender.sendMessage("§e/swap tasks list §7List tasks with difficulty + enabled");
         sender.sendMessage("§e/swap tasks enable|disable <id> §7Toggle a task");
@@ -88,8 +88,13 @@ public class SwapCommand implements CommandExecutor, TabCompleter {
             }
 
             String subCommand = args[0].toLowerCase();
+            if (plugin.getGameManager().isSetupLocked() && java.util.Set.of("setrunners", "sethunters", "reload", "clearteams").contains(subCommand)) {
+                sender.sendMessage("§cStop the round before changing its setup."); return true;
+            }
 
             switch (subCommand) {
+                case "huntergroups":
+                    return handleHunterGroups(sender, Arrays.copyOfRange(args, 1, args.length));
                 case "start":
                     return handleStart(sender);
                 case "stop":
@@ -186,12 +191,12 @@ public class SwapCommand implements CommandExecutor, TabCompleter {
             return false;
         }
 
-        if (plugin.getGameManager().isGameRunning() && !force) {
+        if (plugin.getGameManager().isSetupLocked() && !force) {
             sender.sendMessage("§cStop the current game before switching modes. Add --force to end it and switch now.");
             return false;
         }
 
-        if (force && plugin.getGameManager().isGameRunning()) {
+        if (force && plugin.getGameManager().isSetupLocked()) {
             plugin.getGameManager().stopGame();
         }
 
@@ -210,6 +215,35 @@ public class SwapCommand implements CommandExecutor, TabCompleter {
             plugin.getGuiManager().openMainMenu(player);
         }
 
+        return true;
+    }
+
+    private boolean handleHunterGroups(CommandSender sender, String[] args) {
+        if (!sender.hasPermission("speedrunnerswap.admin")) { sender.sendMessage("§cAdmin permission required."); return true; }
+        var game = plugin.getGameManager();
+        var groups = game.getHunterGroups();
+        if (args.length == 0 || args[0].equalsIgnoreCase("list")) {
+            if (groups.definitions().isEmpty()) sender.sendMessage("§eNo groups configured: shared hunters use one body.");
+            groups.definitions().forEach((name, players) -> sender.sendMessage("§e" + name + " §f(" + groups.interval(name) + "s): " + String.join(", ", players)));
+            sender.sendMessage("§7/swap huntergroups set <group> <players...> | remove <group> | interval <group> <seconds> | gui");
+            return true;
+        }
+        if (args[0].equalsIgnoreCase("gui") && sender instanceof Player p) { plugin.getGuiManager().openHunterGroups(p); return true; }
+        if (game.isSetupLocked()) { sender.sendMessage("§cStop the round before changing hunter groups."); return true; }
+        try {
+            if (args.length >= 3 && args[0].equalsIgnoreCase("set")) {
+                List<String> names = new ArrayList<>();
+                for (int i = 2; i < args.length; i++) {
+                    Player p = Bukkit.getPlayerExact(args[i]);
+                    if (p == null || !game.isHunter(p)) throw new IllegalArgumentException("First select " + args[i] + " as a hunter with /swap sethunters or the team menu.");
+                    names.add(p.getName());
+                }
+                groups.configure(args[1], names);
+            } else if (args.length == 2 && args[0].equalsIgnoreCase("remove")) groups.remove(args[1]);
+            else if (args.length == 3 && args[0].equalsIgnoreCase("interval")) groups.setInterval(args[1], Integer.parseInt(args[2]));
+            else throw new IllegalArgumentException("Use /swap huntergroups list for commands.");
+            sender.sendMessage("§aHunter groups saved. Shared hunter control is enabled when assigning a group.");
+        } catch (IllegalArgumentException ex) { sender.sendMessage("§c" + ex.getMessage()); }
         return true;
     }
 
@@ -314,8 +348,7 @@ public class SwapCommand implements CommandExecutor, TabCompleter {
             sender.sendMessage("§cYou do not have permission to run this.");
             return true;
         }
-        plugin.getGameManager().resumeGame();
-        sender.sendMessage("§aGame resumed.");
+        sender.sendMessage(plugin.getGameManager().resumeGame() ? "§aGame resumed." : "§cCannot resume: no paused round, or an active controller has not returned/respawned.");
         return true;
     }
     
@@ -329,6 +362,10 @@ public class SwapCommand implements CommandExecutor, TabCompleter {
         sender.sendMessage("§eCurrent Mode: §f" + modeName(plugin.getCurrentMode()));
         sender.sendMessage("§eGame Running: §f" + plugin.getGameManager().isGameRunning());
         sender.sendMessage("§eGame Paused: §f" + plugin.getGameManager().isGamePaused());
+        if (plugin.usesSharedHunterControl()) {
+            var groups = plugin.getGameManager().getHunterGroups();
+            for (Player p : groups.activePlayers()) sender.sendMessage("§eHunter " + groups.label(p) + ": §f" + p.getName() + " (" + groups.seconds(p) + "s)");
+        }
         sender.sendMessage("§eSession World: §f" + (plugin.getGameManager().getSessionWorldName() != null
                 ? plugin.getGameManager().getSessionWorldName()
                 : "Not set"));
@@ -354,7 +391,7 @@ public class SwapCommand implements CommandExecutor, TabCompleter {
             List<Player> runners = plugin.getGameManager().getRunners();
             List<Player> hunters = plugin.getGameManager().getHunters();
 
-            if (plugin.usesSharedSecondBody()) {
+            if (plugin.usesSharedSecondBody() && !plugin.usesSharedHunterControl()) {
                 Player activeHunter = plugin.getGameManager().getActiveHunter();
                 sender.sendMessage("§eActive Second Body: §f" + (activeHunter != null ? activeHunter.getName() : "None"));
                 sender.sendMessage(
@@ -680,13 +717,19 @@ public class SwapCommand implements CommandExecutor, TabCompleter {
         
         if (args.length == 1) {
             // Subcommands (canonical names only)
-            List<String> subCommands = Arrays.asList("start", "stop", "pause", "resume", "status", "creator", "setrunners", "sethunters", "reload", "gui", "mode", "clearteams", "tasks", "complete", "interval", "randomize", "help");
+            List<String> subCommands = Arrays.asList("start", "stop", "pause", "resume", "status", "creator", "setrunners", "sethunters", "reload", "gui", "mode", "clearteams", "tasks", "complete", "interval", "randomize", "help", "huntergroups");
             for (String subCommand : subCommands) {
                 if (subCommand.startsWith(args[0].toLowerCase())) {
                     completions.add(subCommand);
                 }
             }
         } else if (args.length > 1) {
+            if (args[0].equalsIgnoreCase("huntergroups")) {
+                List<String> choices = args.length == 2 ? List.of("list", "set", "remove", "interval", "gui")
+                    : args.length == 3 ? new ArrayList<>(plugin.getGameManager().getHunterGroups().definitions().keySet())
+                    : plugin.getGameManager().getHunters().stream().map(Player::getName).toList();
+                return choices.stream().filter(s -> s.toLowerCase().startsWith(args[args.length - 1].toLowerCase())).toList();
+            }
             // Player names for setrunners and sethunters
             if (args[0].equalsIgnoreCase("setrunners") || args[0].equalsIgnoreCase("sethunters")) {
                 for (Player player : Bukkit.getOnlinePlayers()) {

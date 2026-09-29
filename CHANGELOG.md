@@ -1,5 +1,13 @@
 # Changelog
 
+## 4.3.6
+- Added independent Dream-mode hunter groups: a permanent runner can face multiple simultaneous hunter bodies, each rotating only its own members and state.
+- Added persistent group configuration, group-management GUI, `/swap huntergroups` commands, per-group intervals, queue displays, and tracking for every active hunter body.
+- Added assignment/start validation, countdown/setup locking, disconnect recovery, respawn-safe handoffs, cancelled-teleport protection, independent pause/resume timers, and synchronous stop/disable cleanup.
+- Fixed the single-runner swap loop, waiting-hunter cage enforcement, inventory snapshot aliasing, and open-container handoff duplication risks. Transfers now include held slot, velocity, freeze ticks, and respawn point.
+- Preserve initial participant snapshots through swaps/disconnects and defer dead-player restoration until respawn.
+- Target Paper 1.21.11 / Java 21; version 26 is not targeted. CI now runs the automated code-level regression suite rather than skipping tests. No Minecraft client testing was performed for this release.
+
 ## 4.3.5
 - Added config controls for showing or hiding vanilla death messages during active plugin games.
 - Added config controls for showing or hiding vanilla advancement messages during active plugin games.
